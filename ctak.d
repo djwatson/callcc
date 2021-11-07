@@ -15,9 +15,29 @@ __gshared frame* head = null;
 __gshared frame* tail = null;
 __gshared frame* prev_head = null;
 
-__gshared int delegate(frame* k) getsk = null;
+__gshared frame* frame_cache = null;
 
-int callcc(int delegate(frame* k) fp) {
+__gshared int g_x, g_y, g_z;
+
+frame* get_frame() {
+  if (frame_cache) {
+    frame* f = frame_cache;
+    frame_cache = f.next;
+    f.next = null;
+    return f;
+  }
+
+  return new frame;
+}
+
+void push_frame(frame* f) {
+  f.next = frame_cache;
+  frame_cache = f;
+}
+
+__gshared int function(frame* k) getsk = null;
+
+int callcc(int function(frame* k) fp) {
   assert(!getsk);
   getsk = fp;
   prev_head = head;
@@ -25,16 +45,6 @@ int callcc(int delegate(frame* k) fp) {
   return -1;
 }
 
-
-/* int takaux(int x, int y, int z) { */
-/*   if (!(y < x)) { */
-/*     return z; */
-/*   } else { */
-/*     return tak(tak(x - 1, y, z), */
-/* 	       tak(y - 1, z, x), */
-/* 	       tak(z - 1, x, y)); */
-/*   } */
-/* } */
 
 int invoke(frame* k, int res) {
   assert(res >= 0);
@@ -68,9 +78,13 @@ int ctakaux(frame* k, frame* cont, int x, int y, int z) {
     }
   }
   
-  res = callcc((frame* new_cont) {return ctak(null, new_cont, x - 1, y, z); });
+  g_x = x;
+  g_y = y;
+  g_z = z;
+  res = callcc((frame* new_cont) {
+      return ctak(null, new_cont, g_x - 1, g_y, g_z); });
   if (res == -1) {
-    frame* f = new frame;
+    frame* f = get_frame();
     f.x = x;
     f.y = y;
     f.z = z;
@@ -91,9 +105,13 @@ int ctakaux(frame* k, frame* cont, int x, int y, int z) {
  loc0:
   newx = res;
 
-  res = callcc((frame* new_cont) {return ctak(null, new_cont, y - 1, z, x);});
+  g_x = x;
+  g_y = y;
+  g_z = z;
+  res = callcc((frame* new_cont) {
+      return ctak(null, new_cont, g_y - 1, g_z, g_x);});
   if (res == -1) {
-    frame* f = new frame;
+    frame* f = get_frame();
     f.x = x;
     f.y = y;
     f.z = z;
@@ -115,9 +133,13 @@ int ctakaux(frame* k, frame* cont, int x, int y, int z) {
  loc1:
   newy = res;
   
-  res = callcc((frame* new_cont) {return ctak(null, new_cont, z - 1, x, y);});
+  g_x = x;
+  g_y = y;
+  g_z = z;
+  res = callcc((frame* new_cont) {
+      return ctak(null, new_cont, g_z - 1, g_x, g_y);});
   if (res == -1) {
-    frame* f = new frame;
+    frame* f = get_frame();
     f.x = x;
     f.y = y;
     f.z = z;
@@ -146,12 +168,14 @@ int ctakaux(frame* k, frame* cont, int x, int y, int z) {
 
 int ctak(frame* k, frame* cont, int x, int y, int z) {
   if (!(y < x)) {
-    //return invoke(cont, z);
-    return z;
+    return invoke(cont, z);
   }
 
+  g_x = x;
+  g_y = y;
+  g_z = z;
   return callcc((frame* new_cont) {
-      return ctakaux(null, new_cont, x, y, z);
+      return ctakaux(null, new_cont, g_x, g_y, g_z);
     });
     
 }
@@ -161,10 +185,14 @@ int ctakstart(frame* k, frame* cont, int x, int y, int z) {
   if (k) {
     return k.res;
   }
-  
-  int res = callcc((frame* new_cont) {return ctak(null, new_cont, x, y, z);});
+
+  g_x = x;
+  g_y = y;
+  g_z = z;
+  int res = callcc((frame* new_cont) {
+      return ctak(null, new_cont, g_x, g_y, g_z);});
   if (res == -1) {
-    frame* f = new frame;
+    frame* f = get_frame();
     f.x = x;
     f.y = y;
     f.z = z;
@@ -195,6 +223,7 @@ void runloop() {
     } else {
       frame* cur = head;
       head = head.next;
+      push_frame(cur);
       res = cur.fp(cur, cur.cont, cur.x, cur.y, cur.z);
     }
     if (res == -1) { // Get the continuation. Bottom out.
