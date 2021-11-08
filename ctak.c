@@ -2,6 +2,8 @@
 #include <assert.h>
 #include <stdlib.h>
 
+// TODO: Use a callcc start or a sentinel to get rid of if (tail)
+
 typedef struct frame_s {
   int (*fp)(struct frame_s*, struct frame_s*, int, int, int);
   int state[5];
@@ -39,9 +41,10 @@ static void push_frame(frame* f) {
   frame_cache = f;
 }
 
-static int (*getsk)(frame* k) = NULL;
 
-static int callcc(int (*fp)(frame* k)) {
+static int (*getsk)(struct frame_s*, struct frame_s*, int, int, int) = NULL;
+
+static int callcc(  int (*fp)(struct frame_s*, struct frame_s*, int, int, int)) {
   assert(!getsk);
   getsk = fp;
   prev_head = head;
@@ -61,13 +64,13 @@ static int invoke(frame* k, int res) {
 }
 
 static int ctak(frame* k, frame* cont, int x, int y, int z);
-static int v1(frame* new_cont) {
+static int v1(frame* new_cont, frame* a, int b , int c, int d) {
   return ctak(NULL, new_cont, g_x - 1, g_y, g_z);
 }
-static int v2(frame* new_cont) {
+static int v2(frame* new_cont, frame* a, int b , int c, int d) {
   return ctak(NULL, new_cont, g_y - 1, g_z, g_x);
 }
-static int v3(frame* new_cont) {
+static int v3(frame* new_cont, frame* a, int b , int c, int d) {
   return ctak(NULL, new_cont, g_z - 1, g_x, g_y);
 }
 
@@ -178,8 +181,8 @@ static int ctakaux(frame* k, frame* cont, int x, int y, int z) {
   
 }
 
-static int v4(frame* new_cont) {
-  return ctakaux(NULL, new_cont, g_x, g_y, g_z);
+static int v4(frame* new_cont, frame* a, int b , int c, int d) {
+  return  ctakaux(NULL, new_cont, g_x, g_y, g_z) ;
 }
 
 static int ctak(frame* k, frame* cont, int x, int y, int z) {
@@ -193,7 +196,7 @@ static int ctak(frame* k, frame* cont, int x, int y, int z) {
   return callcc(&v4);
 }
 
-static int v5(frame* new_cont) {
+static int v5(frame* new_cont, frame* a, int b , int c, int d) {
       return ctak(NULL, new_cont, g_x, g_y, g_z);
 }
 
@@ -233,9 +236,9 @@ static void runloop() {
   while(head || getsk) {
     int res;
     if (getsk) {
-      int  (*gk)(frame*k) = getsk;
+      int (*gk)(struct frame_s*, struct frame_s*, int, int, int) = getsk;
       getsk = NULL;
-      res = gk(head);
+      res = gk(head, NULL, 0, 0, 0);
     } else {
       frame* cur = head;
       head = head->next;
@@ -244,13 +247,11 @@ static void runloop() {
     }
     if (res == -1) { // Get the continuation. Bottom out.
       assert(getsk);
-      if (prev_head) {
 	if (tail) {
 	  tail->next = prev_head;
 	} else {
 	  head = prev_head;
 	}
-      }
       assert(head);
       prev_head = NULL;
       tail = NULL;
@@ -268,13 +269,13 @@ static void runloop() {
   }
 }
 
-static int t1(frame* k) {
+static int t1(frame* new_cont, frame* a, int b , int c, int d) {
   return ctakstart(NULL, NULL, 9, 6, 3);
 }
-static int t2(frame* k) {
+static int t2(frame* new_cont, frame* a, int b , int c, int d) {
   return ctakstart(NULL, NULL, 18, 12, 6);
 }
-static int t3(frame* k) {
+static int t3(frame* new_cont, frame* a, int b , int c, int d) {
   return ctakstart(NULL, NULL, 29, 21, 9);
 }
 
