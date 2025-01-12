@@ -3,6 +3,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <gc.h>
+
 static int64_t succ(int64_t n) { return n + 1; }
 static int64_t pred(int64_t n) { return n - 1; }
 
@@ -25,7 +27,6 @@ static int64_t thunk(void* unused, int64_t n) { return n; }
 typedef struct ccsave {
   int64_t (*ptr)(void* data, int64_t val);
   void* clo_data;
-  int64_t res;
 
   void* stack;
   size_t sz;
@@ -35,47 +36,38 @@ void* stacktop;
 
 static int64_t ccresthunk(void* unused, int64_t n) {
   ccsave* c = (ccsave*)unused;
-  c->res = n;
 
   register int64_t stack_bottom asm("rdi") = (int64_t)stacktop - c->sz;
   register void* saved_stack asm ("rsi") = c->stack;
   register size_t saved_sz asm ("rcx") = c->sz;
+  register size_t res asm ("rax") = n;
 
    asm volatile (
           	 "mov %2, %%rsp\n\t" // Restore the old stack pointer.
 		 "rep movsb\n\t" // Copy the old stack over (copy rsi -> rdi, rcx times)
 		 "pop %%rbp\n\t" // Pop the old frame pointer.
-		 "mov $1, %%rax\n\t" // Set return value to 1, indicating this is the second return.
 		 "ret\n\t" // Return to caller of 'getstack'.
 		: // output
-		: "r" (saved_stack), "r" (saved_sz), "r" (stack_bottom)//input
-		: "rax", "rsp", "rbp", "memory"// clobbers
+		 : "r" (saved_stack), "r" (saved_sz), "r" (stack_bottom), "r" (res)//input
+		: "rsp", "rbp", "memory"// clobbers
 		);
    __builtin_unreachable();
+   return n;
 }
 
-// *MUST* have a frame pointer...
-__attribute__((returns_twice, noinline)) static int getstack(ccsave *res) [[clang::preserve_none]]  {
+__attribute__((returns_twice, noinline, preserve_none)) int64_t callcc(ccthunk t, int64_t x) {
+  ccsave* stack = GC_malloc(sizeof(ccsave));
+
   void* stack_bottom = __builtin_frame_address(0);
   size_t stack_sz = stacktop - stack_bottom;
-  printf("Stack size %li\n", stack_sz);
-  res->stack = malloc(stack_sz);
-  memcpy(res->stack, stack_bottom, stack_sz);
-  res->sz = stack_sz;
-  return res->res;
-}
+  //printf("Stack size %li\n", stack_sz);
+  stack->stack = GC_malloc(stack_sz);
+  memcpy(stack->stack, stack_bottom, stack_sz);
+  stack->sz = stack_sz;
 
-static int64_t callcc(ccthunk t, int64_t x) {
-  ccsave* stack = malloc(sizeof(ccsave));
   stack->ptr = ccresthunk;
   stack->clo_data = stack;
-  stack->res = 0;
-  int res = getstack(stack);
-  if (res) { // This was the second return.
-    free(stack->stack);
-    free(stack);
-    return stack->res;
-  }
+
   return t((clo*)stack, x);
 }
 
@@ -107,6 +99,7 @@ static int64_t fibc(int64_t x, clo* c) {
 
 int main() {
   int foobar;
+  GC_expand_hp(1000000000);
   stacktop = &foobar;
   // iter count 10
   for(int64_t i = 0; i < 10; i++) {
