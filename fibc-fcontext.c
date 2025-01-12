@@ -45,21 +45,23 @@ static int64_t ccresthunk(void* unused, int64_t n) {
   int64_t stack_bottom = (int64_t)stacktop - c->sz;
   void* saved_stack = c->stack;
   size_t saved_sz = c->sz;
+  uint64_t tmpstackalign = ((uint64_t)tmpstack + 100) & ~15;
 
 #if defined(__x86_64__)
    asm volatile (
 		 "mov %4, %%r12\n\t" // Save the return value in a callee-saved reg.
+		 "mov %1, %%r13\n\t" // save old sp
           	 "mov %0, %%rsp\n\t" // Switch to tmpstack.
 		 "mov %1, %%rdi\n\t" // Set up memcpy call args
 		 "mov %2, %%rsi\n\t"
 		 "mov %3, %%rdx\n\t"
 		 "call memcpy\n\t"   // call memcpy
-		 "mov %1, %%rsp\n\t" // Restore the old stack pointer.
+		 "mov %%r13, %%rsp\n\t" // Restore the old stack pointer.
 		 "pop %%rbp\n\t"     // Pop the old frame pointer.
 		 "mov %%r12, %%rax\n\t" // Move return value from callee-saved to rax.
 		 "ret\n\t" // Return to caller of 'callcc'.
 		: // output
-		 :"r"(tmpstack), "r"(stack_bottom), "r"(saved_stack), "r"(saved_sz), "r"(n)
+		 :"r"(tmpstackalign), "r"(stack_bottom), "r"(saved_stack), "r"(saved_sz), "r"(n)
 		 : "rsp", "rbp", "memory", "rax", "r12", "r13", "rdi", "rsi", "rdx"// clobbers
 		);
 #elif defined(__aarch64__)
@@ -119,34 +121,39 @@ __attribute__((returns_twice, noinline, preserve_none)) int64_t callcc(ccthunk t
   stack->clo_data = stack;
   stack->prev_link = cur_link;
 
+  int64_t unused_res;
+
   cur_link = stack;
 #if defined(__x86_64__)
-  asm volatile ("mov %0, %%rsp\n\t" // Reset stack pointer to stacktop
+  asm volatile ("mov %1, %%rsp\n\t" // Reset stack pointer to stacktop
 		"mov $0, %%rbp\n\t" // Clear out the frame pointer
-		"push %1\n\t" // Push return address of need_more_frames
-		"mov %2, %%rdi\n\t" // Set up call thunk
-		"mov %3, %%rsi\n\t" // and call argument
-		"jmp *%4\n\t" // Jump to thunk.
-		: // output
+		"push %2\n\t" // Push return address of need_more_frames
+		"mov %3, %%rdi\n\t" // Set up call thunk
+		"mov %4, %%rsi\n\t" // and call argument
+		"jmp *%5\n\t" // Jump to thunk.
+                : "+r"(unused_res) // output
 		: "r" (stacktop), "r"(need_more_frames), "r"(stack), "r"(x), "r"(t)// input
-		: "rdi", "rsi", "rsp", "rbp", "memory"// clobbers
+		: "rdi", "rsi", "memory"// clobbers
 		);
 
 #elif defined(__aarch64__)
-  asm volatile ("mov sp, %0\n\t" // Reset stack pointer to stacktop
+  asm volatile ("mov sp, %1\n\t" // Reset stack pointer to stacktop
 		"mov x29, 0\n\t" // Clear out the frame pointer
-		"mov x30, %1\n\t" // Set return address of need_more_frames
-		"mov x0, %2\n\t" // Set up call thunk
-		"mov x1, %3\n\t" // and call argument
-		"br %4\n\t" // Jump to thunk.
-		: // output
+		"mov x30, %2\n\t" // Set return address of need_more_frames
+		"mov x0, %3\n\t" // Set up call thunk
+		"mov x1, %4\n\t" // and call argument
+		"br %5\n\t" // Jump to thunk.
+		: "=r"(unused_res) // output
 		: "r" (stacktop), "r"(need_more_frames), "r"(stack), "r"(x), "r"(t)// input
 		: "x0", "x1", "memory"// clobbers
 		);
 #endif
   // This is unreachable, but if you use __builtin_unreachable(), callers
   // will not have valid return points ... so fake a call.
-  return t((clo*)stack, x);
+
+  // Also, the result *must* be unknowable at compile-time: clang is smart enough
+  // to inline this result, not knowing there is no result.
+  return unused_res;
 }
 
 static int64_t addc(int64_t x, int64_t y, clo* k) {
@@ -179,12 +186,24 @@ static int64_t fibc(int64_t x, clo* c) {
   return addc(arg1, arg2, c);
 }
 
+clo* foo;
+
+int64_t cont(clo* c, int64_t x) {
+  foo = c;
+  return x;
+}
+
+__attribute__((returns_twice)) int64_t bar(int64_t x) {
+  return callcc(cont, x+1);
+}
+
 int main() {
   uint64_t foobar;
   //GC_expand_hp(50000000);
-  stacktop = (void*)((uint64_t)(&foobar) & -15);
+  stacktop = (void*)((uint64_t)(&foobar) & ~15);
   size_t memsize = 1000000000;
   mem = malloc(memsize);
+  memuse = (uint64_t)mem + memsize;
   // iter count 10
   for(int64_t i = 0; i < 10; i++) {
     memuse = (uint64_t)mem + memsize;
@@ -192,5 +211,11 @@ int main() {
     int64_t res = fibc(30, &c);
     printf("Res %li\n", res);
   }
+
+  // Test 2: test that callcc *up* the stack works.
+  int64_t res = bar(10);
+  printf("Bar res is %li\n", res);
+  if (res < 20)
+    call_clo(foo, res+1);
   return 0;
 }
