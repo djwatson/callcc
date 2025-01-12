@@ -34,10 +34,10 @@ typedef struct ccsave {
   struct ccsave*prev_link;
 } ccsave;
 
-void* stacktop;
+static void* stacktop;
 
-ccsave *cur_link = NULL;
-uint8_t tmpstack[100];
+static ccsave *cur_link = NULL;
+static uint8_t tmpstack[100];
 static int64_t ccresthunk(void* unused, int64_t n) {
   ccsave* c = (ccsave*)unused;
   cur_link = c->prev_link;
@@ -46,7 +46,7 @@ static int64_t ccresthunk(void* unused, int64_t n) {
   void* saved_stack = c->stack;
   size_t saved_sz = c->sz;
 
-  // TODO: If we used a tmp stack, we could use memcpy, which is probably faster.
+#if defined(__x86_64__)
    asm volatile (
 		 "mov %4, %%r12\n\t" // Save the return value in a callee-saved reg.
           	 "mov %0, %%rsp\n\t" // Switch to tmpstack.
@@ -60,8 +60,26 @@ static int64_t ccresthunk(void* unused, int64_t n) {
 		 "ret\n\t" // Return to caller of 'callcc'.
 		: // output
 		 :"r"(tmpstack), "r"(stack_bottom), "r"(saved_stack), "r"(saved_sz), "r"(n)
-		 : "rsp", "rbp", "memory", "rax"// clobbers
+		 : "rsp", "rbp", "memory", "rax", "r12", "r13", "rdi", "rsi", "rdx"// clobbers
 		);
+#elif defined(__aarch64__)
+   asm volatile (
+		 "mov x19, %4\n\t" // Save the return value in a callee-saved reg.
+		 "mov x20, %1\n\t" // Save the old sp
+          	 "mov SP, %0\n\t" // Switch to tmpstack.
+		 "mov x0, %1\n\t" // Set up memcpy call args
+		 "mov x1, %2\n\t"
+		 "mov x2, %3\n\t"
+		 "bl memcpy\n\t"   // call memcpy
+		 "mov x0, x19\n\t" // Restore the old stack pointer.
+		 "mov sp, x20\n\t" // Move return value from callee-saved to rax.
+		 "ldp x29, x30, [sp], #16\n\t" // leave
+		 "ret\n\t" // Return to caller of 'callcc'.
+		 : // output
+		 :"r"(tmpstack), "r"(stack_bottom), "r"(saved_stack), "r"(saved_sz), "r"(n)
+		 : "memory", "x19", "x20", "x0", "x1", "x2"
+		);
+#endif
    __builtin_unreachable();
    return n;
 }
@@ -69,14 +87,21 @@ static int64_t ccresthunk(void* unused, int64_t n) {
 void need_more_frames() {
   int64_t res;
   // This is called as a return point.  In x86_64, the return is in rax.
-  asm volatile("mov %%rax, %0\n\t": "=r"(res));
-  assert(cur_link);
+#if defined(__x86_64__)
+  asm volatile("mov %%rax, %0\n\t": "=r"(res) : : "rax");
+#elif defined(__aarch64__)
+  asm volatile("mov %0, x0\n\t": "=r"(res) : : "x0");
+#endif
+  //assert(cur_link);
   ccresthunk(cur_link, res);
+
 }
 
 uint64_t memuse = 0;
+void* mem;
 void* my_malloc(size_t sz) {
   memuse -= sz;
+  assert(memuse >= (uint64_t)mem);
   return (void*)memuse;
 }
 
@@ -95,6 +120,7 @@ __attribute__((returns_twice, noinline, preserve_none)) int64_t callcc(ccthunk t
   stack->prev_link = cur_link;
 
   cur_link = stack;
+#if defined(__x86_64__)
   asm volatile ("mov %0, %%rsp\n\t" // Reset stack pointer to stacktop
 		"mov $0, %%rbp\n\t" // Clear out the frame pointer
 		"push %1\n\t" // Push return address of need_more_frames
@@ -106,6 +132,20 @@ __attribute__((returns_twice, noinline, preserve_none)) int64_t callcc(ccthunk t
 		: "rdi", "rsi", "rsp", "rbp", "memory"// clobbers
 		);
 
+#elif defined(__aarch64__)
+  asm volatile ("mov sp, %0\n\t" // Reset stack pointer to stacktop
+		"mov x29, 0\n\t" // Clear out the frame pointer
+		"mov x30, %1\n\t" // Set return address of need_more_frames
+		"mov x0, %2\n\t" // Set up call thunk
+		"mov x1, %3\n\t" // and call argument
+		"br %4\n\t" // Jump to thunk.
+		: // output
+		: "r" (stacktop), "r"(need_more_frames), "r"(stack), "r"(x), "r"(t)// input
+		: "x0", "x1", "memory"// clobbers
+		);
+#endif
+  // This is unreachable, but if you use __builtin_unreachable(), callers
+  // will not have valid return points ... so fake a call.
   return t((clo*)stack, x);
 }
 
@@ -114,7 +154,7 @@ static int64_t addc(int64_t x, int64_t y, clo* k) {
     //return x;
     return call_clo(k, x);
   }
-  return addc(succ(x), pred(y), k);
+  [[clang::musttail]] return addc(succ(x), pred(y), k);
 }
 
 static int64_t fibc(int64_t x, clo* c);
@@ -125,6 +165,7 @@ static int64_t cc1(clo* c, int64_t x) {
 static int64_t cc2(clo *c, int64_t x) { return fibc(pred(pred(x)), c); }
 
 static int64_t fibc(int64_t x, clo* c) {
+
   if (x == 0) {
     //return 0;
     return call_clo(c, 0);
@@ -142,8 +183,8 @@ int main() {
   uint64_t foobar;
   //GC_expand_hp(50000000);
   stacktop = (void*)((uint64_t)(&foobar) & -15);
-  size_t memsize = 400000000;
-  void* mem = malloc(memsize);
+  size_t memsize = 1000000000;
+  mem = malloc(memsize);
   // iter count 10
   for(int64_t i = 0; i < 10; i++) {
     memuse = (uint64_t)mem + memsize;
