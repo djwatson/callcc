@@ -36,24 +36,31 @@ typedef struct ccsave {
 
 void* stacktop;
 
-ccsave* cur_link = NULL;
+ccsave *cur_link = NULL;
+uint8_t tmpstack[100];
 static int64_t ccresthunk(void* unused, int64_t n) {
   ccsave* c = (ccsave*)unused;
   cur_link = c->prev_link;
 
-  register int64_t stack_bottom asm("rdi") = (int64_t)stacktop - c->sz;
-  register void* saved_stack asm ("rsi") = c->stack;
-  register size_t saved_sz asm ("rcx") = c->sz;
-  register size_t res asm ("rax") = n;
+  int64_t stack_bottom = (int64_t)stacktop - c->sz;
+  void* saved_stack = c->stack;
+  size_t saved_sz = c->sz;
 
+  // TODO: If we used a tmp stack, we could use memcpy, which is probably faster.
    asm volatile (
-          	 "mov %2, %%rsp\n\t" // Restore the old stack pointer.
-		 "rep movsb\n\t" // Copy the old stack over (copy rsi -> rdi, rcx times)
-		 "pop %%rbp\n\t" // Pop the old frame pointer.
-		 "ret\n\t" // Return to caller of 'callcc'.  Res already in rax.
+		 "mov %4, %%r12\n\t" // Save the return value in a callee-saved reg.
+          	 "mov %0, %%rsp\n\t" // Switch to tmpstack.
+		 "mov %1, %%rdi\n\t" // Set up memcpy call args
+		 "mov %2, %%rsi\n\t"
+		 "mov %3, %%rdx\n\t"
+		 "call memcpy\n\t"   // call memcpy
+		 "mov %1, %%rsp\n\t" // Restore the old stack pointer.
+		 "pop %%rbp\n\t"     // Pop the old frame pointer.
+		 "mov %%r12, %%rax\n\t" // Move return value from callee-saved to rax.
+		 "ret\n\t" // Return to caller of 'callcc'.
 		: // output
-		 : "r" (saved_stack), "r" (saved_sz), "r" (stack_bottom), "r" (res)//input
-		: "rsp", "rbp", "memory"// clobbers
+		 :"r"(tmpstack), "r"(stack_bottom), "r"(saved_stack), "r"(saved_sz), "r"(n)
+		 : "rsp", "rbp", "memory", "rax"// clobbers
 		);
    __builtin_unreachable();
    return n;
@@ -66,7 +73,6 @@ void need_more_frames() {
   assert(cur_link);
   ccresthunk(cur_link, res);
 }
-// TODO 1) need framelink 2) need frame pointer
 
 uint64_t memuse = 0;
 void* my_malloc(size_t sz) {
@@ -90,7 +96,7 @@ __attribute__((returns_twice, noinline, preserve_none)) int64_t callcc(ccthunk t
 
   cur_link = stack;
   asm volatile ("mov %0, %%rsp\n\t" // Reset stack pointer to stacktop
-		"mov $0, %%rbp\n\t" // Clear out the frame pointer (TODO also reset it in need_more_frames)
+		"mov $0, %%rbp\n\t" // Clear out the frame pointer
 		"push %1\n\t" // Push return address of need_more_frames
 		"mov %2, %%rdi\n\t" // Set up call thunk
 		"mov %3, %%rsi\n\t" // and call argument
