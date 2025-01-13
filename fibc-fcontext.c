@@ -340,7 +340,8 @@ int main() {
     printf("Res %li\n", res);
     res = call_clo((clo*)gen, 0);
   }
-  
+
+  free(mem);
   
   return 0;
 }
