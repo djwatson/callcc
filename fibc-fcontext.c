@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <valgrind/valgrind.h>
 
 #include <assert.h>
 #include <gc.h>
@@ -88,6 +89,9 @@ void need_more_frames() {
   // This is called as a return point.  In x86_64, the return is in rax.
 #if defined(__x86_64__)
   asm volatile("mov %%rax, %0\n\t" : "=r"(res) : : "rax");
+  // In aarch return and arg1 are equal, so this could be
+  // need_more_frames(int64_t res),
+  // but let's do it like this for consistency.
 #elif defined(__aarch64__)
   asm volatile("mov %0, x0\n\t" : "=r"(res) : : "x0");
 #endif
@@ -109,7 +113,6 @@ callcc(ccthunk t, int64_t x) {
 
   void *stack_bottom = __builtin_frame_address(0);
   size_t stack_sz = stacktop - stack_bottom;
-  // printf("Stack size %li\n", stack_sz);
   stack->stack = my_malloc(stack_sz);
   memcpy(stack->stack, stack_bottom, stack_sz);
   stack->sz = stack_sz;
@@ -128,7 +131,7 @@ callcc(ccthunk t, int64_t x) {
                "mov %3, %%rdi\n\t" // Set up call thunk
                "mov %4, %%rsi\n\t" // and call argument
                "jmp *%5\n\t"       // Jump to thunk.
-               : "+r"(unused_res)  // output
+               : "=r"(unused_res)  // output
                : "r"(stacktop), "r"(need_more_frames), "r"(stack), "r"(x),
                  "r"(t)                 // input
                : "rdi", "rsi", "memory" // clobbers
@@ -194,6 +197,113 @@ __attribute__((returns_twice)) int64_t bar(int64_t x) {
   return callcc(cont, x + 1);
 }
 
+
+
+//////// Leaf test from r4rstest
+
+enum : int64_t {
+  FALSE_REP = 4,
+    NIL = 4 + 8,
+    EOT = 4 + 9,
+};
+
+typedef struct cons_s {
+  int64_t a;
+  int64_t b;
+}cons_s;
+
+int64_t cons(int64_t a, int64_t b) {
+  cons_s* res = my_malloc(sizeof(cons_s));
+  res->a = a;
+  res->b = b;
+  return (int64_t)res + 1;
+}
+
+enum : uint8_t {
+  RET_IDX,
+  CONT_IDX,
+  OBJ_IDX,
+  EOT_IDX,
+};
+
+int pairp(int64_t obj) {
+  return obj&1;
+}
+
+cons_s* to_cons(int64_t obj) {
+  assert(pairp(obj));
+  return (cons_s*)(obj-1);
+}
+
+int64_t thunk2(clo* cc, int64_t data) {
+  int64_t* clo_data2 = (int64_t*)data;
+  int64_t* clo_data = (int64_t*)clo_data2[0];
+  int64_t obj = clo_data2[1];
+  clo_data[CONT_IDX] = (int64_t)cc;
+  return call_clo((clo*)clo_data[RET_IDX], obj);
+}
+
+int64_t recur_f(void *data, int64_t obj) {
+  int64_t* clo_data = ((clo*)data)->clo_data;
+  if (pairp(obj)) {
+    while(pairp(obj)) {
+      cons_s* c = to_cons(obj);
+      obj=c->b;
+      recur_f(data, c->a);
+    }
+  } else {
+    int64_t* data2 = my_malloc(sizeof(int64_t)*2);
+    data2[0] = (int64_t)clo_data;
+    data2[1] = obj;
+    callcc(thunk2, (int64_t)data2);
+  }
+  return 0;
+}
+
+int64_t return_f(void* data, int64_t obj) {
+  int64_t* clo_data = ((clo*)data)->clo_data;
+  return call_clo((clo*)clo_data[RET_IDX], clo_data[EOT_IDX]);
+}
+
+int64_t cont_f(void* data, int64_t x) {
+  int64_t* clo_data = ((clo*)data)->clo_data;
+  recur_f(data, clo_data[OBJ_IDX]);
+  clo* new_cont = my_malloc(sizeof(clo));
+  new_cont->ptr = return_f;
+  new_cont->clo_data = clo_data;
+  clo_data[CONT_IDX] = (int64_t)new_cont;
+  return call_clo(new_cont, FALSE_REP);
+}
+
+int64_t thunk1(clo* cc, int64_t data) {
+  int64_t* clo_data = (int64_t*)data;
+  clo_data[RET_IDX] = (int64_t)cc;
+  return call_clo((clo*)clo_data[CONT_IDX], FALSE_REP);
+}
+
+int64_t do_callcc(void* data, int64_t unused) {
+  int64_t*clo_data = ((clo*)data)->clo_data;
+  return callcc(thunk1, (int64_t)clo_data);
+}
+
+int64_t next_leaf_generator(int64_t obj, int64_t eot) {
+  int64_t* clo_data = my_malloc(sizeof(int64_t)*4);
+  clo_data[RET_IDX] = FALSE_REP;
+  clo_data[EOT_IDX] = eot;
+  clo_data[OBJ_IDX] = obj;
+  clo* cont = my_malloc(sizeof(clo));
+  clo_data[CONT_IDX] = (int64_t)cont;
+  cont->clo_data = clo_data;
+  cont->ptr = cont_f;
+
+  clo* retval = my_malloc(sizeof(clo));
+  retval->ptr = do_callcc;
+  retval->clo_data = clo_data;
+  return (int64_t)retval;
+}
+
+////////////////////////
+
 int main() {
   uint64_t foobar;
   // GC_expand_hp(50000000);
@@ -201,6 +311,10 @@ int main() {
   size_t memsize = 1000000000;
   mem = malloc(memsize);
   memuse = (uint64_t)mem + memsize;
+
+  VALGRIND_STACK_REGISTER(&tmpstack[100], &tmpstack[0]);
+
+  /*
   // iter count 10
   for (int64_t i = 0; i < 10; i++) {
     memuse = (uint64_t)mem + memsize;
@@ -214,5 +328,19 @@ int main() {
   printf("Bar res is %li\n", res);
   if (res < 20)
     call_clo(foo, res + 1);
+  */
+
+  int64_t testa = cons(8, cons(16, cons(24, NIL)));
+  int64_t testb = cons(cons(8, NIL), cons(16, cons(24, NIL)));
+  int64_t testc = cons(cons(8, NIL), cons(16, cons(24, cons(32, NIL))));
+
+  int64_t gen = next_leaf_generator(testc, EOT);
+  int64_t res = call_clo((clo*)gen, 0);
+  while(res != EOT) {
+    printf("Res %li\n", res);
+    res = call_clo((clo*)gen, 0);
+  }
+  
+  
   return 0;
 }
