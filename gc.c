@@ -178,13 +178,18 @@ __attribute__((noinline, preserve_none)) static  void rcimmix_collect(){
     freelist[i].start_ptr = default_slab_size;
     freelist[i].end_ptr = default_slab_size;
   }
+
+  auto new_next_collect = (kv_size(all_slabs) - free_blocks) * default_slab_size * 2;
+  if (new_next_collect > next_collect) {
+    next_collect = new_next_collect;
+  }
   
   clock_gettime(CLOCK_MONOTONIC, &end);
   double time_taken =
       ((double)end.tv_sec - (double)start.tv_sec) * 1000.0; // sec to ms
   time_taken +=
       ((double)end.tv_nsec - (double)start.tv_nsec) / 1000000.0; // ns to ms
-  printf("COLLECT %.3f ms, there are %li slabs\n", time_taken, kv_size(all_slabs));
+  printf("COLLECT %.3f ms, there are %li slabs next %li\n", time_taken, kv_size(all_slabs), next_collect);
 
 }
 
@@ -226,6 +231,7 @@ NOINLINE static void* rcimmix_alloc_slow(uint64_t sz) {
       // TODO hack hack hack
       collect_cnt += sz;
       auto f = kv_pop(large_free);
+      assert(f->class >= sz_class);
       return f->start;
     } else {
       sz = align(sz, PAGE_SIZE);
