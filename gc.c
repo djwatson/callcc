@@ -1,0 +1,228 @@
+#define _POSIX_C_SOURCE 200112L
+
+#include <stdint.h>
+#include <stdlib.h>
+#include <assert.h>
+#include <stdio.h>
+#include <string.h>
+#include <time.h>
+
+#include "kvec.h"
+#include "gc.h"
+#include "list.h"
+#include "alloc_table.h"
+
+#define likely(x) __builtin_expect(x, 1)
+#define unlikely(x) __builtin_expect(x, 0)
+#define NOINLINE __attribute__((noinline))
+#define INLINE __attribute__((always_inline))
+
+static constexpr uint64_t size_classes = 4096 / 8;
+static constexpr uint64_t default_slab_size = 16384;
+static uint64_t next_collect = 50000000;
+static uint64_t collect_cnt = 0;
+static uint64_t PAGE_SIZE = 1UL << 12;
+static alloc_table atable;
+
+static uint64_t *stacktop;
+typedef struct freelist_s {
+  uint64_t start_ptr;
+  uint64_t end_ptr;
+} freelist_s;
+
+typedef struct slab_info {
+  uint32_t class;
+  bool marked;
+  uint64_t markbits[(default_slab_size / 8)/64];
+  uint8_t* end;
+  uint8_t* start;
+  list_head link;
+} slab_info;
+
+static void bts(uint64_t* bits, uint64_t bit) {
+  auto word = bit / 64;
+  auto b = bit % 64;
+  bits[word] |= 1UL << b;
+}
+static void btr(uint64_t* bits, uint64_t bit) {
+  auto word = bit / 64;
+  auto b = bit % 64;
+  bits[word] &= ~(1UL << b);
+}
+static bool bt(uint64_t* bits, uint64_t bit) {
+  auto word = bit / 64;
+  auto b = bit % 64;
+  return bits[word] & (1UL << b);
+}
+
+static freelist_s freelist[size_classes];
+static slab_info* partials[size_classes];
+static slab_info *cur_slab[size_classes];
+static kvec_t(slab_info*) all_slabs;
+static LIST_HEAD(free_slabs);
+
+bool get_partial_range(uint64_t sz_class, freelist_s* fl) {
+  return false;
+}
+
+void gc_init() {
+  stacktop = (uint64_t*)__builtin_frame_address(0);
+  // Set defaults so we don't have to check for wrapping in
+  // the fastpath.
+  for(uint64_t i = 0; i < size_classes; i++) {
+    freelist[i].start_ptr = default_slab_size;
+    freelist[i].end_ptr = default_slab_size;
+  }
+  kv_init(all_slabs);
+}
+
+typedef struct range {
+  uint64_t* start;
+  uint64_t* end;
+} range;
+
+static kvec_t(range) markstack;
+static void mark() {
+  while(kv_size(markstack) > 0) {
+    range r = kv_pop(markstack);
+    //    printf("RANGE %p %p\n", r.start, r.end);
+    // Double check it is aligned.
+    assert(((int64_t)r.start & 0xf) == 0);
+    assert(((int64_t)r.end & 0xf) == 0);
+    while (r.start < r.end) {
+      uint8_t *val = (uint8_t *)*r.start;
+      slab_info *slab = alloc_table_lookup(&atable, val);
+      if (slab && (val >= slab->start) && (val < slab->end)) {
+        // Find the start of the object
+        uint64_t index =
+            ((uint64_t)val - (uint64_t)slab->start) / (slab->class * 8);
+        uint64_t base_ptr = (uint64_t)slab->start + (slab->class * 8 * index);
+        if (!bt(slab->markbits, index)) {
+          bts(slab->markbits, index);
+	  kv_push(markstack, ((range){(uint64_t*)base_ptr, (uint64_t*)(base_ptr + slab->class*8)}));
+        } else {
+          /* printf("ALREADY MARKED %p %i cls %i\n", val, */
+          /*        base_ptr == (uint64_t)val, slab->class); */
+        }
+        slab->marked = true;
+      } 
+      r.start++;
+    }
+  }
+}
+
+__attribute__((noinline, preserve_none)) static  void rcimmix_collect(){
+  struct timespec start;
+  struct timespec end;
+  clock_gettime(CLOCK_MONOTONIC, &start);
+
+  // Clear marks
+  for(uint64_t i = 0; i < kv_size(all_slabs); i++) {
+    slab_info* slab = kv_A(all_slabs, i);
+    memset(slab->markbits, 0, sizeof(slab->markbits));
+    slab->marked = false;
+  }
+
+  // Mark stack
+  uint64_t* sp = (uint64_t*)__builtin_frame_address(0);
+  kv_init(markstack);
+  kv_push(markstack, ((range){sp, stacktop}));
+  mark();
+
+  // Sweep empty blocks.
+  uint64_t free_blocks = 0;
+  for(uint64_t i = 0; i < kv_size(all_slabs); i++) {
+    auto slab = kv_A(all_slabs, i);
+    if (!list_empty(&slab->link)) {
+      // It's already an empty block.
+      free_blocks++;
+      continue;
+    }
+    if (!slab->marked) {
+      list_add(&slab->link, &free_slabs);
+      free_blocks++;
+    }
+  }
+  printf("Free blocks: %li all blocks: %li\n", free_blocks, kv_size(all_slabs));
+  
+  clock_gettime(CLOCK_MONOTONIC, &end);
+  double time_taken =
+      ((double)end.tv_sec - (double)start.tv_sec) * 1000.0; // sec to ms
+  time_taken +=
+      ((double)end.tv_nsec - (double)start.tv_nsec) / 1000000.0; // ns to ms
+  printf("COLLECT %.3f ms, there are %li slabs\n", time_taken, kv_size(all_slabs));
+
+}
+
+slab_info* alloc_slab(uint64_t sz_class) {
+  slab_info* free = list_first_entry_or_null(&free_slabs, slab_info, link);
+  if (free) {
+    free->class = sz_class;
+    list_del(&free->link);
+  } else {
+    free = calloc(1, sizeof(slab_info));
+    free->class = sz_class;
+    init_list_head(&free->link);
+
+    posix_memalign((void **)&free->start, PAGE_SIZE, default_slab_size);
+    free->end = free->start + default_slab_size;
+    kv_push(all_slabs, free);
+
+  }
+  alloc_table_set_range(&atable, free, free->start, free->end - free->start);
+  return free;
+}
+
+NOINLINE static void* rcimmix_alloc_slow(uint64_t sz) {
+  if (collect_cnt >= next_collect) {
+    collect_cnt = 0;
+    rcimmix_collect();
+    [[clang::musttail]] return rcimmix_alloc(sz);
+  }
+  assert((sz & 0x7) == 0);
+  
+  uint64_t sz_class = sz / 8;
+  // It has to be a large slab.
+  if (sz_class >= size_classes) {
+    abort();
+  }
+  // It's in a small slab.
+  assert(freelist[sz_class].start_ptr >= freelist[sz_class].end_ptr);
+  if (get_partial_range(sz_class, &freelist[sz_class])) {
+    abort();
+  } else {
+    auto slab = alloc_slab(sz_class);
+    freelist[sz_class].start_ptr = (uint64_t)slab->start;
+    freelist[sz_class].end_ptr = (uint64_t)slab->end;
+    collect_cnt += freelist[sz_class].end_ptr - freelist[sz_class].start_ptr;
+  }
+  [[clang::musttail]] return rcimmix_alloc(sz);
+}
+
+void* rcimmix_alloc(uint64_t sz) {
+  assert((sz & 0x7) == 0);
+  uint64_t sz_class = sz / 8;
+  if (unlikely(sz_class >= size_classes)) {
+    [[clang::musttail]] return rcimmix_alloc_slow(sz);
+  }
+  auto fl = &freelist[sz_class];
+
+  auto end = fl->end_ptr - sz;
+  if (unlikely(fl->start_ptr > end)) {
+    [[clang::musttail]] return rcimmix_alloc_slow(sz);
+  }
+  
+  fl->end_ptr = end;
+  return (void*)end;
+}
+
+//// TEST
+#if 0
+int main() {
+  gc_init();
+
+  uint64_t* res = rcimmix_alloc(16);
+  res[0] = 1;
+  return 0;
+}
+#endif
