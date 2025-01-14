@@ -5,7 +5,7 @@
 #include <valgrind/valgrind.h>
 
 #include <assert.h>
-#include <gc.h>
+#include "gc.h"
 
 static int64_t succ(int64_t n) { return n + 1; }
 static int64_t pred(int64_t n) { return n - 1; }
@@ -99,12 +99,8 @@ void need_more_frames() {
   ccresthunk(cur_link, res);
 }
 
-uint64_t memuse = 0;
-void *mem;
 void *my_malloc(size_t sz) {
-  memuse -= sz;
-  assert(memuse >= (uint64_t)mem);
-  return (void *)memuse;
+  return rcimmix_alloc(sz);
 }
 
 __attribute__((returns_twice, noinline, preserve_none)) int64_t
@@ -308,27 +304,25 @@ int main() {
   uint64_t foobar;
   // GC_expand_hp(50000000);
   stacktop = (void *)((uint64_t)(&foobar) & ~15);
-  size_t memsize = 1000000000;
-  mem = malloc(memsize);
-  memuse = (uint64_t)mem + memsize;
+
+  gc_init();
+  gc_add_root((uint64_t*)&cur_link);
 
   VALGRIND_STACK_REGISTER(&tmpstack[100], &tmpstack[0]);
 
-  /*
+
   // iter count 10
   for (int64_t i = 0; i < 10; i++) {
-    memuse = (uint64_t)mem + memsize;
     clo c = {thunk, NULL};
     int64_t res = fibc(30, &c);
     printf("Res %li\n", res);
   }
-
+  /*
   // Test 2: test that callcc *up* the stack works.
   int64_t res = bar(10);
   printf("Bar res is %li\n", res);
   if (res < 20)
     call_clo(foo, res + 1);
-  */
 
   int64_t testa = cons(8, cons(16, cons(24, NIL)));
   int64_t testb = cons(cons(8, NIL), cons(16, cons(24, NIL)));
@@ -340,8 +334,7 @@ int main() {
     printf("Res %li\n", res);
     res = call_clo((clo*)gen, 0);
   }
+  */
 
-  free(mem);
-  
   return 0;
 }

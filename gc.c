@@ -58,7 +58,8 @@ static bool bt(uint64_t* bits, uint64_t bit) {
 static freelist_s freelist[size_classes];
 static slab_info* partials[size_classes];
 static slab_info *cur_slab[size_classes];
-static kvec_t(slab_info*) all_slabs;
+static kvec_t(slab_info *) all_slabs;
+static kvec_t(uint64_t*) roots;
 static LIST_HEAD(free_slabs);
 
 bool get_partial_range(uint64_t sz_class, freelist_s* fl) {
@@ -74,6 +75,14 @@ void gc_init() {
     freelist[i].end_ptr = default_slab_size;
   }
   kv_init(all_slabs);
+  kv_init(roots);
+}
+
+void gc_add_root(uint64_t *rootp) { kv_push(roots, rootp); }
+
+void gc_pop_root(uint64_t *rootp) {
+  auto old_rootp = kv_pop(roots);
+  assert(old_rootp == rootp);
 }
 
 typedef struct range {
@@ -85,10 +94,10 @@ static kvec_t(range) markstack;
 static void mark() {
   while(kv_size(markstack) > 0) {
     range r = kv_pop(markstack);
-    //    printf("RANGE %p %p\n", r.start, r.end);
+    //printf("RANGE %p %p\n", r.start, r.end);
     // Double check it is aligned.
-    assert(((int64_t)r.start & 0xf) == 0);
-    assert(((int64_t)r.end & 0xf) == 0);
+    assert(((int64_t)r.start & 0x7) == 0);
+    assert(((int64_t)r.end & 0x7) == 0);
     while (r.start < r.end) {
       uint8_t *val = (uint8_t *)*r.start;
       slab_info *slab = alloc_table_lookup(&atable, val);
@@ -99,6 +108,7 @@ static void mark() {
         uint64_t base_ptr = (uint64_t)slab->start + (slab->class * 8 * index);
         if (!bt(slab->markbits, index)) {
           bts(slab->markbits, index);
+	  //printf("Marking %p cls %i\n", base_ptr, slab->class);
 	  kv_push(markstack, ((range){(uint64_t*)base_ptr, (uint64_t*)(base_ptr + slab->class*8)}));
         } else {
           /* printf("ALREADY MARKED %p %i cls %i\n", val, */
@@ -123,9 +133,17 @@ __attribute__((noinline, preserve_none)) static  void rcimmix_collect(){
     slab->marked = false;
   }
 
+  // Init mark stack
+  kv_init(markstack);
+
+  // Mark roots
+  for(uint64_t i = 0; i < kv_size(roots); i++) {
+    auto root = kv_A(roots, i);
+    kv_push(markstack, ((range){root, root+1}));
+  }
+
   // Mark stack
   uint64_t* sp = (uint64_t*)__builtin_frame_address(0);
-  kv_init(markstack);
   kv_push(markstack, ((range){sp, stacktop}));
   mark();
 
@@ -154,7 +172,7 @@ __attribute__((noinline, preserve_none)) static  void rcimmix_collect(){
 
 }
 
-slab_info* alloc_slab(uint64_t sz_class) {
+static slab_info* alloc_slab(uint64_t sz_class) {
   slab_info* free = list_first_entry_or_null(&free_slabs, slab_info, link);
   if (free) {
     free->class = sz_class;
@@ -187,7 +205,7 @@ NOINLINE static void* rcimmix_alloc_slow(uint64_t sz) {
     abort();
   }
   // It's in a small slab.
-  assert(freelist[sz_class].start_ptr >= freelist[sz_class].end_ptr);
+  //  assert(freelist[sz_class].start_ptr >= freelist[sz_class].end_ptr);
   if (get_partial_range(sz_class, &freelist[sz_class])) {
     abort();
   } else {
@@ -207,13 +225,14 @@ void* rcimmix_alloc(uint64_t sz) {
   }
   auto fl = &freelist[sz_class];
 
-  auto end = fl->end_ptr - sz;
-  if (unlikely(fl->start_ptr > end)) {
+  auto s = fl->start_ptr;
+  auto start = fl->start_ptr + sz_class * 8;
+  if (unlikely(start > fl->end_ptr)) {
     [[clang::musttail]] return rcimmix_alloc_slow(sz);
   }
   
-  fl->end_ptr = end;
-  return (void*)end;
+  fl->start_ptr = start;
+  return (void*)s;
 }
 
 //// TEST
