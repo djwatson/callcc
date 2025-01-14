@@ -106,6 +106,58 @@ typedef struct closure_s {
   gc_obj v[];
 } closure_s;
 
+// This one is not PTR, but anything!
+void *to_raw_ptr(gc_obj obj) { return (void *)(obj.value & ~TAG_MASK); }
+string_s *to_string(gc_obj obj) { return (string_s *)(obj.value - PTR_TAG); }
+int64_t to_fixnum(gc_obj obj) { return obj.value >> 3; }
+cons_s *to_cons(gc_obj obj) { return (cons_s *)(obj.value - CONS_TAG); }
+vector_s *to_vector(gc_obj obj) { return (vector_s *)(obj.value - VECTOR_TAG); }
+char to_char(gc_obj obj) { return (char)(obj.value >> 8); }
+
+uint8_t get_tag(gc_obj obj) { return obj.value & TAG_MASK; }
+uint8_t get_imm_tag(gc_obj obj) { return obj.value & IMMEDIATE_MASK; }
+uint32_t get_ptr_tag(gc_obj obj) {
+  return ((uint32_t *)(obj.value - PTR_TAG))[0];
+}
+bool is_char(gc_obj obj) { return get_imm_tag(obj) == CHAR_TAG; }
+bool is_closure(gc_obj obj) { return get_tag(obj) == CLOSURE_TAG; }
+bool is_cons(gc_obj obj) { return get_tag(obj) == CONS_TAG; }
+bool is_ptr(gc_obj obj) { return get_tag(obj) == PTR_TAG; }
+bool is_literal(gc_obj obj) { return get_tag(obj) == LITERAL_TAG; }
+bool is_string(gc_obj obj) {
+  return is_ptr(obj) && get_ptr_tag(obj) == STRING_TAG;
+}
+bool is_record(gc_obj obj) {
+  return is_ptr(obj) && get_ptr_tag(obj) == RECORD_TAG;
+}
+bool is_undefined(gc_obj obj) { return get_imm_tag(obj) == UNDEFINED_TAG; }
+bool is_vector(gc_obj obj) { return get_tag(obj) == VECTOR_TAG; }
+bool is_symbol(gc_obj obj) { return get_tag(obj) == SYMBOL_TAG; }
+bool is_fixnum(gc_obj obj) { return get_tag(obj) == FIXNUM_TAG; }
+bool is_heap_object(gc_obj obj) { return !is_fixnum(obj) && !is_literal(obj); }
+gc_obj tag_fixnum(int64_t num) {
+  assert(((num << 3) >> 3) == num);
+  return (gc_obj){.value = num << 3};
+}
+gc_obj tag_string(string_s *s) {
+  return (gc_obj){.value = ((int64_t)s + PTR_TAG)};
+}
+gc_obj tag_cons(cons_s *s) {
+  return (gc_obj){.value = ((int64_t)s + CONS_TAG)};
+}
+gc_obj tag_vector(vector_s *s) {
+  return (gc_obj){.value = ((int64_t)s + VECTOR_TAG)};
+}
+gc_obj tag_cont(closure_s *s) {
+  return (gc_obj){.value = ((int64_t)s + PTR_TAG)};
+}
+gc_obj tag_closure(closure_s *s) {
+  return (gc_obj){.value = ((int64_t)s + CLOSURE_TAG)};
+}
+gc_obj tag_char(char ch) {
+  return (gc_obj){.value = (((int64_t)ch << 8) + CHAR_TAG)};
+}
+
 #define TAG_SET ((1 <<4)|(1 <<3)|(1 <<0))
 static bool has_tag_4_or_3_or_0 ( int64_t n ) {
   // Note that unlike the paper, we need to explictly ensure n is
@@ -125,10 +177,6 @@ gc_obj double_to_gc(double d) {
   abort();
 }
 
-bool is_ptr(gc_obj obj) {
-  return (obj.value & TAG_MASK) == PTR_TAG;
-}
-
 double to_double(gc_obj obj) {
   if (is_ptr(obj)) {
     abort();
@@ -141,6 +189,7 @@ double to_double(gc_obj obj) {
   return res;
 }
 
+#if 0
 int main() {
   gc_obj res = double_to_gc(0.0);
   printf("Res was %lx, %f\n", res.value, to_double(res));
@@ -152,3 +201,4 @@ int main() {
   printf("Res was %lx, %f\n", res.value, to_double(res));
   return 0;
 }
+#endif

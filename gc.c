@@ -61,6 +61,7 @@ static slab_info *cur_slab[size_classes];
 static kvec_t(slab_info *) all_slabs;
 static kvec_t(uint64_t*) roots;
 static LIST_HEAD(free_slabs);
+static kvec_t(slab_info*) large_free;
 
 bool get_partial_range(uint64_t sz_class, freelist_s* fl) {
   return false;
@@ -76,6 +77,7 @@ void gc_init() {
   }
   kv_init(all_slabs);
   kv_init(roots);
+  kv_init(large_free);
 }
 
 void gc_add_root(uint64_t *rootp) { kv_push(roots, rootp); }
@@ -148,6 +150,8 @@ __attribute__((noinline, preserve_none)) static  void rcimmix_collect(){
   mark();
 
   // Sweep empty blocks.
+  kv_destroy(large_free);
+  kv_init(large_free);
   uint64_t free_blocks = 0;
   for(uint64_t i = 0; i < kv_size(all_slabs); i++) {
     auto slab = kv_A(all_slabs, i);
@@ -157,8 +161,15 @@ __attribute__((noinline, preserve_none)) static  void rcimmix_collect(){
       continue;
     }
     if (!slab->marked) {
-      list_add(&slab->link, &free_slabs);
-      free_blocks++;
+      // TODO free large
+      if (slab->class >= size_classes) {
+	//free(slab->start);
+	//slab->start = nullptr;
+	kv_push(large_free, slab);
+      } else {
+	list_add(&slab->link, &free_slabs);
+	free_blocks++;
+      }
     }
   }
   printf("Free blocks: %li all blocks: %li\n", free_blocks, kv_size(all_slabs));
@@ -196,6 +207,10 @@ static slab_info* alloc_slab(uint64_t sz_class) {
   return free;
 }
 
+static uintptr_t align(uintptr_t val, uintptr_t alignment) {
+  return (val + alignment - 1) & ~(alignment - 1);
+}
+
 NOINLINE static void* rcimmix_alloc_slow(uint64_t sz) {
   if (collect_cnt >= next_collect) {
     collect_cnt = 0;
@@ -207,7 +222,25 @@ NOINLINE static void* rcimmix_alloc_slow(uint64_t sz) {
   uint64_t sz_class = sz / 8;
   // It has to be a large slab.
   if (sz_class >= size_classes) {
-    abort();
+    if (kv_size(large_free)) {
+      // TODO hack hack hack
+      collect_cnt += sz;
+      auto f = kv_pop(large_free);
+      return f->start;
+    } else {
+      sz = align(sz, PAGE_SIZE);
+      slab_info *info = malloc(sizeof(slab_info));
+      sz_class = sz / 8;
+      info->class = sz_class;
+      init_list_head(&info->link);
+      posix_memalign((void **)&info->start, PAGE_SIZE, sz);
+      info->end = info->start + sz;
+      alloc_table_set_range(&atable, info, info->start, sz);
+      collect_cnt += sz;
+      kv_push(all_slabs, info);
+
+      return info->start;
+    }
   }
   // It's in a small slab.
   //  assert(freelist[sz_class].start_ptr >= freelist[sz_class].end_ptr);
@@ -228,7 +261,7 @@ void* rcimmix_alloc(uint64_t sz) {
   if (unlikely(sz_class >= size_classes)) {
     [[clang::musttail]] return rcimmix_alloc_slow(sz);
   }
-  auto fl = &freelist[sz_class];
+    auto fl = &freelist[sz_class];
 
   auto s = fl->start_ptr;
   auto start = fl->start_ptr + sz_class * 8;
