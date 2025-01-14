@@ -162,6 +162,11 @@ __attribute__((noinline, preserve_none)) static  void rcimmix_collect(){
     }
   }
   printf("Free blocks: %li all blocks: %li\n", free_blocks, kv_size(all_slabs));
+  for(uint64_t i = 0; i < size_classes; i++) {
+    cur_slab[i] = nullptr;
+    freelist[i].start_ptr = default_slab_size;
+    freelist[i].end_ptr = default_slab_size;
+  }
   
   clock_gettime(CLOCK_MONOTONIC, &end);
   double time_taken =
