@@ -1,0 +1,13 @@
+(import (scheme base) (scheme write) (scheme file) (expand) (library-manager) (third-party pp)
+	(scheme process-context)
+	(util) (match)
+	(passes)
+	(srfi 1)
+	(srfi 69)
+	(srfi 151)
+	(format)
+	;; Gauche's write double
+	(rename (only (binary io) write-f64)
+		(write-f64 write-double))
+	)
+(include "bc.scm")
