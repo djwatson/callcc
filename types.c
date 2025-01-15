@@ -45,8 +45,8 @@ enum : uint8_t {
   (gc_obj) { .value = NIL_TAG }
 #define UNDEFINED                                                              \
   (gc_obj) { .value = UNDEFINED_TAG }
-#define TRUE_REP (gc_obj){.value = 0x0104}
-#define FALSE_REP (gc_obj){.value = 0x0004}
+#define TRUE_REP (gc_obj){.value = 0x0106}
+#define FALSE_REP (gc_obj){.value = 0x0006}
 #define EOF_OBJ                                                                \
   (gc_obj) { .value = EOF_TAG }
 
@@ -54,54 +54,35 @@ typedef struct {
   int64_t value;
 } gc_obj;
 
-typedef struct gc_header {
-  union {
-    struct {
-      uint32_t type;
-      uint32_t rc;
-    };
-    uint64_t fwdtag;
-  };
-  struct gc_header *fwd;
-} gc_header;
-
 typedef struct flonum_s {
-  uint32_t type;
-  uint32_t rc;
+  uint64_t type;
   double x;
 } flonum_s;
 
 typedef struct string_s {
-  uint32_t type;
-  uint32_t rc;
+  uint64_t type;
   gc_obj len;
   char str[];
 } string_s;
 
 typedef struct symbol {
-  uint32_t type;
-  uint32_t rc;
+  uint64_t type;
   gc_obj name; // string_s PTR_TAG'd value
   gc_obj val;
 } symbol;
 
 typedef struct vector_s {
-  uint32_t type;
-  uint32_t rc;
   gc_obj len;
   gc_obj v[];
 } vector_s;
 
 typedef struct cons_s {
-  uint32_t type;
-  uint32_t rc;
   gc_obj a;
   gc_obj b;
 } cons_s;
 
 typedef struct closure_s {
-  uint32_t type;
-  uint32_t rc;
+  uint64_t type;
   gc_obj len;
   gc_obj v[];
 } closure_s;
@@ -109,6 +90,7 @@ typedef struct closure_s {
 // This one is not PTR, but anything!
 void *to_raw_ptr(gc_obj obj) { return (void *)(obj.value & ~TAG_MASK); }
 string_s *to_string(gc_obj obj) { return (string_s *)(obj.value - PTR_TAG); }
+symbol *to_symbol(gc_obj obj) { return (symbol *)(obj.value - PTR_TAG); }
 int64_t to_fixnum(gc_obj obj) { return obj.value >> 3; }
 cons_s *to_cons(gc_obj obj) { return (cons_s *)(obj.value - CONS_TAG); }
 vector_s *to_vector(gc_obj obj) { return (vector_s *)(obj.value - VECTOR_TAG); }
@@ -187,6 +169,128 @@ double to_double(gc_obj obj) {
   double res;
   memcpy(&res, &r, sizeof(res));
   return res;
+}
+
+gc_obj display(gc_obj obj);
+void print_obj(gc_obj obj, FILE*) {
+  display (obj);
+}
+
+gc_obj display(gc_obj obj) {
+  auto tag = get_tag(obj);
+  switch(tag) {
+  case FIXNUM_TAG:
+    printf("%li", to_fixnum(obj));
+    break;
+  case FLONUM1_TAG:
+  case FLONUM2_TAG:
+  case FLONUM3_TAG:
+    char buffer[40];
+    double d = to_double(obj);
+    snprintf(buffer, 40 - 3, "%g", d);
+    if (strpbrk(buffer, ".eE") == nullptr) {
+      size_t len = strlen(buffer);
+      buffer[len] = '.';
+      buffer[len + 1] = '0';
+      buffer[len + 2] = '\0';
+    }
+    printf("%s", buffer);
+    break;
+  case PTR_TAG: {
+    auto ptr_tag = get_ptr_tag(obj);
+    switch(ptr_tag) {
+    case STRING_TAG: {
+      auto str = to_string(obj);
+      printf("%.*s", (int)to_fixnum(str->len), str->str);
+      break;
+    }
+    case SYMBOL_TAG: {
+      auto sym = to_symbol(obj);
+      auto str = to_string(sym->name);
+      printf("%.*s", (int)to_fixnum(str->len), str->str);
+      break;
+    }
+    case RECORD_TAG: {
+      printf("#<record>");
+      break;
+    }
+    case CLOSURE_TAG: {
+      printf("#<closure>");
+      break;
+    }
+    case CONT_TAG: {
+      printf("#<cont>");
+      break;
+    }
+    default:
+      printf("Unknown ptr tag: %i\n", ptr_tag);
+      abort();
+    }
+    break;
+  }
+  case CONS_TAG: {
+    auto file = stdout;
+    auto c = to_cons(obj);
+    fputc('(', file);
+    while (is_cons(c->b)) {
+      print_obj(c->a, file);
+      c = to_cons(c->b);
+      fputc(' ', file);
+    }
+    print_obj(c->a, file);
+    if (c->b.value != NIL_TAG) {
+      fputs(" . ", file);
+      print_obj(c->b, file);
+    }
+    fputc(')', file);
+    break;
+  }
+  case LITERAL_TAG: {
+    auto lit_tag = get_imm_tag(obj);
+    switch(lit_tag) {
+    case CHAR_TAG: {
+      printf("%c", to_char(obj));
+      break;
+    }
+    case BOOL_TAG: {
+      if (obj.value == TRUE_REP.value) {
+	printf("#t");
+      } else if (obj.value == FALSE_REP.value) {
+	printf("#f");
+      }
+      break;
+    }
+    case NIL_TAG: {
+      printf("'()");
+      break;
+    }
+    case UNDEFINED_TAG: {
+	printf("#<undef>");
+	break;
+    }
+    default:
+      printf("Unknown lit tag: %i\n", lit_tag);
+      abort();
+    }
+    break;
+  }
+  case VECTOR_TAG: {
+    auto v = to_vector(obj);
+    printf("#(");
+    for(uint64_t i = 0; i < to_fixnum(v->len); i++) {
+      if (i != 0) {
+	printf(" ");
+      }
+      display(v->v[i]);
+    }
+    printf(")");
+    break;
+  }
+  default:
+    printf("Unknown tag: %i\n", tag);
+    abort();
+  }
+  return NIL;
 }
 
 #if 0
