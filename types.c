@@ -140,31 +140,43 @@ gc_obj tag_char(char ch) {
   return (gc_obj){.value = (((int64_t)ch << 8) + CHAR_TAG)};
 }
 
-#define TAG_SET ((1 <<4)|(1 <<3)|(1 <<0))
-static bool has_tag_4_or_3_or_0 ( int64_t n ) {
+#define TAG_SET2 ((1 <<5)|(1 <<4)|(1 <<1))
+static bool has_tag_5_or_4_or_1 ( int64_t n ) {
   // Note that unlike the paper, we need to explictly ensure n is
   // masked to 5 bits: shifting by more than 32 bits here is undefined
   // behavior, and clang will happily optimize everything out.
-  return ((( uint32_t )1 << (n&0x1f) ) & (~( uint32_t )0/0xff * TAG_SET )) != 0;
+  return ((( uint32_t )1 << (n&0x1f) ) & (~( uint32_t )0/0xff * TAG_SET2 )) != 0;
+}
+bool is_flonum_fast(gc_obj obj) {
+  return has_tag_5_or_4_or_1(obj.value);
 }
 
-gc_obj double_to_gc(double d) {
+bool double_to_gc(double d, gc_obj* res) {
   uint64_t di;
   memcpy(&di, &d, sizeof(d));
   di = __builtin_rotateleft64(di, 4);
-  if (has_tag_4_or_3_or_0(di)) {
-    di++; // Offset by one, so that we keep fixnum as 0 tag.
-    return (gc_obj){.value = di};
+  di++; // Offset by one, so that we keep fixnum as 0 tag.
+  if (has_tag_5_or_4_or_1(di)) {
+    *res = (gc_obj){.value = di};
+    return true;
   }
-  abort();
+  return false;
 }
 
 double to_double(gc_obj obj) {
   if (is_ptr(obj)) {
     abort();
   }
+  assert(has_tag_5_or_4_or_1(obj.value));
   uint64_t r = obj.value - 1;
-  assert(has_tag_4_or_3_or_0(r));
+  r = __builtin_rotateright64(r, 4);
+  double res;
+  memcpy(&res, &r, sizeof(res));
+  return res;
+}
+
+double to_double_fast(gc_obj obj) {
+  uint64_t r = obj.value - 1;
   r = __builtin_rotateright64(r, 4);
   double res;
   memcpy(&res, &r, sizeof(res));
@@ -306,3 +318,29 @@ int main() {
   return 0;
 }
 #endif
+
+////////////// MATH
+#define likely(x) __builtin_expect(x, 1)
+#define unlikely(x) __builtin_expect(x, 0)
+#define NOINLINE __attribute__((noinline))
+#define INLINE __attribute__((always_inline))
+
+NOINLINE gc_obj SCM_ADD_SLOW(gc_obj a, gc_obj b) {
+  if (likely((is_flonum_fast(a) & is_flonum_fast(b)) == 1)) {
+    gc_obj res;
+    if(double_to_gc(to_double_fast(a) + to_double_fast(b), &res)) {
+      return res;
+    }
+  }
+  abort();
+}
+
+INLINE gc_obj SCM_ADD(gc_obj a, gc_obj b) {
+  if (likely((is_fixnum(a) & is_fixnum(b)) == 1)) {
+    gc_obj res;
+    if(!__builtin_add_overflow(a.value, b.value, &res.value)) {
+      return res;
+    }
+  }
+  [[clang::musttail]] return SCM_ADD_SLOW(a, b);
+}
