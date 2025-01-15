@@ -9,12 +9,14 @@
 	(set! id (+ id 1))
 	res))))
 
-(define-record-type fun (%make-fun code name) fun?
+(define-record-type fun (%make-fun code name args) fun?
 		    (code fun-code fun-code-set!)
-		    (name fun-name fun-name-set!))
+		    (name fun-name fun-name-set!)
+		    (last-label fun-last-label fun-last-label-set!)
+		    (args fun-args fun-args-set!))
 
 (define (make-fun name)
-  (%make-fun '() name))
+  (%make-fun '() name '()))
 
 (define (push-instr! fun instr)
   (fun-code-set! fun (cons instr (fun-code fun))))
@@ -41,13 +43,12 @@
   (newline)
   (exit))
 
-(define last-label #f)
-
 (define (emit sexp env fun tail)
   (define (finish res)
     (if tail
 	(begin
-	  (when res (push-instr! fun (format "ret i64 ~a" res)))
+	  (when res
+	    (push-instr! fun (format "ret i64 ~a" res)))
 	  #f)
 	res))
   (match sexp
@@ -56,7 +57,8 @@
 	  (emit sexp env fun #f))
      (emit end env fun tail))
     ((set! ,var ,val)
-     (emit `(define ,var ,val) env fun #f))
+     (emit `(define ,var ,val) env fun #f)
+     (finish undefined-tag))
     ((define ,var ,val)
      (let ((val (emit val env fun #f))
 	   (sym (emit-const var))
@@ -92,7 +94,7 @@
 	    (id (next-id)))
        (push-instr! fun (format "%v~a = call i64 @~a(~a)"
 		 id (string-append "SCM_" (symbol->string var)) arglist))
-       (format "%v~a" id)))
+       (finish (format "%v~a" id))))
     ((if ,a ,b ,c)
      (let ((id (next-id))
 	   (join-id (next-id))
@@ -103,38 +105,46 @@
        (push-instr! fun (format "%test~a = icmp ne i64 ~a, ~a" id test false-rep))
        (push-instr! fun (format "br i1 %test~a, label %~a, label %~a" id true false))
        (push-instr! fun (format "~a:" true))
-       (set! last-label true)
-       (let ((t-res (emit b env fun tail)))
+       (fun-last-label-set! fun true)
+       (let* ((t-res (emit b env fun tail))
+	      (t-last-label (fun-last-label fun)))
 	 (if (or tail (not t-res))
-	     (finish t-res)
+	     #f
 	     (push-instr! fun (format "br label %~a" join)))
 	 (push-instr! fun (format "~a:" false))
-	 (set! last-label false)
-	 (let ((f-res (emit c env fun tail)))
+	 (fun-last-label-set! fun false)
+	 (let* ((f-res (emit c env fun tail))
+		(f-last-label (fun-last-label fun)))
 	   (if (or tail (not f-res))
-	       (finish f-res)
+	       #f
 	       (push-instr! fun (format "br label %~a" join)))
-	   (unless tail
-	     (push-instr! fun (format "~a:" join))
-	     (set! last-label join)
-	     (push-instr! fun (format "%v~a = phi i64 [~a, %~a], [~a, %~a]"
-				  join-id t-res true f-res false)))))
-       (finish (format "%v~a" join-id))))
+	   (if tail
+	       #f
+	       (begin
+		 (push-instr! fun (format "~a:" join))
+		 (fun-last-label-set! join)
+		 (push-instr! fun (format "%v~a = phi i64 [~a, %~a], [~a, %~a]"
+					  join-id t-res t-last-label f-res f-last-label))))))
+       (format "%v~a" join-id)))
     ((call ,loop-var ,args ___)
      (guard (and (assq loop-var env) (loop-var? (cdr (assq loop-var env)))))
      (abort 'loop-call))
     ((call ,args ___)
      (abort 'call))
     ((label-call ,label ,args ___)
-     (abort 'label-call))
+     (let* ((args (omap arg args (emit arg env fun #f)))
+	    (arglist (join ", " (omap arg args (format "i64 ~a" arg))))
+	    (id (next-id)))
+       (push-instr! fun (format "%v~a = call i64 @~a(~a)" id label arglist))
+       (finish (format "%v~a" id))))
     ((let ((,vars ,vals) ___) ,body)
-     (abort 'let))
+     (let ((args (omap val vals (emit val env fun #f))))
+       (emit body (append (map cons vars args) env) fun #t)))
     ((closure (label ,label) ,args ___)
      (abort 'closure))
     ((const-closure (label ,label))
      (abort 'const-closure))
     ((labels ((,vars ,lambdas) ___) ,body)
-     (abort 'labels)
      (let* ((label-ids (iota (length vars) (length functions)))
 	    (funs (map-in-order (lambda (id) (define fun (make-fun 1))
 					(push! functions fun)
@@ -148,29 +158,17 @@
 		   (fun-name-set! func-p name)
 		   (for case cases
 			(define argcnt (length (to-proper (second case))))
+			(define args (second case))
+			(define arg-ids (omap arg args (format "%v~a" (next-id))))
 			(define v-type (list? (second case)))
-			(define last (eq? case last-case))
-			(when last-case-jmp
-			  (list-set! last-case-jmp 2
-				     (- (length (fun-code func-p)) (list-ref last-case-jmp 2))))
-			(push-instr! func-p (list (if v-type (if last 'FUNC 'CFUNC) (if last 'FUNCV 'CFUNCV)) argcnt))
-			(unless last
-			  (let ((jmp `(JMP 0 ,(length (fun-code func-p)))))
-			    (set! last-case-jmp jmp)
-			    (push-instr! func-p jmp)))
+			(fun-args-set! func-p arg-ids)
 			(emit (third case)
-			      (append (map cons (to-proper (second case)) (iota argcnt))
+			      (append (map cons (to-proper (second case)) arg-ids)
 				      env)
 			      func-p
 			      #t)))
 		 funs lambdas vars label-ids)
-       (let ((res (emit body (append  env) fun tail)))
-	 (if res
-	     (begin
-	       (unless (check-need-arg res rg)
-		 (push-instr! fun (list 'ARG rg res)))
-	       rg)
-	     #f))))
+       (emit body env fun tail)))
     (,var
      ;; Only lookup, doesn't gen code.
      (guard (symbol? var))
@@ -190,12 +188,12 @@
        (push-instr! fun (format "%v~a = add i64 ~a, ~a" id sym (+ (- ptr-tag) 16)))
        (push-instr! fun (format "%v~a = inttoptr i64 %v~a to i64*" pid id))
        (push-instr! fun (format "%v~a = load i64, i64* %v~a" resid pid))
-       (format "%v~a" resid)))
+       (finish (format "%v~a" resid))))
     (,const
      (guard (not (pair? const)))
-     (emit-const const))
+     (finish (emit-const const)))
     ((quote ,const)
-     (emit-const const))
+     (finish (emit-const const)))
     (,else (error "UNKOWN EMIT:" sexp))))
 
 (define (dformat . args)
@@ -273,6 +271,8 @@
    "target triple = \"x86_64-pc-linux-gnu\"\n
 declare i64 @display (i64)
 declare i64 @SCM_ADD (i64, i64)
+declare i64 @SCM_LT (i64, i64)
+declare i64 @SCM_SUB (i64, i64)
 "))
 
 (define (compile file verbose)
@@ -308,7 +308,8 @@ declare i64 @SCM_ADD (i64, i64)
 	 (fun-code-set! func (reverse! (fun-code func)))
 
 	 (newline)
-	 (display (format "define i64 @~a() {\n" (fun-name func)))
+	 (display (format "define i64 @~a(~a) {\n" (fun-name func)
+			  (join ", " (omap arg (fun-args func) (format "i64 ~a" arg)))))
 	 (for line (fun-code func)
 	      (display "  ") (display line) (newline))
 	 (display "}\n"))
