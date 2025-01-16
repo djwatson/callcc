@@ -1,5 +1,5 @@
 
-* fibc, cpstak, ctak, destruc, diviter, divrec, gcbench? ntakl
+* fibc, ctak, destruc, divrec, gcbench? ntakl
 
 * symbols can use name in ll
 
