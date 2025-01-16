@@ -85,6 +85,7 @@ typedef struct cons_s {
 
 typedef struct closure_s {
   uint64_t type;
+  // v[0] is always the closure ptr.
   gc_obj v[];
 } closure_s;
 
@@ -95,6 +96,7 @@ symbol *to_symbol(gc_obj obj) { return (symbol *)(obj.value - PTR_TAG); }
 int64_t to_fixnum(gc_obj obj) { return obj.value >> 3; }
 cons_s *to_cons(gc_obj obj) { return (cons_s *)(obj.value - CONS_TAG); }
 vector_s *to_vector(gc_obj obj) { return (vector_s *)(obj.value - VECTOR_TAG); }
+closure_s *to_closure(gc_obj obj) { return (closure_s *)(obj.value - PTR_TAG); }
 char to_char(gc_obj obj) { return (char)(obj.value >> 8); }
 
 uint8_t get_tag(gc_obj obj) { return obj.value & TAG_MASK; }
@@ -135,7 +137,7 @@ gc_obj tag_cont(closure_s *s) {
   return (gc_obj){.value = ((int64_t)s + PTR_TAG)};
 }
 gc_obj tag_closure(closure_s *s) {
-  return (gc_obj){.value = ((int64_t)s + CLOSURE_TAG)};
+  return (gc_obj){.value = ((int64_t)s + PTR_TAG)};
 }
 gc_obj tag_char(char ch) {
   return (gc_obj){.value = (((int64_t)ch << 8) + CHAR_TAG)};
@@ -365,7 +367,7 @@ INLINE gc_obj SCM_ADD(gc_obj a, gc_obj b) {
   }
 }
 
-NOINLINE gc_obj SCM_SUB_SLOW(gc_obj a, gc_obj b) {
+NOINLINE __attribute__((preserve_all)) gc_obj SCM_SUB_SLOW(gc_obj a, gc_obj b) {
   double fa, fb;
   if (is_fixnum(a)) {
     fa = to_fixnum(a);
@@ -384,28 +386,28 @@ NOINLINE gc_obj SCM_SUB_SLOW(gc_obj a, gc_obj b) {
   abort();
 }
 
-INLINE gc_obj SCM_SUB(gc_obj a, gc_obj b) {
+INLINE  gc_obj SCM_SUB(gc_obj a, gc_obj b) {
   if (likely((is_fixnum(a) & is_fixnum(b)) == 1)) {
     gc_obj res;
     if(likely(!__builtin_sub_overflow(a.value, b.value, &res.value))) {
       return res;
     } else {
-      [[clang::musttail]] return SCM_SUB_SLOW(a, b);
+      return SCM_SUB_SLOW(a, b);
     }
   } else if (likely((is_flonum_fast(a) & is_flonum_fast(b)) == 1)) {
     gc_obj res;
     if(likely(double_to_gc(to_double_fast(a) - to_double_fast(b), &res))) {
       return res;
     } else {
-      [[clang::musttail]] return SCM_SUB_SLOW(a, b);
+       return SCM_SUB_SLOW(a, b);
     }
   } else {
-    [[clang::musttail]] return SCM_SUB_SLOW(a, b);
+     return SCM_SUB_SLOW(a, b);
   }
 }
 // TODO check is_flonum
 
-NOINLINE gc_obj SCM_LT_SLOW(gc_obj a, gc_obj b) {
+NOINLINE __attribute__((preserve_all)) gc_obj SCM_LT_SLOW(gc_obj a, gc_obj b) {
   double fa, fb;
   if (is_fixnum(a)) {
     fa = to_fixnum(a);
@@ -436,7 +438,7 @@ INLINE gc_obj SCM_LT(gc_obj a, gc_obj b) {
     }
     return FALSE_REP;
   }
-  [[clang::musttail]] return SCM_LT_SLOW(a, b);
+  return SCM_LT_SLOW(a, b);
 }
 
 NOINLINE gc_obj SCM_GT_SLOW(gc_obj a, gc_obj b) {
@@ -597,4 +599,22 @@ gc_obj vector_ref(gc_obj vec, gc_obj idx) {
 gc_obj vector_set(gc_obj vec, gc_obj idx, gc_obj val) {
   to_vector(vec)->v[to_fixnum(idx)] = val;
   return UNDEFINED;
+}
+
+gc_obj SCM_CLOSURE(gc_obj p, uint64_t len) {
+  //  printf("make closure %li\n", len);
+  closure_s* clo = rcimmix_alloc(sizeof(closure_s) + (len+1) * sizeof(gc_obj));
+  clo->type = CLOSURE_TAG;
+  clo->v[0] = p;
+  return tag_closure(clo);
+}
+
+void SCM_CLOSURE_SET(gc_obj clo, gc_obj obj, uint64_t i) {
+  //    printf("Closure set %li\n", i);
+  to_closure(clo)->v[i + 1] = obj;
+}
+
+gc_obj SCM_CLOSURE_GET(gc_obj clo, gc_obj i) {
+  //  printf("Closure get %li\n", to_fixnum(i));
+  return to_closure(clo)->v[to_fixnum(i) + 1];
 }

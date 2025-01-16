@@ -213,11 +213,11 @@ static uintptr_t align(uintptr_t val, uintptr_t alignment) {
   return (val + alignment - 1) & ~(alignment - 1);
 }
 
-NOINLINE static void *rcimmix_alloc_slow(uint64_t sz) {
+NOINLINE __attribute__((preserve_all)) static void *rcimmix_alloc_slow(uint64_t sz) {
   if (collect_cnt >= next_collect) {
     collect_cnt = 0;
     rcimmix_collect();
-    [[clang::musttail]] return rcimmix_alloc(sz);
+    return rcimmix_alloc(sz);
   }
   assert((sz & 0x7) == 0);
 
@@ -255,23 +255,25 @@ NOINLINE static void *rcimmix_alloc_slow(uint64_t sz) {
     freelist[sz_class].end_ptr = (uint64_t)slab->end;
     collect_cnt += freelist[sz_class].end_ptr - freelist[sz_class].start_ptr;
   }
-  [[clang::musttail]] return rcimmix_alloc(sz);
+  return rcimmix_alloc(sz);
 }
 
 void *rcimmix_alloc(uint64_t sz) {
   assert((sz & 0x7) == 0);
   uint64_t sz_class = sz / 8;
   if (unlikely(sz_class >= size_classes)) {
-    [[clang::musttail]] return rcimmix_alloc_slow(sz);
-  }
-  auto fl = &freelist[sz_class];
+     return rcimmix_alloc_slow(sz);
+  } else {
+    auto fl = &freelist[sz_class];
 
-  auto s = fl->start_ptr;
-  auto start = fl->start_ptr + sz_class * 8;
-  if (unlikely(start > fl->end_ptr)) {
-    [[clang::musttail]] return rcimmix_alloc_slow(sz);
-  }
+    auto s = fl->start_ptr;
+    auto start = fl->start_ptr + sz_class * 8;
+    if (unlikely(start > fl->end_ptr)) {
+       return rcimmix_alloc_slow(sz);
+    } else {
 
-  fl->start_ptr = start;
-  return (void *)s;
+      fl->start_ptr = start;
+      return (void *)s;
+    }
+  }
 }

@@ -69,12 +69,6 @@
        (push-instr! fun (format "%v~a = inttoptr i64 %v~a to i64*" pid id))
        (push-instr! fun (format "store i64 ~a, i64* %v~a" val pid)))
      (finish undefined-tag))
-    ((primcall closure-ref ,var ,cnt)
-     (abort "closure-ref")
-     (finish rg))
-    ((primcall closure-set! ,var ,cnt ,res)
-     (abort "closure-set!")
-     (finish rg))
     ((primcall ,op ,cell ,val ,loc)
      (guard (memq op '(STORE STORE_CHAR)))
      (let* ((val-cell (emit cell env fun #f))
@@ -158,7 +152,15 @@
      (let ((args (omap val vals (emit val env fun #f))))
        (emit body (append (map cons vars args) env) fun tail)))
     ((closure (label ,label) ,args ___)
-     (abort 'closure))
+     (let* ((args (omap arg args (emit arg env fun #f)))
+	    (id (next-id)))
+       (push-instr! fun ( format "%v~a = call i64 @SCM_CLOSURE(i64 ptrtoint (ptr @~a to i64), i64 ~a)"
+			  id label (length args)))
+       
+       (for (arg i) (args (iota (length args)))
+	    (push-instr! fun (format "call void @SCM_CLOSURE_SET(i64 %v~a, i64 ~a, i64 ~a)"
+				     id arg i)))
+       (format "%v~a" id)))
     ((const-closure (label ,label))
      (finish (emit-const `($const-closure ,label))))
     ((labels ((,vars ,lambdas) ___) ,body)
@@ -289,7 +291,7 @@
 			    id a b))
       (format "add (i64 ~a, i64 ptrtoint ({i64, i64}* @cons~a to i64))"
 	      cons-tag id)))
-   (else (abort 'Unknown-const))))
+   (else (error "Unknown Const: " c))))
 
 (define (emit-header)
   (display
@@ -302,6 +304,9 @@ declare i64 @SCM_GTE (i64, i64)
 declare i64 @SCM_SUB (i64, i64)
 declare i64 @SCM_NUM_EQ (i64, i64)
 declare i64 @SCM_GUARD (i64, i64)
+declare i64 @SCM_CLOSURE (i64, i64)
+declare i64 @SCM_CLOSURE_GET (i64, i64)
+declare void @SCM_CLOSURE_SET (i64, i64, i64)
 declare i64 @append (i64, i64)
 declare i64 @cons (i64, i64)
 declare i64 @car (i64)
