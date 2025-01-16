@@ -439,6 +439,74 @@ INLINE gc_obj SCM_LT(gc_obj a, gc_obj b) {
   [[clang::musttail]] return SCM_LT_SLOW(a, b);
 }
 
+NOINLINE gc_obj SCM_GT_SLOW(gc_obj a, gc_obj b) {
+  double fa, fb;
+  if (is_fixnum(a)) {
+    fa = to_fixnum(a);
+  } else {
+    fa = to_double(a);
+  }
+  if (is_fixnum(b)) {
+    fb = to_fixnum(b);
+  } else {
+    fb = to_double(b);
+  }
+  if (fa > fb) {
+    return TRUE_REP;
+  }
+  return FALSE_REP;
+}
+
+INLINE gc_obj SCM_GT(gc_obj a, gc_obj b) {
+  if (likely((is_fixnum(a) & is_fixnum(b)) == 1)) {
+    if(a.value > b.value) {
+      return TRUE_REP;
+    }
+    return FALSE_REP;
+  }
+  if (likely((is_flonum_fast(a) & is_flonum_fast(b)) == 1)) {
+    if(to_double_fast(a) > to_double_fast(b)) {
+      return TRUE_REP;
+    }
+    return FALSE_REP;
+  }
+  [[clang::musttail]] return SCM_GT_SLOW(a, b);
+}
+
+NOINLINE gc_obj SCM_GTE_SLOW(gc_obj a, gc_obj b) {
+  double fa, fb;
+  if (is_fixnum(a)) {
+    fa = to_fixnum(a);
+  } else {
+    fa = to_double(a);
+  }
+  if (is_fixnum(b)) {
+    fb = to_fixnum(b);
+  } else {
+    fb = to_double(b);
+  }
+  if (fa >= fb) {
+    return TRUE_REP;
+  }
+  return FALSE_REP;
+}
+
+INLINE gc_obj SCM_GTE(gc_obj a, gc_obj b) {
+  if (likely((is_fixnum(a) & is_fixnum(b)) == 1)) {
+    if(a.value >= b.value) {
+      return TRUE_REP;
+    }
+    return FALSE_REP;
+  }
+  if (likely((is_flonum_fast(a) & is_flonum_fast(b)) == 1)) {
+    if(to_double_fast(a) >= to_double_fast(b)) {
+      return TRUE_REP;
+    }
+    return FALSE_REP;
+  }
+  [[clang::musttail]] return SCM_GTE_SLOW(a, b);
+}
+
 NOINLINE gc_obj SCM_NUM_EQ_SLOW(gc_obj a, gc_obj b) {
   double fa, fb;
   if (is_fixnum(a)) {
@@ -481,12 +549,16 @@ gc_obj cdr(gc_obj obj) {
   return to_cons(obj)->b;
 }
 
+gc_obj setcar(gc_obj obj, gc_obj val) {
+  to_cons(obj)->a = val;
+  return UNDEFINED;
+}
+
+gc_obj setcdr(gc_obj obj, gc_obj val) {
+  to_cons(obj)->b = val;
+  return UNDEFINED;
+}
 gc_obj cons(gc_obj a, gc_obj b) {
-  static bool init = false;
-  if (!init) {
-    init = true;
-    gc_init();
-  }
   cons_s* c = rcimmix_alloc(sizeof(cons_s));
   c->a = a;
   c->b = b;
@@ -506,4 +578,23 @@ gc_obj SCM_GUARD(gc_obj a, int64_t type) {
     return TRUE_REP;
   }
   return FALSE_REP;
+}
+
+gc_obj make_vector(gc_obj obj) {
+  vector_s* v = rcimmix_alloc(sizeof(vector_s) + to_fixnum(obj)*sizeof(gc_obj));
+  v->len = obj;
+  return tag_vector(v);
+}
+
+gc_obj vector_length(gc_obj vec) {
+  return to_vector(vec)->len;
+}
+
+gc_obj vector_ref(gc_obj vec, gc_obj idx) {
+  return to_vector(vec)->v[to_fixnum(idx)];
+}
+
+gc_obj vector_set(gc_obj vec, gc_obj idx, gc_obj val) {
+  to_vector(vec)->v[to_fixnum(idx)] = val;
+  return UNDEFINED;
 }
