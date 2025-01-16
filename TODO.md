@@ -1,5 +1,5 @@
 
-* fibc, ctak, gcbench? 
+* gcbench?
 
 * symbols can use name in ll
 * macro-ify more of the generated code.

@@ -660,9 +660,9 @@ typedef struct ccsave {
   uint64_t type;
   gc_obj v[1];
 
-  void *stack;
-  size_t sz;
   struct ccsave *prev_link;
+  size_t sz;
+  int64_t stack[];
 } ccsave;
 
 static ccsave *cur_link = NULL;
@@ -716,7 +716,9 @@ static gc_obj ccresthunk(gc_obj unused, gc_obj n) {
   return n;
 }
 
-static void need_more_frames() {
+// We can 'preserve_none' here because we are explicitly loading the arg,
+// and we don't need to preserve anything.
+static __attribute__((preserve_none)) void need_more_frames() {
   gc_obj res;
   // This is called as a return point.  In x86_64, the return is in rax.
 #if defined(__x86_64__)
@@ -733,20 +735,18 @@ static void need_more_frames() {
 
 __attribute__((returns_twice, noinline, preserve_none)) gc_obj
 SCM_CALLCC(gc_obj cont) {
-  ccsave *stack = rcimmix_alloc(sizeof(ccsave));
   assert(is_closure(cont));
   auto clo = to_closure(cont);
 
   void *stack_bottom = __builtin_frame_address(0);
   void* stacktop = (void*)gc_get_stack_top();
   size_t stack_sz = stacktop - stack_bottom;
-  stack->stack = rcimmix_alloc(stack_sz);
-  memcpy(stack->stack, stack_bottom, stack_sz);
+  ccsave *stack = rcimmix_alloc(sizeof(ccsave) + stack_sz);
   stack->sz = stack_sz;
-
   stack->type = CLOSURE_TAG;
   stack->v[0] = (gc_obj){.value = (int64_t)ccresthunk};
   stack->prev_link = cur_link;
+  memcpy(stack->stack, stack_bottom, stack_sz);
 
   auto cc = tag_closure((closure_s*)stack);
 
