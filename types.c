@@ -5,6 +5,8 @@
 #include <stdbool.h>
 #include <assert.h>
 
+#include "gc.h"
+
 #define LOW_TAGS							\
   X(FIXNUM, 0)                                                                 \
   X(FLONUM1, 1)                                                                    \
@@ -469,4 +471,39 @@ INLINE gc_obj SCM_NUM_EQ(gc_obj a, gc_obj b) {
     return FALSE_REP;
   }
   [[clang::musttail]] return SCM_NUM_EQ_SLOW(a, b);
+}
+
+gc_obj car(gc_obj obj) {
+  return to_cons(obj)->a;
+}
+
+gc_obj cdr(gc_obj obj) {
+  return to_cons(obj)->b;
+}
+
+gc_obj cons(gc_obj a, gc_obj b) {
+  static bool init = false;
+  if (!init) {
+    init = true;
+    gc_init();
+  }
+  cons_s* c = rcimmix_alloc(sizeof(cons_s));
+  c->a = a;
+  c->b = b;
+  return tag_cons(c);
+}
+
+gc_obj append(gc_obj a, gc_obj b) {
+  if(is_cons(a)) {
+    auto p = to_cons(a);
+    return cons(p->a, append(p->b, b));
+  }
+  return b;
+}
+
+gc_obj SCM_GUARD(gc_obj a, int64_t type) {
+  if (a.value == NIL.value) {
+    return TRUE_REP;
+  }
+  return FALSE_REP;
 }

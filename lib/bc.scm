@@ -9,14 +9,14 @@
 	(set! id (+ id 1))
 	res))))
 
-(define-record-type fun (%make-fun code name args) fun?
+(define-record-type fun (%make-fun code name last-label args) fun?
 		    (code fun-code fun-code-set!)
 		    (name fun-name fun-name-set!)
 		    (last-label fun-last-label fun-last-label-set!)
 		    (args fun-args fun-args-set!))
 
 (define (make-fun name)
-  (%make-fun '() name '()))
+  (%make-fun '() name "entry" '()))
 
 (define (push-instr! fun instr)
   (fun-code-set! fun (cons instr (fun-code fun))))
@@ -33,9 +33,9 @@
       (hash-table-set! const-hash  c val)
       val))))
 
-(define-record-type loop-var (make-loop-var dest rg) loop-var?
+(define-record-type loop-var (make-loop-var dest phis) loop-var?
 		    (dest loop-var-dest)
-		    (rg loop-var-rg))
+		    (phis loop-var-phis loop-var-phis-set!))
 
 (define (abort str)
   (display "TODO:")
@@ -122,13 +122,18 @@
 	       #f
 	       (begin
 		 (push-instr! fun (format "~a:" join))
-		 (fun-last-label-set! join)
+		 (fun-last-label-set! fun join)
 		 (push-instr! fun (format "%v~a = phi i64 [~a, %~a], [~a, %~a]"
 					  join-id t-res t-last-label f-res f-last-label))))))
        (format "%v~a" join-id)))
     ((call ,loop-var ,args ___)
      (guard (and (assq loop-var env) (loop-var? (cdr (assq loop-var env)))))
-     (abort 'loop-call))
+     (let ((args (omap arg args (emit arg env fun #f)))
+	   (loop (cdr (assq loop-var env))))
+       (push-instr! fun (format "br label %~a" (loop-var-dest loop)))
+       (loop-var-phis-set! loop
+			   (omap (arg phi) (args (loop-var-phis loop))
+				 (string-append phi (format ", [~a, %~a]" arg (fun-last-label fun)))))))
     ((call ,args ___)
      (let* ((args (omap arg args (emit arg env fun #f)))
 	    (arglist (join ", " (omap arg args (format "i64 ~a" arg))))
@@ -190,7 +195,17 @@
        (else
 	(error "Unknown sym:" var)))))
     ((loop  ,vars ,name ,body ,inits ___)
-     (abort 'loop))
+     (let* ((args (omap init inits (emit init env fun #f)))
+	    (label (format "loop~a" (next-id)))
+	    (phi-ids (omap init inits (format "%v~a" (next-id))))
+	    (phis (omap (phi init) (phi-ids args) (format "~a = phi i64 [~a, %~a]" phi init (fun-last-label fun))))
+	    (loop (make-loop-var label phis)))
+       (push-instr! fun (format "br label %~a" label))
+       (push-instr! fun (format "~a:" label))
+       (push-instr! fun loop)
+       (fun-last-label-set! fun label)
+       (emit body (append (list (cons name loop)) (map cons vars phi-ids) env) fun tail))
+     )
     ((lookup ,var)
      (let ((sym (emit-const var))
 	   (id (next-id))
@@ -284,6 +299,11 @@ declare i64 @SCM_ADD (i64, i64)
 declare i64 @SCM_LT (i64, i64)
 declare i64 @SCM_SUB (i64, i64)
 declare i64 @SCM_NUM_EQ (i64, i64)
+declare i64 @SCM_GUARD (i64, i64)
+declare i64 @append (i64, i64)
+declare i64 @cons (i64, i64)
+declare i64 @car (i64)
+declare i64 @cdr (i64)
 "))
 
 (define (compile file verbose)
@@ -319,10 +339,14 @@ declare i64 @SCM_NUM_EQ (i64, i64)
 	 (fun-code-set! func (reverse! (fun-code func)))
 
 	 (newline)
-	 (display (format "define i64 @~a(~a) {\n" (fun-name func)
+	 (display (format "define i64 @~a(~a) {\n  entry:\n" (fun-name func)
 			  (join ", " (omap arg (fun-args func) (format "i64 ~a" arg)))))
 	 (for line (fun-code func)
-	      (display "  ") (display line) (newline))
+	      (if (loop-var? line)
+		  (for phi (loop-var-phis line)
+		       (display "  ") (display phi) (newline))
+		  (begin
+		    (display "  ") (display line) (newline))))
 	 (display "}\n"))
     ))
 
