@@ -367,7 +367,7 @@ INLINE gc_obj SCM_ADD(gc_obj a, gc_obj b) {
   }
 }
 
-NOINLINE __attribute__((preserve_all)) gc_obj SCM_SUB_SLOW(gc_obj a, gc_obj b) {
+NOINLINE __attribute__((preserve_most)) gc_obj SCM_SUB_SLOW(gc_obj a, gc_obj b) {
   double fa, fb;
   if (is_fixnum(a)) {
     fa = to_fixnum(a);
@@ -407,7 +407,7 @@ INLINE  gc_obj SCM_SUB(gc_obj a, gc_obj b) {
 }
 // TODO check is_flonum
 
-NOINLINE __attribute__((preserve_all)) gc_obj SCM_LT_SLOW(gc_obj a, gc_obj b) {
+NOINLINE __attribute__((preserve_most)) gc_obj SCM_LT_SLOW(gc_obj a, gc_obj b) {
   double fa, fb;
   if (is_fixnum(a)) {
     fa = to_fixnum(a);

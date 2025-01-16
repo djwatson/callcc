@@ -213,7 +213,7 @@ static uintptr_t align(uintptr_t val, uintptr_t alignment) {
   return (val + alignment - 1) & ~(alignment - 1);
 }
 
-NOINLINE __attribute__((preserve_all)) static void *rcimmix_alloc_slow(uint64_t sz) {
+NOINLINE __attribute__((preserve_most)) static void *rcimmix_alloc_slow(uint64_t sz) {
   if (collect_cnt >= next_collect) {
     collect_cnt = 0;
     rcimmix_collect();
