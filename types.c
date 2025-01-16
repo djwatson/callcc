@@ -83,7 +83,6 @@ typedef struct cons_s {
 
 typedef struct closure_s {
   uint64_t type;
-  gc_obj len;
   gc_obj v[];
 } closure_s;
 
@@ -402,6 +401,7 @@ INLINE gc_obj SCM_SUB(gc_obj a, gc_obj b) {
     [[clang::musttail]] return SCM_SUB_SLOW(a, b);
   }
 }
+// TODO check is_flonum
 
 NOINLINE gc_obj SCM_LT_SLOW(gc_obj a, gc_obj b) {
   double fa, fb;
@@ -435,4 +435,38 @@ INLINE gc_obj SCM_LT(gc_obj a, gc_obj b) {
     return FALSE_REP;
   }
   [[clang::musttail]] return SCM_LT_SLOW(a, b);
+}
+
+NOINLINE gc_obj SCM_NUM_EQ_SLOW(gc_obj a, gc_obj b) {
+  double fa, fb;
+  if (is_fixnum(a)) {
+    fa = to_fixnum(a);
+  } else {
+    fa = to_double(a);
+  }
+  if (is_fixnum(b)) {
+    fb = to_fixnum(b);
+  } else {
+    fb = to_double(b);
+  }
+  if (fa == fb) {
+    return TRUE_REP;
+  }
+  return FALSE_REP;
+}
+
+INLINE gc_obj SCM_NUM_EQ(gc_obj a, gc_obj b) {
+  if (likely((is_fixnum(a) & is_fixnum(b)) == 1)) {
+    if(a.value == b.value) {
+      return TRUE_REP;
+    }
+    return FALSE_REP;
+  }
+  if (likely((is_flonum_fast(a) & is_flonum_fast(b)) == 1)) {
+    if(to_double_fast(a) == to_double_fast(b)) {
+      return TRUE_REP;
+    }
+    return FALSE_REP;
+  }
+  [[clang::musttail]] return SCM_NUM_EQ_SLOW(a, b);
 }
