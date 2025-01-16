@@ -80,7 +80,13 @@
      (let* ((id (next-id))
 	    (args (omap arg args (format "i64 ~a" (emit arg env fun #f))))
 	    (argstr (join ", " args)))
-       (push-instr! fun (format "%v~a = call i64 @\"~a\"(~a)" id name argstr))
+       (push-instr! fun (format "%v~a = call ~a i64 @\"~a\"(~a) ~a"
+				id
+				(if (equal? "SCM_CALLCC" name)
+				    "preserve_nonecc" "")
+				name argstr
+				(if (equal? "SCM_CALLCC" name)
+				    "#0" "")))
        (finish (format "%v~a" id))))
     ((primcall ,var ,vals ___)
      (let* ((vals (omap val vals (emit val env fun #f)))
@@ -112,14 +118,17 @@
 	   (if (or tail (not f-res))
 	       #f
 	       (push-instr! fun (format "br label %~a" join)))
-	   (if tail
+	   (if (or tail (not (or f-res t-res)))
 	       #f
 	       (begin
 		 (push-instr! fun (format "~a:" join))
 		 (fun-last-label-set! fun join)
-		 (push-instr! fun (format "%v~a = phi i64 [~a, %~a], [~a, %~a]"
-					  join-id t-res t-last-label f-res f-last-label))))))
-       (format "%v~a" join-id)))
+		 (if (and f-res t-res)
+		     (begin
+		       (push-instr! fun (format "%v~a = phi i64 [~a, %~a], [~a, %~a]"
+						join-id t-res t-last-label f-res f-last-label))
+		       (format "%v~a" join-id))
+		     (or f-res t-res))))))))
     ((call ,loop-var ,args ___)
      (guard (and (assq loop-var env) (loop-var? (cdr (assq loop-var env)))))
      (let ((args (omap arg args (emit arg env fun #f)))
@@ -127,7 +136,8 @@
        (push-instr! fun (format "br label %~a" (loop-var-dest loop)))
        (loop-var-phis-set! loop
 			   (omap (arg phi) (args (loop-var-phis loop))
-				 (string-append phi (format ", [~a, %~a]" arg (fun-last-label fun)))))))
+				 (string-append phi (format ", [~a, %~a]" arg (fun-last-label fun)))))
+       #f))
     ((call ,args ___)
      (let* ((args (omap arg args (emit arg env fun #f)))
 	    (arglist (join ", " (omap arg args (format "i64 ~a" arg))))
@@ -206,8 +216,7 @@
        (push-instr! fun (format "~a:" label))
        (push-instr! fun loop)
        (fun-last-label-set! fun label)
-       (emit body (append (list (cons name loop)) (map cons vars phi-ids) env) fun tail))
-     )
+       (emit body (append (list (cons name loop)) (map cons vars phi-ids) env) fun tail)))
     ((lookup ,var)
      (let ((sym (emit-const var))
 	   (id (next-id))
@@ -298,6 +307,7 @@
    "target triple = \"x86_64-pc-linux-gnu\"\n
 declare i64 @display (i64)
 declare i64 @SCM_ADD (i64, i64)
+declare i64 @SCM_DIV (i64, i64)
 declare i64 @SCM_LT (i64, i64)
 declare i64 @SCM_GT (i64, i64)
 declare i64 @SCM_GTE (i64, i64)
@@ -307,6 +317,7 @@ declare i64 @SCM_GUARD (i64, i64)
 declare i64 @SCM_CLOSURE (i64, i64)
 declare i64 @SCM_CLOSURE_GET (i64, i64)
 declare void @SCM_CLOSURE_SET (i64, i64, i64)
+declare preserve_nonecc i64 @SCM_CALLCC (i64)  #0
 declare i64 @append (i64, i64)
 declare i64 @cons (i64, i64)
 declare i64 @car (i64)
@@ -318,6 +329,7 @@ declare i64 @vector_length (i64)
 declare i64 @vector_ref (i64, i64)
 declare i64 @vector_set (i64, i64, i64)
 declare void @gc_init ()
+attributes #0 = { noinline returns_twice }
 "))
 
 (define (compile file verbose)

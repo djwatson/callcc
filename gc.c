@@ -25,6 +25,10 @@ static uint64_t PAGE_SIZE = 1UL << 12;
 static alloc_table atable;
 
 static uint64_t *stacktop;
+
+uint64_t* gc_get_stack_top() {
+  return stacktop;
+}
 typedef struct freelist_s {
   uint64_t start_ptr;
   uint64_t end_ptr;

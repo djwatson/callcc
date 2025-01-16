@@ -1,7 +1,8 @@
 
-* fibc, ctak, destruc, divrec, gcbench? ntakl
+* fibc, ctak, gcbench? 
 
 * symbols can use name in ll
+* macro-ify more of the generated code.
 
 * check for undefined globals
 * check for bad closure

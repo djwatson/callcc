@@ -102,12 +102,12 @@ char to_char(gc_obj obj) { return (char)(obj.value >> 8); }
 uint8_t get_tag(gc_obj obj) { return obj.value & TAG_MASK; }
 uint8_t get_imm_tag(gc_obj obj) { return obj.value & IMMEDIATE_MASK; }
 uint32_t get_ptr_tag(gc_obj obj) {
-  return ((uint32_t *)(obj.value - PTR_TAG))[0];
+  return ((uint64_t *)(obj.value - PTR_TAG))[0];
 }
 bool is_char(gc_obj obj) { return get_imm_tag(obj) == CHAR_TAG; }
-bool is_closure(gc_obj obj) { return get_tag(obj) == CLOSURE_TAG; }
 bool is_cons(gc_obj obj) { return get_tag(obj) == CONS_TAG; }
 bool is_ptr(gc_obj obj) { return get_tag(obj) == PTR_TAG; }
+bool is_closure(gc_obj obj) { return is_ptr(obj) && get_ptr_tag(obj) == CLOSURE_TAG; }
 bool is_literal(gc_obj obj) { return get_tag(obj) == LITERAL_TAG; }
 bool is_string(gc_obj obj) {
   return is_ptr(obj) && get_ptr_tag(obj) == STRING_TAG;
@@ -305,7 +305,7 @@ gc_obj display(gc_obj obj) {
     printf("Unknown tag: %i\n", tag);
     abort();
   }
-  return NIL;
+  return UNDEFINED;
 }
 
 #if 0
@@ -406,6 +406,40 @@ INLINE  gc_obj SCM_SUB(gc_obj a, gc_obj b) {
   }
 }
 // TODO check is_flonum
+
+NOINLINE gc_obj SCM_DIV_SLOW(gc_obj a, gc_obj b) {
+  double fa, fb;
+  if (is_fixnum(a)) {
+    fa = to_fixnum(a);
+  } else {
+    fa = to_double(a);
+  }
+  if (is_fixnum(b)) {
+    fb = to_fixnum(b);
+  } else {
+    fb = to_double(b);
+  }
+  gc_obj res;
+  if(double_to_gc(fa / fb, &res)) {
+    return res;
+  }
+  abort();
+}
+
+INLINE gc_obj SCM_DIV(gc_obj a, gc_obj b) {
+  if (likely((is_fixnum(a) & is_fixnum(b)) == 1)) {
+    return tag_fixnum(to_fixnum(a) / to_fixnum(b));
+  } else if (likely((is_flonum_fast(a) & is_flonum_fast(b)) == 1)) {
+    gc_obj res;
+    if(likely(double_to_gc(to_double_fast(a) + to_double_fast(b), &res))) {
+      return res;
+    } else {
+      [[clang::musttail]] return SCM_DIV_SLOW(a, b);
+    }
+  } else {
+    [[clang::musttail]] return SCM_DIV_SLOW(a, b);
+  }
+}
 
 NOINLINE __attribute__((preserve_most)) gc_obj SCM_LT_SLOW(gc_obj a, gc_obj b) {
   double fa, fb;
@@ -617,4 +651,137 @@ void SCM_CLOSURE_SET(gc_obj clo, gc_obj obj, uint64_t i) {
 gc_obj SCM_CLOSURE_GET(gc_obj clo, gc_obj i) {
   //  printf("Closure get %li\n", to_fixnum(i));
   return to_closure(clo)->v[to_fixnum(i) + 1];
+}
+
+///////////// CALL cc
+
+// MUST look like a closure.
+typedef struct ccsave {
+  uint64_t type;
+  gc_obj v[1];
+
+  void *stack;
+  size_t sz;
+  struct ccsave *prev_link;
+} ccsave;
+
+static ccsave *cur_link = NULL;
+static uint8_t tmpstack[100];
+static gc_obj ccresthunk(gc_obj unused, gc_obj n) {
+  ccsave *c = (ccsave *)to_closure(unused);
+  cur_link = c->prev_link;
+
+  int64_t stack_bottom = (int64_t)gc_get_stack_top() - c->sz;
+  void *saved_stack = c->stack;
+  size_t saved_sz = c->sz;
+  uint64_t tmpstackalign = ((uint64_t)tmpstack + 100) & ~15;
+
+#if defined(__x86_64__)
+  asm volatile(
+      "mov %4, %%r12\n\t" // Save the return value in a callee-saved reg.
+      "mov %1, %%r13\n\t" // save old sp
+      "mov %0, %%rsp\n\t" // Switch to tmpstack.
+      "mov %1, %%rdi\n\t" // Set up memcpy call args
+      "mov %2, %%rsi\n\t"
+      "mov %3, %%rdx\n\t"
+      "call memcpy\n\t"      // call memcpy
+      "mov %%r13, %%rsp\n\t" // Restore the old stack pointer.
+      "pop %%rbp\n\t"        // Pop the old frame pointer.
+      "mov %%r12, %%rax\n\t" // Move return value from callee-saved to rax.
+      "ret\n\t"              // Return to caller of 'callcc'.
+      :                      // output
+      : "r"(tmpstackalign), "r"(stack_bottom), "r"(saved_stack), "r"(saved_sz),
+        "r"(n)
+      : "rsp", "rbp", "memory", "rax", "r12", "r13", "rdi", "rsi",
+        "rdx" // clobbers
+  );
+#elif defined(__aarch64__)
+  asm volatile("mov x19, %4\n\t" // Save the return value in a callee-saved reg.
+               "mov x20, %1\n\t" // Save the old sp
+               "mov SP, %0\n\t"  // Switch to tmpstack.
+               "mov x0, %1\n\t"  // Set up memcpy call args
+               "mov x1, %2\n\t"
+               "mov x2, %3\n\t"
+               "bl memcpy\n\t"   // call memcpy
+               "mov x0, x19\n\t" // Restore the old stack pointer.
+               "mov sp, x20\n\t" // Move return value from callee-saved to rax.
+               "ldp x29, x30, [sp], #16\n\t" // leave
+               "ret\n\t"                     // Return to caller of 'callcc'.
+               :                             // output
+               : "r"(tmpstack), "r"(stack_bottom), "r"(saved_stack),
+                 "r"(saved_sz), "r"(n)
+               : "memory", "x19", "x20", "x0", "x1", "x2");
+#endif
+  __builtin_unreachable();
+  return n;
+}
+
+static void need_more_frames() {
+  gc_obj res;
+  // This is called as a return point.  In x86_64, the return is in rax.
+#if defined(__x86_64__)
+  asm volatile("mov %%rax, %0\n\t" : "=r"(res) : : "rax");
+  // In aarch return and arg1 are equal, so this could be
+  // need_more_frames(int64_t res),
+  // but let's do it like this for consistency.
+#elif defined(__aarch64__)
+  asm volatile("mov %0, x0\n\t" : "=r"(res) : : "x0");
+#endif
+  // assert(cur_link);
+  ccresthunk(tag_closure((closure_s*)cur_link), res);
+}
+
+__attribute__((returns_twice, noinline, preserve_none)) gc_obj
+SCM_CALLCC(gc_obj cont) {
+  ccsave *stack = rcimmix_alloc(sizeof(ccsave));
+  assert(is_closure(cont));
+  auto clo = to_closure(cont);
+
+  void *stack_bottom = __builtin_frame_address(0);
+  void* stacktop = (void*)gc_get_stack_top();
+  size_t stack_sz = stacktop - stack_bottom;
+  stack->stack = rcimmix_alloc(stack_sz);
+  memcpy(stack->stack, stack_bottom, stack_sz);
+  stack->sz = stack_sz;
+
+  stack->type = CLOSURE_TAG;
+  stack->v[0] = (gc_obj){.value = (int64_t)ccresthunk};
+  stack->prev_link = cur_link;
+
+  auto cc = tag_closure((closure_s*)stack);
+
+  gc_obj unused_res;
+
+  cur_link = stack;
+#if defined(__x86_64__)
+  asm volatile("mov %1, %%rsp\n\t" // Reset stack pointer to stacktop
+               "mov $0, %%rbp\n\t" // Clear out the frame pointer
+               "push %2\n\t"       // Push return address of need_more_frames
+               "mov %3, %%rdi\n\t" // Set up call thunk - closure arg
+               "mov %4, %%rsi\n\t" // Set up call thunk - callcc cont arg
+               "jmp *%5\n\t"       // Jump to thunk.
+               : "=r"(unused_res)  // output
+               : "r"(stacktop), "r"(need_more_frames), "r"(cont), "r"(cc), "r"(clo->v[0])                 // input
+               : "rdi", "rsi", "memory" // clobbers
+  );
+
+#elif defined(__aarch64__)
+  asm volatile("mov sp, %1\n\t"   // Reset stack pointer to stacktop
+               "mov x29, 0\n\t"   // Clear out the frame pointer
+               "mov x30, %2\n\t"  // Set return address of need_more_frames
+               "mov x0, %3\n\t"   // Set up call thunk
+               "mov x1, %4\n\t"   // and call argument
+               "br %5\n\t"        // Jump to thunk.
+               : "=r"(unused_res) // output
+               : "r"(stacktop), "r"(need_more_frames), "r"(cont), "r"(cc),
+                 "r"(clo->v[0])               // input
+               : "x0", "x1", "memory" // clobbers
+  );
+#endif
+  // This is unreachable, but if you use __builtin_unreachable(), callers
+  // will not have valid return points ... so fake a call.
+
+  // Also, the result *must* be unknowable at compile-time: clang is smart
+  // enough to inline this result, not knowing there is no result.
+  return unused_res;
 }
