@@ -61,13 +61,9 @@
      (finish undefined-tag))
     ((define ,var ,val)
      (let ((val (emit val env fun #f))
-	   (sym (emit-const var))
-	   (id (next-id))
-	   (pid (next-id)))
-       ;; Offset in to the global.
-       (push-instr! fun (format "%v~a = add i64 ~a, ~a" id sym (+ (- ptr-tag) 16)))
-       (push-instr! fun (format "%v~a = inttoptr i64 %v~a to i64*" pid id))
-       (push-instr! fun (format "store i64 ~a, i64* %v~a" val pid)))
+	   (sym (emit-const var)))
+       (push-instr! fun (format "call void @SCM_SET_GLOBAL(i64 ~a, i64 ~a)"
+				sym val)))
      (finish undefined-tag))
     ((primcall ,op ,cell ,val ,loc)
      (guard (memq op '(STORE STORE_CHAR)))
@@ -145,21 +141,17 @@
        (let* ((arglist (join ", " (append (omap arg reg-args (format "i64 ~a" arg))
 					  (make-list (- max-reg-args (length reg-args)) "i64 undef"))))
 	      (id (next-id))
-	      (pid (next-id))
-	      (clo-id (next-id))
-	      (fid (next-id)))
+	      (clo-id (next-id)))
 	 (for (arg i) (stack-args (iota (length stack-args)))
 	      (let ((sid (next-id)))
 		(push-instr! fun (format "%v~a = getelementptr inbounds [100 x i64], ptr @shadow_stack, i64 0, i64 ~a"
 					 sid i))
 		(push-instr! fun (format "store i64 ~a, ptr %v~a, align 8"
 					 arg sid))))
-	 (push-instr! fun (format "%v~a = add i64 ~a, ~a" id (car reg-args) (+ (- ptr-tag) 8)))
-	 (push-instr! fun (format "%v~a = inttoptr i64 %v~a to ptr" pid id))
-	 (push-instr! fun (format "%v~a = load ptr, ptr %v~a" clo-id pid))
-
-	 (push-instr! fun (format "%v~a = ~a call i64 %v~a(~a)" fid (if tail "musttail" "") clo-id arglist))
-	 (finish (format "%v~a" fid)))))
+	 (push-instr! fun (format "%v~a = call ptr @SCM_LOAD_CLOSURE_PTR(i64 ~a)"
+				  clo-id (car reg-args)))
+	 (push-instr! fun (format "%v~a = ~a call i64 %v~a(~a)" id (if tail "musttail" "") clo-id arglist))
+	 (finish (format "%v~a" id)))))
     ((label-call ,label ,args ___)
      (let-values (((reg-args stack-args) (split-arglist (omap arg args (emit arg env fun #f)))))
        (let* ((arglist (join ", " (append (omap arg reg-args (format "i64 ~a" arg))
@@ -237,11 +229,12 @@
 	   (id (next-id))
 	   (pid (next-id))
 	   (resid (next-id)))
-       ;; Offset in to the global.
-       (push-instr! fun (format "%v~a = add i64 ~a, ~a" id sym (+ (- ptr-tag) 16)))
-       (push-instr! fun (format "%v~a = inttoptr i64 %v~a to i64*" pid id))
-       (push-instr! fun (format "%v~a = load i64, i64* %v~a" resid pid))
-       (finish (format "%v~a" resid))))
+       (push-instr! fun (format "%v~a = call i64 @SCM_LOAD_GLOBAL(i64 ~a)" id sym))
+       ;; ;; Offset in to the global.
+       ;; (push-instr! fun (format "%v~a = add i64 ~a, ~a" id sym (+ (- ptr-tag) 16)))
+       ;; (push-instr! fun (format "%v~a = inttoptr i64 %v~a to i64*" pid id))
+       ;; (push-instr! fun (format "%v~a = load i64, i64* %v~a" resid pid))
+       (finish (format "%v~a" id))))
     (,const
      (guard (not (pair? const)))
      (finish (emit-const const)))
@@ -260,11 +253,11 @@
   (cond
    ((symbol? c)
     (let ((str (emit-const (symbol->string c)))
-	  (id (next-id)))
-      (push! consts (format "@sym~a = internal unnamed_addr global {i64, i64, i64} {i64 ~a, i64 ~a, i64 ~a}, align 8\n"
-			    id symbol-tag str undefined-tag))
-      (format "add (i64 ~a, i64 ptrtoint ({i64, i64, i64}* @sym~a to i64))"
-	      ptr-tag id)))
+	  (sym-name (string-append "SYM-" (symbol->string c))))
+      (push! consts (format "@\"~a\" = internal unnamed_addr global {i64, i64, i64} {i64 ~a, i64 ~a, i64 ~a}, align 8\n"
+			    sym-name symbol-tag str undefined-tag))
+      (format "add (i64 ~a, i64 ptrtoint ({i64, i64, i64}* @\"~a\" to i64))"
+	      ptr-tag sym-name)))
    ((flonum? c)
     (let* ((id (next-id))
 	   (u (get-double-as-u64 c))
@@ -331,6 +324,9 @@ declare i64 @SCM_GUARD (i64, i64)
 declare i64 @SCM_CLOSURE (i64, i64)
 declare i64 @SCM_CLOSURE_GET (i64, i64)
 declare void @SCM_CLOSURE_SET (i64, i64, i64)
+declare i64 @SCM_LOAD_GLOBAL(i64)
+declare void @SCM_SET_GLOBAL(i64, i64)
+declare ptr @SCM_LOAD_CLOSURE_PTR(i64)
 declare preserve_nonecc i64 @SCM_CALLCC (i64)  #0
 declare i64 @append (i64, i64)
 declare i64 @cons (i64, i64)

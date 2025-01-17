@@ -1,8 +1,5 @@
 
-* gcbench?
-
-* symbols can use name in ll
-* macro-ify more of the generated code.
+* case-lambda, argcnt stubs
 
 * check for undefined globals
 * check for bad closure
@@ -22,9 +19,6 @@
 * outpout/input buffering
 * gc fd's.
 * gset check
-* argcnt check
-* varargs
-* case-lambda
 * bignums, compnums, ratnums
 
 * DONE self-tagging: experiment with better double tagging

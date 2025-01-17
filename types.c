@@ -328,6 +328,40 @@ int main() {
 #define NOINLINE __attribute__((noinline))
 #define INLINE __attribute__((always_inline))
 
+NOINLINE gc_obj SCM_LOAD_GLOBAL_FAIL(gc_obj a) {
+  auto str = to_string(to_symbol(a)->name);
+  printf("Attempting to load undefined sym: %.*s\n", (int)to_fixnum(str->len), str->str);
+  abort();
+}
+gc_obj SCM_LOAD_GLOBAL(gc_obj a) {
+  //assert(is_symbol(a));
+  auto sym = to_symbol(a);
+  auto val = sym->val;
+  if (likely(val.value != UNDEFINED.value)) {
+    return val;
+  }
+  [[clang::musttail]] return SCM_LOAD_GLOBAL_FAIL(a);
+}
+
+void SCM_SET_GLOBAL(gc_obj a, gc_obj b) {
+  auto sym = to_symbol(a);
+  sym->val = b;
+}
+
+NOINLINE void* SCM_LOAD_CLOSURE_PTR_FAIL(gc_obj a) {
+  printf("Attempting to call non-closure:");
+  display(a);
+  printf("\n");
+  abort();
+}
+void* SCM_LOAD_CLOSURE_PTR(gc_obj a) {
+  if (likely(is_closure(a))) {
+    auto clo = to_closure(a);
+    return (void*)clo->v[0].value;
+  }
+  [[clang::musttail]] return SCM_LOAD_CLOSURE_PTR_FAIL(a);
+}
+
 NOINLINE gc_obj SCM_ADD_SLOW(gc_obj a, gc_obj b) {
   double fa, fb;
   if (is_fixnum(a)) {
@@ -858,3 +892,4 @@ SCM_CALLCC(gc_obj cont) {
   // enough to inline this result, not knowing there is no result.
   return unused_res;
 }
+
