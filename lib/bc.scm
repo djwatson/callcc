@@ -43,6 +43,28 @@
   (newline)
   (exit))
 
+(define (emit-function func-p nlambda var id env)
+  (define name (second nlambda))
+  (define cases (cddr nlambda))
+  (define last-case (last cases))
+  (define last-case-jmp #f)
+  (fun-name-set! func-p var)
+
+  (when (hash-table-exists? escapes-table var)
+    1
+    )
+  (for case cases
+       (define argcnt (length (to-proper (second case))))
+       (define args (second case))
+       (define arg-ids (omap arg args (format "%v~a" (next-id))))
+       (define v-type (list? (second case)))
+       (fun-args-set! func-p arg-ids)
+       (emit (third case)
+	     (append (map cons (to-proper (second case)) arg-ids)
+		     env)
+	     func-p
+	     #t)))
+
 (define (emit sexp env fun tail)
   (define (finish res)
     (if tail
@@ -137,34 +159,20 @@
 				 (string-append phi (format ", [~a, %~a]" arg (fun-last-label fun)))))
        #f))
     ((call ,args ___)
-     (let-values (((reg-args stack-args) (split-arglist (omap arg args (emit arg env fun #f)))))
-       (let* ((arglist (join ", " (append (omap arg reg-args (format "i64 ~a" arg))
-					  (make-list (- max-reg-args (length reg-args)) "i64 undef"))))
-	      (id (next-id))
-	      (clo-id (next-id)))
-	 (for (arg i) (stack-args (iota (length stack-args)))
-	      (let ((sid (next-id)))
-		(push-instr! fun (format "%v~a = getelementptr inbounds [100 x i64], ptr @shadow_stack, i64 0, i64 ~a"
-					 sid i))
-		(push-instr! fun (format "store i64 ~a, ptr %v~a, align 8"
-					 arg sid))))
-	 (push-instr! fun (format "%v~a = call ptr @SCM_LOAD_CLOSURE_PTR(i64 ~a)"
-				  clo-id (car reg-args)))
-	 (push-instr! fun (format "%v~a = ~a call i64 %v~a(~a)" id (if tail "musttail" "") clo-id arglist))
-	 (finish (format "%v~a" id)))))
+     (let* ((args (omap arg args (emit arg env fun #f)))
+	    (arglist (join ", " (omap arg args (format "i64 ~a" arg))))
+	    (id (next-id))
+	    (clo-id (next-id)))
+       (push-instr! fun (format "%v~a = call ptr @SCM_LOAD_CLOSURE_PTR(i64 ~a)"
+				clo-id (car args)))
+       (push-instr! fun (format "%v~a = ~a call tailcc i64 %v~a(~a)" id (if tail "musttail" "") clo-id arglist))
+       (finish (format "%v~a" id))))
     ((label-call ,label ,args ___)
-     (let-values (((reg-args stack-args) (split-arglist (omap arg args (emit arg env fun #f)))))
-       (let* ((arglist (join ", " (append (omap arg reg-args (format "i64 ~a" arg))
-					  (make-list (- max-reg-args (length reg-args)) "i64 undef"))))
-	      (id (next-id)))
-	 (for (arg i) (stack-args (iota (length stack-args)))
-	      (let ((sid (next-id)))
-		(push-instr! fun (format "%v~a = getelementptr inbounds [100 x i64], ptr @shadow_stack, i64 0, i64 ~a"
-					 sid i))
-		(push-instr! fun (format "store i64 ~a, ptr %v~a, align 8"
-					 arg sid))))
-	 (push-instr! fun (format "%v~a = ~a call i64 @\"~a\"(~a)" id (if tail "musttail" "") label arglist))
-	 (finish (format "%v~a" id)))))
+     (let* ((args (omap arg args (emit arg env fun #f)))
+	    (arglist (join ", " (omap arg args (format "i64 ~a" arg))))
+	    (id (next-id)))
+       (push-instr! fun (format "%v~a = ~a call tailcc i64 @\"~a\"(~a)" id (if tail "musttail" "") label arglist))
+       (finish (format "%v~a" id))))
     ((let ((,vars ,vals) ___) ,body)
      (let ((args (omap val vals (emit val env fun #f))))
        (emit body (append (map cons vars args) env) fun tail)))
@@ -186,24 +194,8 @@
 					(push! functions fun)
 					fun) label-ids))
 	    (env (append (map cons vars label-ids) env)))
-       (for-each (lambda (func-p nlambda var id)
-		   (define name (second nlambda))
-		   (define cases (cddr nlambda))
-		   (define last-case (last cases))
-		   (define last-case-jmp #f)
-		   (fun-name-set! func-p var)
-		   (for case cases
-			(define argcnt (length (to-proper (second case))))
-			(define args (second case))
-			(define arg-ids (omap arg args (format "%v~a" (next-id))))
-			(define v-type (list? (second case)))
-			(fun-args-set! func-p arg-ids)
-			(emit (third case)
-			      (append (map cons (to-proper (second case)) arg-ids)
-				      env)
-			      func-p
-			      #t)))
-		 funs lambdas vars label-ids)
+       (for (func-p lambda var id) (funs lambdas vars label-ids)
+	    (emit-function func-p lambda var id env))
        (emit body env fun tail)))
     (,var
      ;; Only lookup, doesn't gen code.
@@ -339,7 +331,6 @@ declare i64 @vector_length (i64)
 declare i64 @vector_ref (i64, i64)
 declare i64 @vector_set (i64, i64, i64)
 declare void @gc_init ()
-@shadow_stack = internal unnamed_addr global [100 x i64] zeroinitializer, align 16
 attributes #0 = { noinline returns_twice }
 "))
 
@@ -382,25 +373,19 @@ attributes #0 = { noinline returns_twice }
 
 	 (newline)
 
-	 (let-values (((real-args shadow-args) (split-arglist (fun-args func))))
-	   (display (format "define i64 @\"~a\"(~a) {\n" (fun-name func)
-			    (join ", " (append (omap arg real-args (format "i64 ~a" arg))
-					       (make-list (- max-reg-args (length real-args)) "i64")))))
-	   (display (format " entry:\n"))
-	   (for (arg i) (shadow-args (iota (length shadow-args)))
-		(let ((id (next-id)))
-		  (display (format "  %v~a = getelementptr inbounds [100 x i64], ptr @shadow_stack, i64 0, i64 ~a\n"
-				   id i))
-		  (display (format "  ~a = load i64, ptr %v~a\n"
-				   arg id)))))
+	 (display (format "define ~a i64 @\"~a\"(~a) {\n" 
+			  (if (equal? (fun-name func) "main")
+			      "tailcc" "internal tailcc")
+			  (fun-name func)
+			  (join ", " (omap arg (fun-args func) (format "i64 ~a" arg)))))
+	 (display (format " entry:\n"))
 	 (when (equal? "main" (fun-name func))
 	   (display (format "  call void @gc_init()\n")))
 	 (for line (fun-code func)
 	      (if (loop-var? line)
 		  (for phi (loop-var-phis line)
-		       (display "  ") (display phi) (newline))
-		  (begin
-		    (display "  ") (display line) (newline))))
+		       (display (format "  ~a\n" phi)))
+		  (display (format "  ~a\n" line))))
 	 (display "}\n"))
     ))
 

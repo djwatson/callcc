@@ -1,8 +1,6 @@
 
 * case-lambda, argcnt stubs
 
-* check for undefined globals
-* check for bad closure
 * fast globals
 * program-ify
 * better letrec
@@ -10,7 +8,6 @@
 
 * figure out strategy for intrinsics????
 * cleanup runtime
-* call/cc
 * inliner?? 
 
 * r4rs, r5rs*
