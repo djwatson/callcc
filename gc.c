@@ -104,8 +104,9 @@ static void mark() {
     assert(((int64_t)r.end & 0x7) == 0);
     while (r.start < r.end) {
       uint8_t *val = (uint8_t *)*r.start;
-      slab_info *slab = alloc_table_lookup(&atable, val);
-      if (slab && (val >= slab->start) && (val < slab->end)) {
+      slab_info *slab;
+      bool found = alloc_table_lookup(&atable, val, (void**)&slab);
+      if (found && slab && (val >= slab->start) && (val < slab->end)) {
         // Find the start of the object
         uint64_t index =
             ((uint64_t)val - (uint64_t)slab->start) / (slab->class * 8);
@@ -185,6 +186,8 @@ __attribute__((noinline, preserve_none)) static void rcimmix_collect() {
   if (new_next_collect > next_collect) {
     next_collect = new_next_collect;
   }
+
+  kv_destroy(markstack);
 
   clock_gettime(CLOCK_MONOTONIC, &end);
   double time_taken =

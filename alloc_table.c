@@ -18,25 +18,25 @@ static void set(alloc_table *table, void *val, uint64_t ps) {
   (*l2)[(ps >> shift) & ind_mask] = val;
 }
 
-void *alloc_table_lookup(alloc_table *table, void *p) {
+bool alloc_table_lookup(alloc_table *table, void *p, void**slab) {
   uint64_t ps = (uint64_t)p;
-  if (ps < table->min) {
-    return nullptr;
-  }
-  if (ps > table->max) {
-    return nullptr;
+  bool below = ps < table->min;
+  bool above = ps > table->max;
+  if (below || above) {
+    return false;
   }
 
   auto l1 = table->map[(ps >> (shift + shift + shift)) & ind_mask];
   if (l1 == nullptr) {
-    return nullptr;
+    return false;
   }
   auto l2 = l1[(ps >> (shift + shift)) & ind_mask];
   if (l2 == nullptr) {
-    return nullptr;
+    return false;
   }
   auto l3 = l2[(ps >> shift) & ind_mask];
-  return l3;
+  *slab = l3;
+  return true;
 }
 
 void alloc_table_set_range(alloc_table *table, void *val, void *p, uint64_t range) {

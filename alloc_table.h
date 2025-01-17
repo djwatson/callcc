@@ -17,7 +17,7 @@ typedef struct  alloc_table {
 
 } alloc_table;
 
-void *alloc_table_lookup(alloc_table *table, void *p);
+bool alloc_table_lookup(alloc_table *table, void *p, void**slab);
 void alloc_table_set_range(alloc_table *table, void *val, void *p, uint64_t range);
 
 
