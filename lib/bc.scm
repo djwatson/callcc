@@ -76,6 +76,8 @@
 	    (val-loc (emit loc env fun #f)))
        (abort op)
        (finish rg)))
+    ;; TODO: callcc probably also needs to be musttail.
+    ;; but, the calling conventions don't match.
     ((primcall FOREIGN_CALL ,name ,args ___)
      (let* ((id (next-id))
 	    (args (omap arg args (format "i64 ~a" (emit arg env fun #f))))
@@ -93,7 +95,7 @@
 	    (arglist (join ", " (omap val vals (format "i64 ~a" val))))
 	    (id (next-id)))
        (push-instr! fun (format "%v~a = call i64 @\"~a\"(~a)"
-		 id (string-append "SCM_" (symbol->string var)) arglist))
+				id (string-append "SCM_" (symbol->string var)) arglist))
        (finish (format "%v~a" id))))
     ((if ,a ,b ,c)
      (let ((id (next-id))
@@ -139,25 +141,38 @@
 				 (string-append phi (format ", [~a, %~a]" arg (fun-last-label fun)))))
        #f))
     ((call ,args ___)
-     (let* ((args (omap arg args (emit arg env fun #f)))
-	    (arglist (join ", " (omap arg args (format "i64 ~a" arg))))
-	    (id (next-id))
-	    (pid (next-id))
-	    (clo-id (next-id))
-	    (fid (next-id)))
-       (push-instr! fun (format "%v~a = add i64 ~a, ~a" id (car args) (+ (- ptr-tag) 8)))
-       (push-instr! fun (format "%v~a = inttoptr i64 %v~a to ptr" pid id))
-       (push-instr! fun (format "%v~a = load ptr, ptr %v~a" clo-id pid))
+     (let-values (((reg-args stack-args) (split-arglist (omap arg args (emit arg env fun #f)))))
+       (let* ((arglist (join ", " (append (omap arg reg-args (format "i64 ~a" arg))
+					  (make-list (- max-reg-args (length reg-args)) "i64 undef"))))
+	      (id (next-id))
+	      (pid (next-id))
+	      (clo-id (next-id))
+	      (fid (next-id)))
+	 (for (arg i) (stack-args (iota (length stack-args)))
+	      (let ((sid (next-id)))
+		(push-instr! fun (format "%v~a = getelementptr inbounds [100 x i64], ptr @shadow_stack, i64 0, i64 ~a"
+					 sid i))
+		(push-instr! fun (format "store i64 ~a, ptr %v~a, align 8"
+					 arg sid))))
+	 (push-instr! fun (format "%v~a = add i64 ~a, ~a" id (car reg-args) (+ (- ptr-tag) 8)))
+	 (push-instr! fun (format "%v~a = inttoptr i64 %v~a to ptr" pid id))
+	 (push-instr! fun (format "%v~a = load ptr, ptr %v~a" clo-id pid))
 
-       (push-instr! fun (format "%v~a = call i64 %v~a(~a)" fid clo-id arglist))
-       (finish (format "%v~a" fid)))
-     )
+	 (push-instr! fun (format "%v~a = ~a call i64 %v~a(~a)" fid (if tail "musttail" "") clo-id arglist))
+	 (finish (format "%v~a" fid)))))
     ((label-call ,label ,args ___)
-     (let* ((args (omap arg args (emit arg env fun #f)))
-	    (arglist (join ", " (omap arg args (format "i64 ~a" arg))))
-	    (id (next-id)))
-       (push-instr! fun (format "%v~a = call i64 @\"~a\"(~a)" id label arglist))
-       (finish (format "%v~a" id))))
+     (let-values (((reg-args stack-args) (split-arglist (omap arg args (emit arg env fun #f)))))
+       (let* ((arglist (join ", " (append (omap arg reg-args (format "i64 ~a" arg))
+					  (make-list (- max-reg-args (length reg-args)) "i64 undef"))))
+	      (id (next-id)))
+	 (for (arg i) (stack-args (iota (length stack-args)))
+	      (let ((sid (next-id)))
+		(push-instr! fun (format "%v~a = getelementptr inbounds [100 x i64], ptr @shadow_stack, i64 0, i64 ~a"
+					 sid i))
+		(push-instr! fun (format "store i64 ~a, ptr %v~a, align 8"
+					 arg sid))))
+	 (push-instr! fun (format "%v~a = ~a call i64 @\"~a\"(~a)" id (if tail "musttail" "") label arglist))
+	 (finish (format "%v~a" id)))))
     ((let ((,vars ,vals) ___) ,body)
      (let ((args (omap val vals (emit val env fun #f))))
        (emit body (append (map cons vars args) env) fun tail)))
@@ -233,9 +248,6 @@
     ((quote ,const)
      (finish (emit-const const)))
     (,else (error "UNKOWN EMIT:" sexp))))
-
-(define (dformat . args)
-  (display (apply format args)))
 
 (define (flonum? c)
   (and (number? c) (inexact? c)))
@@ -331,8 +343,14 @@ declare i64 @vector_length (i64)
 declare i64 @vector_ref (i64, i64)
 declare i64 @vector_set (i64, i64, i64)
 declare void @gc_init ()
+@shadow_stack = internal unnamed_addr global [100 x i64] zeroinitializer, align 16
 attributes #0 = { noinline returns_twice }
 "))
+
+(define (split-arglist args)
+  (if (> (length args) max-reg-args)
+      (split-at args max-reg-args)
+      (values args '())))
 
 (define (compile file verbose)
   (set! functions '())
@@ -348,8 +366,8 @@ attributes #0 = { noinline returns_twice }
 	 (runtime (expand-program runtime-input "" libman))
 	 (prog (expand-program input "PROG-" libman))
 	 (lowered (r7-pass `(begin	,@runtime
-			      ,@prog
-			      ) #f))
+					,@prog
+					) #f))
 	 (main-fun (make-fun "main")))
     (when verbose
       (display (format "Compiling ~a\n" file) (current-error-port))
@@ -367,9 +385,18 @@ attributes #0 = { noinline returns_twice }
 	 (fun-code-set! func (reverse! (fun-code func)))
 
 	 (newline)
-	 (display (format "define i64 @\"~a\"(~a) {\n" (fun-name func)
-			  (join ", " (omap arg (fun-args func) (format "i64 ~a" arg)))))
-	 (display (format " entry:\n"))
+
+	 (let-values (((real-args shadow-args) (split-arglist (fun-args func))))
+	   (display (format "define i64 @\"~a\"(~a) {\n" (fun-name func)
+			    (join ", " (append (omap arg real-args (format "i64 ~a" arg))
+					       (make-list (- max-reg-args (length real-args)) "i64")))))
+	   (display (format " entry:\n"))
+	   (for (arg i) (shadow-args (iota (length shadow-args)))
+		(let ((id (next-id)))
+		  (display (format "  %v~a = getelementptr inbounds [100 x i64], ptr @shadow_stack, i64 0, i64 ~a\n"
+				   id i))
+		  (display (format "  ~a = load i64, ptr %v~a\n"
+				   arg id)))))
 	 (when (equal? "main" (fun-name func))
 	   (display (format "  call void @gc_init()\n")))
 	 (for line (fun-code func)
