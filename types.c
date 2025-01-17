@@ -367,6 +367,45 @@ INLINE gc_obj SCM_ADD(gc_obj a, gc_obj b) {
   }
 }
 
+NOINLINE gc_obj SCM_MUL_SLOW(gc_obj a, gc_obj b) {
+  double fa, fb;
+  if (is_fixnum(a)) {
+    fa = to_fixnum(a);
+  } else {
+    fa = to_double(a);
+  }
+  if (is_fixnum(b)) {
+    fb = to_fixnum(b);
+  } else {
+    fb = to_double(b);
+  }
+  gc_obj res;
+  if(double_to_gc(fa * fb, &res)) {
+    return res;
+  }
+  abort();
+}
+
+INLINE gc_obj SCM_MUL(gc_obj a, gc_obj b) {
+  if (likely((is_fixnum(a) & is_fixnum(b)) == 1)) {
+    gc_obj res;
+    if(likely(!__builtin_mul_overflow(a.value, b.value >> 3, &res.value))) {
+      return res;
+    } else {
+      [[clang::musttail]] return SCM_ADD_SLOW(a, b);
+    }
+  } else if (likely((is_flonum_fast(a) & is_flonum_fast(b)) == 1)) {
+    gc_obj res;
+    if(likely(double_to_gc(to_double_fast(a) * to_double_fast(b), &res))) {
+      return res;
+    } else {
+      [[clang::musttail]] return SCM_MUL_SLOW(a, b);
+    }
+  } else {
+    [[clang::musttail]] return SCM_MUL_SLOW(a, b);
+  }
+}
+
 NOINLINE __attribute__((preserve_most)) gc_obj SCM_SUB_SLOW(gc_obj a, gc_obj b) {
   double fa, fb;
   if (is_fixnum(a)) {
@@ -473,6 +512,40 @@ INLINE gc_obj SCM_LT(gc_obj a, gc_obj b) {
     return FALSE_REP;
   }
   return SCM_LT_SLOW(a, b);
+}
+
+NOINLINE __attribute__((preserve_most)) gc_obj SCM_LTE_SLOW(gc_obj a, gc_obj b) {
+  double fa, fb;
+  if (is_fixnum(a)) {
+    fa = to_fixnum(a);
+  } else {
+    fa = to_double(a);
+  }
+  if (is_fixnum(b)) {
+    fb = to_fixnum(b);
+  } else {
+    fb = to_double(b);
+  }
+  if (fa <= fb) {
+    return TRUE_REP;
+  }
+  return FALSE_REP;
+}
+
+INLINE gc_obj SCM_LTE(gc_obj a, gc_obj b) {
+  if (likely((is_fixnum(a) & is_fixnum(b)) == 1)) {
+    if(a.value <= b.value) {
+      return TRUE_REP;
+    }
+    return FALSE_REP;
+  }
+  if (likely((is_flonum_fast(a) & is_flonum_fast(b)) == 1)) {
+    if(to_double_fast(a) <= to_double_fast(b)) {
+      return TRUE_REP;
+    }
+    return FALSE_REP;
+  }
+  return SCM_LTE_SLOW(a, b);
 }
 
 NOINLINE gc_obj SCM_GT_SLOW(gc_obj a, gc_obj b) {
