@@ -22,7 +22,8 @@
   X(RECORD, 0xa)                                                               \
   X(CLOSURE, 0x12)							\
   X(SYMBOL, 0x1a)							\
-  X(CONT, 0x22)
+  X(CONT, 0x22)							\
+  X(FLONUM, 0x2a)
 
 #define IMMEDIATE_TAGS                                                         \
   X(BOOL, 0x6)                                                                 \
@@ -150,8 +151,10 @@ static bool has_tag_5_or_4_or_1 ( int64_t n ) {
   // behavior, and clang will happily optimize everything out.
   return ((( uint32_t )1 << (n&0x1f) ) & (~( uint32_t )0/0xff * TAG_SET2 )) != 0;
 }
-bool is_flonum_fast(gc_obj obj) {
-  return has_tag_5_or_4_or_1(obj.value);
+bool is_flonum_fast(gc_obj obj) { return has_tag_5_or_4_or_1(obj.value); }
+
+bool is_flonum(gc_obj obj) {
+  return is_flonum_fast(obj) || (is_ptr(obj) && get_ptr_tag(obj) == FLONUM_TAG);
 }
 
 bool double_to_gc(double d, gc_obj* res) {
@@ -371,13 +374,23 @@ NOINLINE gc_obj SCM_ADD_SLOW(gc_obj a, gc_obj b) {
   double fa, fb;
   if (is_fixnum(a)) {
     fa = to_fixnum(a);
-  } else {
+  } else if (is_flonum(b)){
     fa = to_double(a);
+  } else {
+    printf("Add: not a number:");
+    display(a);
+    printf("\n");
+    abort();
   }
   if (is_fixnum(b)) {
     fb = to_fixnum(b);
-  } else {
+  } else if (is_flonum(b)) {
     fb = to_double(b);
+  } else {
+    printf("Add: not a number:");
+    display(b);
+    printf("\n");
+    abort();
   }
   gc_obj res;
   if(double_to_gc(fa + fb, &res)) {
@@ -949,12 +962,19 @@ __attribute__((used)) int64_t consargs(gc_obj* reg_args) {
   auto start_slot = argcnt_to_slot(argcnt-1);
   reg_args[end_slot] = res;
 
-  // TODO: round up to nearest 16, and add one.
   if (start_slot > reg_arg_cnt) {
     if (end_slot < reg_arg_cnt) {
       end_slot = argcnt_to_slot(reg_arg_cnt);
+    } else {
+      end_slot += 1;
     }
-    int64_t shift = (0 + start_slot - end_slot) * 8;
+    // clang's tailcc always pops an odd number, eq or greater than the stack args:
+    // Round down to even, then add one.
+    //
+    // Calculate the difference between the new and old args, and shift the stack.
+    auto prev_pop = ((argcnt-reg_arg_cnt)&~1)+1;
+    auto new_pop = ((end_slot -argcnt_to_slot(reg_arg_cnt))&~1)+1;
+    auto shift = (prev_pop - new_pop)*8;
     size_t sz =  (intptr_t)&reg_args[end_slot] - (intptr_t)reg_args;
     // We have to slide the whole stack up.
     memmove((void *)((int64_t)reg_args + shift), reg_args, sz);
