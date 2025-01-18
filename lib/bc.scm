@@ -60,9 +60,14 @@
 	       (call-res (next-id))
 	       (true-label (next-id))
 	       (false-label (next-id)))
-	   (push-instr! fun (format "%v~a = icmp eq i64 %argcnt, ~a" id (length (second case))))
+	   (if (list? (second case))
+	       (push-instr! fun (format "%v~a = icmp eq i64 %argcnt, ~a" id (length (second case))))
+	       (push-instr! fun (format "%v~a = icmp uge i64 %argcnt, ~a" id (- (length (to-proper (second case))) 1))))
 	   (push-instr! fun (format "br i1 %v~a, label %~a, label %~a" id true-label false-label))
 	   (push-instr! fun (format "~a:" true-label))
+	   (unless (list? (second case))
+	     (push-instr! fun (format "store i64 ~a, ptr @wanted_argcnt" (- (length (to-proper (second case))) 1)))
+	     (push-instr! fun (format "call void @consargs_stub()")))
 	   (push-instr! fun (format "%v~a = musttail call tailcc i64 @\"~a\"(~a)"
 				    call-res (format "~a_case~a" var i)
 				    "i64 undef"))
@@ -74,7 +79,7 @@
   (for (case i) (cases (iota (length cases)))
        (define cfun (make-fun 1))
        (define argcnt (length (to-proper (second case))))
-       (define args (second case))
+       (define args (to-proper (second case)))
        (define arg-ids (omap arg args (format "%v~a" (next-id))))
        (define v-type (list? (second case)))
        (define case-label (format "~a_case~a" var i))
@@ -358,6 +363,7 @@ declare i64 @SCM_LOAD_GLOBAL(i64)
 declare void @SCM_SET_GLOBAL(i64, i64)
 declare ptr @SCM_LOAD_CLOSURE_PTR(i64)
 declare preserve_nonecc i64 @SCM_CALLCC (i64)  #0
+declare void @consargs_stub () #0
 declare i64 @append (i64, i64)
 declare i64 @cons (i64, i64)
 declare i64 @car (i64)
@@ -370,6 +376,7 @@ declare i64 @vector_ref (i64, i64)
 declare i64 @vector_set (i64, i64, i64)
 declare void @gc_init ()
 @argcnt = dso_local global i64 0
+@wanted_argcnt = dso_local global i64 0
 attributes #0 = { noinline returns_twice \"thunk\" cold}
 "))
 

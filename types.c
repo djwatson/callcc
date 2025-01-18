@@ -844,7 +844,9 @@ static __attribute__((preserve_none)) void need_more_frames() {
   // assert(cur_link);
   ccresthunk(tag_closure((closure_s*)cur_link), res);
 }
+
 extern int64_t argcnt;
+extern int64_t wanted_argcnt;
 
 __attribute__((returns_twice, noinline, preserve_none)) gc_obj
 SCM_CALLCC(gc_obj cont) {
@@ -900,3 +902,64 @@ SCM_CALLCC(gc_obj cont) {
   return unused_res;
 }
 
+/////////////////////// CONSARGS for varargs functions
+
+// Spill arguments to stack, call stub.
+// TODO: stack adjustment.
+__attribute__((naked)) void consargs_stub(gc_obj a, gc_obj b, gc_obj c, gc_obj d, gc_obj e, gc_obj f) {
+  asm volatile(
+	       "sub $8, %rsp\n\t"
+	       "push %r9\n\t"
+	       "push %r8\n\t"
+	       "push %rcx\n\t"
+	       "push %rdx\n\t"
+	       "push %rsi\n\t"
+	       "push %rdi\n\t"
+	       "mov %rsp, %rdi\n\t"
+	       "call consargs\n\t"
+	       "add %rax, %rsp\n\t"
+	       "pop %rdi\n\t"
+	       "pop %rsi\n\t"
+	       "pop %rdx\n\t"
+	       "pop %rcx\n\t"
+	       "pop %r8\n\t"
+	       "pop %r9\n\t"
+	       "add $8, %rsp\n\t"
+	       "ret\n\t");
+}
+
+// Skip over the *two* frames that are in the way: one for the call
+// itself, and one for consargs_stub (return address + frame pointer
+// (or alignment)).
+static const uint64_t reg_arg_cnt = 6;
+static size_t argcnt_to_slot(size_t arg) {
+  if (arg >= reg_arg_cnt) {
+    return arg + 4;
+  }
+  return arg;
+}
+
+__attribute__((used)) int64_t consargs(gc_obj* reg_args) {
+  auto res = NIL;
+
+  for(auto wanted = argcnt; wanted > wanted_argcnt; wanted--) {
+    res = cons(reg_args[argcnt_to_slot(wanted - 1)], res);
+  }
+  auto end_slot = argcnt_to_slot(wanted_argcnt);
+  auto start_slot = argcnt_to_slot(argcnt-1);
+  reg_args[end_slot] = res;
+
+  // TODO: round up to nearest 16, and add one.
+  if (start_slot > reg_arg_cnt) {
+    if (end_slot < reg_arg_cnt) {
+      end_slot = argcnt_to_slot(reg_arg_cnt);
+    }
+    int64_t shift = (0 + start_slot - end_slot) * 8;
+    size_t sz =  (intptr_t)&reg_args[end_slot] - (intptr_t)reg_args;
+    // We have to slide the whole stack up.
+    memmove((void *)((int64_t)reg_args + shift), reg_args, sz);
+
+    return shift;
+  }
+  return 0;
+}

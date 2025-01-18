@@ -1,5 +1,5 @@
 
-* case-lambda, argcnt stubs
+* varargs, apply
 
 * fast globals
 * program-ify
