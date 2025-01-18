@@ -348,6 +348,11 @@ void SCM_SET_GLOBAL(gc_obj a, gc_obj b) {
   sym->val = b;
 }
 
+NOINLINE void SCM_ARGCNT_FAIL() {
+  printf("Call with invalid argcnt\n");
+  abort();
+}
+
 NOINLINE void* SCM_LOAD_CLOSURE_PTR_FAIL(gc_obj a) {
   printf("Attempting to call non-closure:");
   display(a);
@@ -839,6 +844,7 @@ static __attribute__((preserve_none)) void need_more_frames() {
   // assert(cur_link);
   ccresthunk(tag_closure((closure_s*)cur_link), res);
 }
+extern int64_t argcnt;
 
 __attribute__((returns_twice, noinline, preserve_none)) gc_obj
 SCM_CALLCC(gc_obj cont) {
@@ -856,6 +862,7 @@ SCM_CALLCC(gc_obj cont) {
   memcpy(stack->stack, stack_bottom, stack_sz);
 
   auto cc = tag_closure((closure_s*)stack);
+  argcnt = 2; // Two args: Closure ptr & cc.
 
   gc_obj unused_res;
 

@@ -9,14 +9,16 @@
 	(set! id (+ id 1))
 	res))))
 
-(define-record-type fun (%make-fun code name last-label args) fun?
+(define-record-type fun (%make-fun code name last-label args thunk cases) fun?
 		    (code fun-code fun-code-set!)
 		    (name fun-name fun-name-set!)
 		    (last-label fun-last-label fun-last-label-set!)
-		    (args fun-args fun-args-set!))
+		    (args fun-args fun-args-set!)
+		    (thunk fun-thunk fun-thunk-set!)
+		    (cases fun-cases fun-cases-set!))
 
 (define (make-fun name)
-  (%make-fun '() name "entry" '()))
+  (%make-fun '() name "entry" '() #f '()))
 
 (define (push-instr! fun instr)
   (fun-code-set! fun (cons instr (fun-code fun))))
@@ -43,27 +45,58 @@
   (newline)
   (exit))
 
-(define (emit-function func-p nlambda var id env)
+(define (emit-function fun nlambda var env)
   (define name (second nlambda))
   (define cases (cddr nlambda))
   (define last-case (last cases))
   (define last-case-jmp #f)
-  (fun-name-set! func-p var)
+  (fun-name-set! fun var)
 
   (when (hash-table-exists? escapes-table var)
-    1
-    )
-  (for case cases
+    (fun-thunk-set! fun #t)
+    (push-instr! fun (format "%argcnt = load i64, ptr @argcnt"))
+    (for (case i) (cases (iota (length cases)))
+	 (let ((id (next-id))
+	       (call-res (next-id))
+	       (true-label (next-id))
+	       (false-label (next-id)))
+	   (push-instr! fun (format "%v~a = icmp eq i64 %argcnt, ~a" id (length (second case))))
+	   (push-instr! fun (format "br i1 %v~a, label %~a, label %~a" id true-label false-label))
+	   (push-instr! fun (format "~a:" true-label))
+	   (push-instr! fun (format "%v~a = musttail call tailcc i64 @\"~a\"(~a)"
+				    call-res (format "~a_case~a" var i)
+				    "i64 undef"))
+	   (push-instr! fun (format "ret i64 %v~a" call-res))
+	   (push-instr! fun (format "~a:" false-label)))))
+  (push-instr! fun (format "%res = call i64 @SCM_ARGCNT_FAIL()"))
+  (push-instr! fun (format "ret i64 %res"))
+  
+  (for (case i) (cases (iota (length cases)))
+       (define cfun (make-fun 1))
        (define argcnt (length (to-proper (second case))))
        (define args (second case))
        (define arg-ids (omap arg args (format "%v~a" (next-id))))
        (define v-type (list? (second case)))
-       (fun-args-set! func-p arg-ids)
+       (define case-label (format "~a_case~a" var i))
+       (fun-cases-set! fun (alist-cons argcnt case-label (fun-cases fun)))
+       (fun-args-set! cfun arg-ids)
+       (fun-name-set! cfun case-label)
+       (push! functions cfun)
        (emit (third case)
 	     (append (map cons (to-proper (second case)) arg-ids)
 		     env)
-	     func-p
-	     #t)))
+	     cfun
+	     #t))
+  (fun-cases-set! fun (reverse! (fun-cases fun))))
+
+(define (find-label-for-case lfun argcnt)
+  (let loop ((cases (fun-cases lfun)))
+    (if (null? cases)
+	(error "Can't find case for call:" (fun-name lfun))
+	(let ((case (car cases)))
+	  (if (= argcnt (car case))
+	      (cdr case)
+	      (loop (cdr cases)))))))
 
 (define (emit sexp env fun tail)
   (define (finish res)
@@ -165,13 +198,16 @@
 	    (clo-id (next-id)))
        (push-instr! fun (format "%v~a = call ptr @SCM_LOAD_CLOSURE_PTR(i64 ~a)"
 				clo-id (car args)))
+       (push-instr! fun (format "store i64 ~a, ptr @argcnt" (length args)))
        (push-instr! fun (format "%v~a = ~a call tailcc i64 %v~a(~a)" id (if tail "musttail" "") clo-id arglist))
        (finish (format "%v~a" id))))
     ((label-call ,label ,args ___)
      (let* ((args (omap arg args (emit arg env fun #f)))
 	    (arglist (join ", " (omap arg args (format "i64 ~a" arg))))
-	    (id (next-id)))
-       (push-instr! fun (format "%v~a = ~a call tailcc i64 @\"~a\"(~a)" id (if tail "musttail" "") label arglist))
+	    (id (next-id))
+	    (lfun (cdr (assq label env)))
+	    (case-label (find-label-for-case lfun (length args))))
+       (push-instr! fun (format "%v~a = ~a call tailcc i64 @\"~a\"(~a)" id (if tail "musttail" "") case-label arglist))
        (finish (format "%v~a" id))))
     ((let ((,vars ,vals) ___) ,body)
      (let ((args (omap val vals (emit val env fun #f))))
@@ -189,13 +225,14 @@
     ((const-closure (label ,label))
      (finish (emit-const `($const-closure ,label))))
     ((labels ((,vars ,lambdas) ___) ,body)
-     (let* ((label-ids (iota (length vars) (length functions)))
-	    (funs (map-in-order (lambda (id) (define fun (make-fun 1))
-					(push! functions fun)
-					fun) label-ids))
-	    (env (append (map cons vars label-ids) env)))
-       (for (func-p lambda var id) (funs lambdas vars label-ids)
-	    (emit-function func-p lambda var id env))
+     (let* ((funs (map-in-order
+		   (lambda (id) (define fun (make-fun 1))
+			   (push! functions fun)
+			   fun)
+		   vars))
+	    (env (append (map cons vars funs) env)))
+       (for (func-p lambda var) (funs lambdas vars)
+	    (emit-function func-p lambda var env))
        (emit body env fun tail)))
     (,var
      ;; Only lookup, doesn't gen code.
@@ -315,6 +352,7 @@ declare i64 @SCM_NUM_EQ (i64, i64)
 declare i64 @SCM_GUARD (i64, i64)
 declare i64 @SCM_CLOSURE (i64, i64)
 declare i64 @SCM_CLOSURE_GET (i64, i64)
+declare i64 @SCM_ARGCNT_FAIL ()
 declare void @SCM_CLOSURE_SET (i64, i64, i64)
 declare i64 @SCM_LOAD_GLOBAL(i64)
 declare void @SCM_SET_GLOBAL(i64, i64)
@@ -331,7 +369,8 @@ declare i64 @vector_length (i64)
 declare i64 @vector_ref (i64, i64)
 declare i64 @vector_set (i64, i64, i64)
 declare void @gc_init ()
-attributes #0 = { noinline returns_twice }
+@argcnt = dso_local global i64 0
+attributes #0 = { noinline returns_twice \"thunk\" cold}
 "))
 
 (define (split-arglist args)
@@ -373,11 +412,12 @@ attributes #0 = { noinline returns_twice }
 
 	 (newline)
 
-	 (display (format "define ~a i64 @\"~a\"(~a) {\n" 
+	 (display (format "define ~a i64 @\"~a\"(~a) ~a {\n" 
 			  (if (equal? (fun-name func) "main")
 			      "tailcc" "internal tailcc")
 			  (fun-name func)
-			  (join ", " (omap arg (fun-args func) (format "i64 ~a" arg)))))
+			  (join ", " (omap arg (fun-args func) (format "i64 ~a" arg)))
+			  (if (fun-thunk func) "#0" "")))
 	 (display (format " entry:\n"))
 	 (when (equal? "main" (fun-name func))
 	   (display (format "  call void @gc_init()\n")))
