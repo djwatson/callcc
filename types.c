@@ -919,6 +919,8 @@ SCM_CALLCC(gc_obj cont) {
 
 // Spill arguments to stack, call stub.
 // TODO: stack adjustment.
+#if defined(__x86_64__)
+static const uint64_t reg_arg_cnt = 6;
 __attribute__((naked)) void consargs_stub(gc_obj a, gc_obj b, gc_obj c, gc_obj d, gc_obj e, gc_obj f) {
   asm volatile(
 	       "sub $8, %rsp\n\t"
@@ -940,11 +942,31 @@ __attribute__((naked)) void consargs_stub(gc_obj a, gc_obj b, gc_obj c, gc_obj d
 	       "add %rax, %rsp\n\t"
 	       "ret\n\t");
 }
+#elif defined(__aarch64__)
+static const uint64_t reg_arg_cnt = 8;
+__attribute__((naked)) void consargs_stub(gc_obj a, gc_obj b, gc_obj c, gc_obj d, gc_obj e, gc_obj f) {
+  asm volatile(
+	       "stp x29, x30, [sp, #-16]!\n\t"
+	       "stp x6, x7, [sp, #-16]!\n\t"
+	       "stp x4, x5, [sp, #-16]!\n\t"
+	       "stp x2, x3, [sp, #-16]!\n\t"
+	       "stp x0, x1, [sp, #-16]!\n\t"
+	       "mov x0, sp\n\t"
+	       "bl consargs\n\t"
+	       "mov x8, x0\n\t"
+	       "ldp x0, x1, [sp], #16\n\t"
+	       "ldp x2, x3, [sp], #16\n\t"
+	       "ldp x4, x5, [sp], #16\n\t"
+	       "ldp x6, x7, [sp], #16\n\t"
+	       "ldp x29, x30, [sp], #16\n\t"
+	       "add sp, sp, x8\n\t"
+	       "ret\n\t");
+}
+#endif
 
 // Skip over the *two* frames that are in the way: one for the call
 // itself, and one for consargs_stub (return address + frame pointer
 // (or alignment)).
-static const uint64_t reg_arg_cnt = 6;
 static size_t argcnt_to_slot(size_t arg) {
   if (arg >= reg_arg_cnt) {
     return arg + 4;
