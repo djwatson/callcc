@@ -67,9 +67,8 @@
 	   (unless (list? (second case))
 	     (push-instr! fun (format "store i64 ~a, ptr @wanted_argcnt" (- (length (to-proper (second case))) 1)))
 	     (push-instr! fun (format "call void @consargs_stub()")))
-	   (push-instr! fun (format "%v~a = musttail call tailcc i64 @\"~a\"(~a)"
-				    call-res (format "~a_case~a" var i)
-				    "i64 undef"))
+	   (push-instr! fun (format "%v~a = musttail call tailcc i64 @\"~a\"()"
+				    call-res (format "~a_case~a" var i)))
 	   (push-instr! fun (format "ret i64 %v~a" call-res))
 	   (push-instr! fun (format "~a:" false-label)))))
   (push-instr! fun (format "%res = call i64 @SCM_ARGCNT_FAIL()"))
@@ -302,7 +301,7 @@
    ((symbol? c)
     (let ((str (emit-const (symbol->string c)))
 	  (sym-name (string-append "SYM-" (symbol->string c))))
-      (push! consts (format "@\"~a\" = internal unnamed_addr global {i64, i64, i64} {i64 ~a, i64 ~a, i64 ~a}, align 8\n"
+      (push! consts (format "@\"~a\" = private unnamed_addr global {i64, i64, i64} {i64 ~a, i64 ~a, i64 ~a}, align 8\n"
 			    sym-name symbol-tag str undefined-tag))
       (format "add (i64 ~a, i64 ptrtoint ({i64, i64, i64}* @\"~a\" to i64))"
 	      ptr-tag sym-name)))
@@ -315,7 +314,7 @@
       (if (memq low '(0 3 4))
 	  plus
 	  (let ((id (next-id)))
-	    (push! consts (format "@flonum~a = internal unnamed_addr global [2 x i64] [i64 ~a, i64 ~a], align 8\n"
+	    (push! consts (format "@flonum~a = private unnamed_addr global [2 x i64] [i64 ~a, i64 ~a], align 8\n"
 				  id flonum-tag u))
 	    (format "add (i64 ~a, i64 ptrtoint ([2 x i64]* @flonum~a to i64))"
 		    ptr-tag id)	    
@@ -328,7 +327,7 @@
    ((null? c) nil-tag)
    ((string? c)
     (let ((id (next-id)))
-      (push! consts (format "@str~a = internal unnamed_addr constant {i64, i64, [~a x i8]} {i64 ~a, i64 ~a, [~a x i8] c\"~a\"}, align 8\n"
+      (push! consts (format "@str~a = private unnamed_addr constant {i64, i64, [~a x i8]} {i64 ~a, i64 ~a, [~a x i8] c\"~a\"}, align 8\n"
 			    id (string-length c) string-tag (* 8 (string-length c)) (string-length c) (fix-string-format c) ))
       (format "add (i64 ~a, i64 ptrtoint ({i64, i64, [~a x i8]}* @str~a to i64))"
 	      ptr-tag (string-length c) id)))
@@ -339,7 +338,7 @@
    ;; TODO use a record
    ((and (pair? c) (eq? '$const-closure (car c)))
     (let ((id (next-id)))
-      (push! consts (format "@clo~a = internal unnamed_addr constant [2 x i64] [i64 ~a, i64 ptrtoint (ptr @\"~a\" to i64)], align 8" id closure-tag (second c)))
+      (push! consts (format "@clo~a = private unnamed_addr constant [2 x i64] [i64 ~a, i64 ptrtoint (ptr @\"~a\" to i64)], align 8" id closure-tag (second c)))
       (format "add (i64 ~a, i64 ptrtoint ([2 x i64]* @clo~a to i64))"
 	      ptr-tag id)))
    ((vector? c)
@@ -347,7 +346,7 @@
     (let* ((vals (cons (* 8 (vector-length c)) (omap val (vector->list c) (emit-const val))))
 	   (val-str (join ", " (omap val vals (format "i64 ~a" val))))
 	   (id (next-id)))
-      (push! consts (format "@vec~a = internal unnamed_addr constant [~a x i64] [~a], align 8\n"
+      (push! consts (format "@vec~a = private unnamed_addr constant [~a x i64] [~a], align 8\n"
 			    id (+ 1 (vector-length c)) val-str ))
       (format "add (i64 ~a, i64 ptrtoint ([~a x i64]* @vec~a to i64))"
 	      vector-tag (+ 1 (vector-length c)) id)))
@@ -355,7 +354,7 @@
     (let* ((id (next-id))
 	   (a (emit-const (car c)))
 	   (b (emit-const (cdr c))))
-      (push! consts (format "@cons~a = internal unnamed_addr constant {i64, i64} {i64 ~a, i64 ~a}, align 8"
+      (push! consts (format "@cons~a = private unnamed_addr constant {i64, i64} {i64 ~a, i64 ~a}, align 8"
 			    id a b))
       (format "add (i64 ~a, i64 ptrtoint ({i64, i64}* @cons~a to i64))"
 	      cons-tag id)))
@@ -411,6 +410,7 @@ declare void @gc_init ()
 @argcnt = dso_local global i64 0
 @wanted_argcnt = dso_local global i64 0
 attributes #0 = { noinline returns_twice \"thunk\" cold optnone}
+attributes #1 = { returns_twice}
 "))
 
 (define (split-arglist args)
@@ -457,7 +457,7 @@ attributes #0 = { noinline returns_twice \"thunk\" cold optnone}
 			      "tailcc" "internal tailcc")
 			  (fun-name func)
 			  (join ", " (omap arg (fun-args func) (format "i64 ~a" arg)))
-			  (if (fun-thunk func) "#0" "")))
+			  (if (fun-thunk func) "#0" "#1")))
 	 (display (format " entry:\n"))
 	 (when (equal? "main" (fun-name func))
 	   (display (format "  call void @gc_init()\n")))
