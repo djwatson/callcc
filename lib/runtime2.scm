@@ -307,6 +307,17 @@
 (define (exact? x) (fixnum? x))
 (define (inexact? x) (flonum? x))
 
+(define (inexact->exact a)
+  (if (flonum? a) 
+      (sys:FOREIGN_CALL "SCM_EXACT" a)
+      a))
+(define exact inexact->exact)
+(define (exact->inexact a)
+  (if (fixnum? a)
+      (sys:FOREIGN_CALL "SCM_INEXACT" a)
+      a))
+(define inexact exact->inexact)
+
 ;; List
 (define (append2 a b)
   (let loop ((a a) (b b))
@@ -512,6 +523,32 @@
 (define (cdddar e) (cdr (cddar e)))
 
 ;;;;;; vector
+(define vector
+  (case-lambda
+   ((a) (let ((v (make-vector 1)))
+	  (vector-set! v 0 a)
+	  v))
+   ((a b)
+    (let ((v (make-vector 2)))
+      (vector-set! v 0 a)
+      (vector-set! v 1 b)
+      v))
+   ((a b c)
+    (let ((v (make-vector 3)))
+      (vector-set! v 0 a)
+      (vector-set! v 1 b)
+      (vector-set! v 2 c)
+      v))
+   ((a b c d)
+    (let ((v (make-vector 4)))
+      (vector-set! v 0 a)
+      (vector-set! v 1 b)
+      (vector-set! v 2 c)
+      (vector-set! v 3 d)
+      v))
+   (vals
+    (list->vector vals))))
+
 (define (vector->list vec)
   (let loop ((i (vector-length vec)) (l '()))
     (if (= i 0)
@@ -692,4 +729,6 @@
 			  (loop p q))))))))))))
 
 (include "str2num.scm")
+
+(define (integer->char a) (integer->char a))
 

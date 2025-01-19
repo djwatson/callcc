@@ -312,9 +312,14 @@
 	   (urot (bit-field-rotate u 4 0 64))
 	   (plus (+ urot 1))
 	   (low (bitwise-and urot 7)))
-      (unless (memq low '(0 3 4))
-	(error "Bad flonum:" c))
-      plus))
+      (if (memq low '(0 3 4))
+	  plus
+	  (let ((id (next-id)))
+	    (push! consts (format "@flonum~a = internal unnamed_addr global [2 x i64] [i64 ~a, i64 ~a], align 8\n"
+				  id flonum-tag u))
+	    (format "add (i64 ~a, i64 ptrtoint ([2 x i64]* @flonum~a to i64))"
+		    ptr-tag id)	    
+	    ))))
    ((fixnum? c)
     (* 8 c))
    ((char? c) (+ char-tag (* 256 (char->integer c))))
@@ -400,6 +405,8 @@ declare i64 @SCM_SYMBOL_STRING(i64)
 declare i64 @SCM_MAKE_SYMBOL(i64)
 declare i64 @SCM_STRING_SET(i64,i64,i64)
 declare i64 @SCM_STRING_REF(i64,i64)
+declare i64 @SCM_EXACT(i64)
+declare i64 @SCM_INEXACT(i64)
 declare void @gc_init ()
 @argcnt = dso_local global i64 0
 @wanted_argcnt = dso_local global i64 0

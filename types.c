@@ -147,6 +147,9 @@ gc_obj tag_char(char ch) {
 gc_obj tag_symbol(symbol* s) {
   return (gc_obj){.value = ((int64_t)s + PTR_TAG)};
 }
+gc_obj tag_ptr(void* s) {
+  return (gc_obj){.value = ((int64_t)s + PTR_TAG)};
+}
 
 #define TAG_SET2 ((1 <<5)|(1 <<4)|(1 <<1))
 static bool has_tag_5_or_4_or_1 ( int64_t n ) {
@@ -182,7 +185,8 @@ bool double_to_gc(double d, gc_obj* res) {
 
 double to_double(gc_obj obj) {
   if (is_ptr(obj)) {
-    abort();
+    flonum_s* f = to_raw_ptr(obj);
+    return f->x;
   }
   assert(has_tag_5_or_4_or_1(obj.value));
   uint64_t r = obj.value - 1;
@@ -201,8 +205,19 @@ double to_double_fast(gc_obj obj) {
 }
 
 gc_obj display(gc_obj obj);
-void print_obj(gc_obj obj, FILE*) {
-  display (obj);
+void print_obj(gc_obj obj, FILE *) { display(obj); }
+
+void display_double(gc_obj obj) {
+    char buffer[40];
+    double d = to_double(obj);
+    snprintf(buffer, 40 - 3, "%g", d);
+    if (strpbrk(buffer, ".eE") == nullptr) {
+      size_t len = strlen(buffer);
+      buffer[len] = '.';
+      buffer[len + 1] = '0';
+      buffer[len + 2] = '\0';
+    }
+    printf("%s", buffer);
 }
 
 gc_obj display(gc_obj obj) {
@@ -214,16 +229,7 @@ gc_obj display(gc_obj obj) {
   case FLONUM1_TAG:
   case FLONUM2_TAG:
   case FLONUM3_TAG:
-    char buffer[40];
-    double d = to_double(obj);
-    snprintf(buffer, 40 - 3, "%g", d);
-    if (strpbrk(buffer, ".eE") == nullptr) {
-      size_t len = strlen(buffer);
-      buffer[len] = '.';
-      buffer[len + 1] = '0';
-      buffer[len + 2] = '\0';
-    }
-    printf("%s", buffer);
+    display_double(obj);
     break;
   case PTR_TAG: {
     auto ptr_tag = get_ptr_tag(obj);
@@ -249,6 +255,10 @@ gc_obj display(gc_obj obj) {
     }
     case CONT_TAG: {
       printf("#<cont>");
+      break;
+    }
+    case FLONUM_TAG: {
+      display_double(obj);
       break;
     }
     default:
@@ -385,7 +395,7 @@ NOINLINE gc_obj SCM_ADD_SLOW(gc_obj a, gc_obj b) {
   double fa, fb;
   if (is_fixnum(a)) {
     fa = to_fixnum(a);
-  } else if (is_flonum(b)){
+  } else if (is_flonum(a)){
     fa = to_double(a);
   } else {
     printf("Add: not a number:");
@@ -1122,4 +1132,20 @@ INLINE gc_obj SCM_MAKE_SYMBOL(gc_obj str) {
   sym->name = str;
   sym->val = UNDEFINED;
   return tag_symbol(sym);
+}
+
+INLINE gc_obj SCM_EXACT(gc_obj flo) {
+  return tag_fixnum(to_double(flo));
+}
+
+INLINE gc_obj SCM_INEXACT(gc_obj fix) {
+  gc_obj res;
+  double d = (double)to_fixnum(fix);
+  if (double_to_gc(d, &res)) {
+    return res;
+  }
+  flonum_s* f = rcimmix_alloc(sizeof(flonum_s));
+  f->type = FLONUM_TAG;
+  f->x = d;
+  return tag_ptr(f);
 }

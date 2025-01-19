@@ -20,6 +20,7 @@
 (define closure-tag   #b010010)
 (define symbol-tag   #b011010)
 (define cont-tag    #b100010)
+(define flonum-tag    #b101010)
 ;; literals, using literal-tag (so bottom 3 bits must be 0b111)
 (define false-rep #x006)
 (define true-rep #x106)
