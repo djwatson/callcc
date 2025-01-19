@@ -327,11 +327,12 @@
       (format "add (i64 ~a, i64 ptrtoint ([2 x i64]* @clo~a to i64))"
 	      ptr-tag id)))
    ((vector? c)
-    (let* ((vals (omap val (vector->list c) (add-const val)))
+    ;; Prepend the length.
+    (let* ((vals (cons (* 8 (vector-length c)) (omap val (vector->list c) (emit-const val))))
 	   (val-str (join ", " (omap val vals (format "i64 ~a" val))))
 	   (id (next-id)))
-      (push! consts (format "@vec~a = internal unnamed_addr constant [~a x i64] [i64 ~a, ~a], align 8\n"
-			    id (+ 1 (vector-length c)) (* 8 (vector-length c)) val-str ))
+      (push! consts (format "@vec~a = internal unnamed_addr constant [~a x i64] [~a], align 8\n"
+			    id (+ 1 (vector-length c)) val-str ))
       (format "add (i64 ~a, i64 ptrtoint ([~a x i64]* @vec~a to i64))"
 	      vector-tag (+ 1 (vector-length c)) id)))
    ((pair? c)
@@ -378,6 +379,9 @@ declare i64 @vector_length (i64)
 declare i64 @vector_ref (i64, i64)
 declare i64 @vector_set (i64, i64, i64)
 declare i64 @SCM_STRING_LENGTH (i64)
+declare i64 @SCM_EQ (i64, i64)
+declare i64 @SCM_MAKE_STRING (i64, i64)
+declare i64 @SCM_IS_FLONUM(i64)
 declare void @gc_init ()
 @argcnt = dso_local global i64 0
 @wanted_argcnt = dso_local global i64 0

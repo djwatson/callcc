@@ -151,10 +151,17 @@ static bool has_tag_5_or_4_or_1 ( int64_t n ) {
   // behavior, and clang will happily optimize everything out.
   return ((( uint32_t )1 << (n&0x1f) ) & (~( uint32_t )0/0xff * TAG_SET2 )) != 0;
 }
-bool is_flonum_fast(gc_obj obj) { return has_tag_5_or_4_or_1(obj.value); }
+static bool is_flonum_fast(gc_obj obj) { return has_tag_5_or_4_or_1(obj.value); }
 
-bool is_flonum(gc_obj obj) {
+static bool is_flonum(gc_obj obj) {
   return is_flonum_fast(obj) || (is_ptr(obj) && get_ptr_tag(obj) == FLONUM_TAG);
+}
+
+gc_obj SCM_IS_FLONUM(gc_obj obj) {
+  if (is_flonum(obj)) {
+    return TRUE_REP;
+  }
+  return FALSE_REP;
 }
 
 bool double_to_gc(double d, gc_obj* res) {
@@ -1031,6 +1038,23 @@ __attribute__((used)) int64_t consargs(gc_obj* reg_args) {
   return 0;
 }
 
-INLINE gc_obj SCM_STRING_LENGTH(gc_obj obj) {
-  return to_string(obj)->len;
+INLINE gc_obj SCM_STRING_LENGTH(gc_obj obj) { return to_string(obj)->len; }
+
+INLINE gc_obj SCM_EQ(gc_obj a, gc_obj b) {
+  if (a.value == b.value) {
+    return TRUE_REP;
+  }
+  return FALSE_REP;
+}
+
+INLINE gc_obj SCM_MAKE_STRING(gc_obj len, gc_obj fill) {
+  // Align.
+  auto strlen = (to_fixnum(len)+7)&~7;
+  string_s* str = rcimmix_alloc(sizeof(string_s) + strlen);
+  str->type = STRING_TAG;
+  str->len = len;
+  if (fill.value != FALSE_REP.value) {
+    memset(str->str, to_char(fill), to_fixnum(len));
+  }
+  return tag_string(str);
 }
