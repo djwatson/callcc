@@ -1,5 +1,4 @@
 
-* apply
 * fixup r4rs case selection: need to load cases in letrec for all before codegen
 
 * fast globals
@@ -8,8 +7,10 @@
 * program-ify letrec????
 
 * figure out strategy for intrinsics????
+  * can generate declare's.  Prefix all with SCM_
 * cleanup runtime
 * inliner?? 
+* apply - real apply
 
 * r4rs, r5rs*
 * self-compile

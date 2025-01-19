@@ -9,16 +9,15 @@
 	(set! id (+ id 1))
 	res))))
 
-(define-record-type fun (%make-fun code name last-label args thunk cases) fun?
+(define-record-type fun (%make-fun code name last-label args thunk) fun?
 		    (code fun-code fun-code-set!)
 		    (name fun-name fun-name-set!)
 		    (last-label fun-last-label fun-last-label-set!)
 		    (args fun-args fun-args-set!)
-		    (thunk fun-thunk fun-thunk-set!)
-		    (cases fun-cases fun-cases-set!))
+		    (thunk fun-thunk fun-thunk-set!))
 
 (define (make-fun name)
-  (%make-fun '() name "entry" '() #f '()))
+  (%make-fun '() name "entry" '() #f))
 
 (define (push-instr! fun instr)
   (fun-code-set! fun (cons instr (fun-code fun))))
@@ -83,7 +82,6 @@
        (define arg-ids (omap arg args (format "%v~a" (next-id))))
        (define v-type (list? (second case)))
        (define case-label (format "~a_case~a" var i))
-       (fun-cases-set! fun (alist-cons argcnt case-label (fun-cases fun)))
        (fun-args-set! cfun arg-ids)
        (fun-name-set! cfun case-label)
        (push! functions cfun)
@@ -91,19 +89,18 @@
 	     (append (map cons (to-proper (second case)) arg-ids)
 		     env)
 	     cfun
-	     #t))
-  (fun-cases-set! fun (reverse! (fun-cases fun))))
+	     #t)))
 
-(define (find-label-for-case lfun argcnt var)
-  (let loop ((cases (fun-cases lfun)))
+(define (find-label-for-case nlambda argcnt var)
+  (let loop ((cases (cddr nlambda)) (i 0))
     (if (null? cases)
-	(begin (display (format "Warning: Can't find case for call:~a cnt ~a\n" (fun-name lfun) var) (current-error-port))
+	(begin (display (format "Warning: Can't find case for call:~a cnt ~a\n"
+				(fun-name lfun) var) (current-error-port))
 	       var)
-					;(error "Can't find case for call:" (fun-name lfun) argcnt)
 	(let ((case (car cases)))
-	  (if (= argcnt (car case))
-	      (cdr case)
-	      (loop (cdr cases)))))))
+	  (if (= argcnt (length (second case)))
+	      (format "~a_case~a" var i)
+	      (loop (cdr cases) (+ i 1)))))))
 
 (define (emit sexp env fun tail)
   (define (finish res)
@@ -209,7 +206,6 @@
        (push-instr! fun (format "%v~a = ~a call tailcc i64 %v~a(~a)" id (if tail "musttail" "") clo-id arglist))
        (finish (format "%v~a" id))))
     ((label-call ,label ,args ___)
-     (display (format "LABEL_CALL:~a\n" sexp) (current-error-port))
      (let* ((args (omap arg args (emit arg env fun #f)))
 	    (arglist (join ", " (omap arg args (format "i64 ~a" arg))))
 	    (id (next-id))
@@ -238,7 +234,7 @@
 			   (push! functions fun)
 			   fun)
 		   vars))
-	    (env (append (map cons vars funs) env)))
+	    (env (append (map cons vars lambdas) env)))
        (for (func-p lambda var) (funs lambdas vars)
 	    (emit-function func-p lambda var env))
        (emit body env fun tail)))
