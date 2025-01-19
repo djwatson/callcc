@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <assert.h>
+#include <math.h>
 
 #include "gc.h"
 
@@ -142,6 +143,9 @@ gc_obj tag_closure(closure_s *s) {
 }
 gc_obj tag_char(char ch) {
   return (gc_obj){.value = (((int64_t)ch << 8) + CHAR_TAG)};
+}
+gc_obj tag_symbol(symbol* s) {
+  return (gc_obj){.value = ((int64_t)s + PTR_TAG)};
 }
 
 #define TAG_SET2 ((1 <<5)|(1 <<4)|(1 <<1))
@@ -536,6 +540,40 @@ INLINE gc_obj SCM_DIV(gc_obj a, gc_obj b) {
     }
   } else {
     [[clang::musttail]] return SCM_DIV_SLOW(a, b);
+  }
+}
+
+NOINLINE gc_obj SCM_MOD_SLOW(gc_obj a, gc_obj b) {
+  double fa, fb;
+  if (is_fixnum(a)) {
+    fa = to_fixnum(a);
+  } else {
+    fa = to_double(a);
+  }
+  if (is_fixnum(b)) {
+    fb = to_fixnum(b);
+  } else {
+    fb = to_double(b);
+  }
+  gc_obj res;
+  if(double_to_gc(fmod(fa, fb), &res)) {
+    return res;
+  }
+  abort();
+}
+
+INLINE gc_obj SCM_MOD(gc_obj a, gc_obj b) {
+  if (likely((is_fixnum(a) & is_fixnum(b)) == 1)) {
+    return tag_fixnum(to_fixnum(a) % to_fixnum(b));
+  } else if (likely((is_flonum_fast(a) & is_flonum_fast(b)) == 1)) {
+    gc_obj res;
+    if(likely(double_to_gc(fmod(to_double_fast(a), to_double_fast(b)), &res))) {
+      return res;
+    } else {
+      [[clang::musttail]] return SCM_MOD_SLOW(a, b);
+    }
+  } else {
+    [[clang::musttail]] return SCM_MOD_SLOW(a, b);
   }
 }
 
@@ -1057,4 +1095,31 @@ INLINE gc_obj SCM_MAKE_STRING(gc_obj len, gc_obj fill) {
     memset(str->str, to_char(fill), to_fixnum(len));
   }
   return tag_string(str);
+}
+
+INLINE gc_obj SCM_CHAR_INTEGER(gc_obj ch) {
+  return tag_fixnum(to_char(ch));
+}
+
+INLINE gc_obj SCM_INTEGER_CHAR(gc_obj i) { return tag_char(to_fixnum(i)); }
+
+INLINE gc_obj SCM_SYMBOL_STRING(gc_obj sym) {
+  return to_symbol(sym)->name;
+}
+
+INLINE gc_obj SCM_STRING_REF(gc_obj str, gc_obj pos) {
+  return tag_char(to_string(str)->str[to_fixnum(pos)]);
+}
+
+INLINE gc_obj SCM_STRING_SET(gc_obj str, gc_obj pos, gc_obj ch) {
+  to_string(str)->str[to_fixnum(pos)] = to_char(ch);
+  return UNDEFINED;
+}
+
+INLINE gc_obj SCM_MAKE_SYMBOL(gc_obj str) {
+  symbol* sym = rcimmix_alloc(sizeof(symbol));
+  sym->type = SYMBOL_TAG;
+  sym->name = str;
+  sym->val = UNDEFINED;
+  return tag_symbol(sym);
 }

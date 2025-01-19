@@ -1,5 +1,16 @@
 (import (scheme r5rs) (prefix (flow sys) sys:) (scheme case-lambda) (scheme base))
 
+;;;;;;;;math 
+(define (negative? p)
+  (< p 0))
+
+(define (positive? p)
+  (> p 0))
+(define (abs p)
+  (if (negative? p)
+      (- p)
+      p))
+
 (define (reducer f init args)
   (let loop ((init init) (args args))
     (if (pair? args)
@@ -16,6 +27,16 @@
    ((a b c) (base+ (base+ a b) c))
    (rest (reducer base+ 0 rest))))
 
+(define (base- a b)
+  (sys:SUB a b))
+(define -
+  (case-lambda
+   (() 0)
+   ((a) (* -1 a))
+   ((a b) (base- a b))
+   ((a b c) (base- (base- a b) c))
+   (rest (reducer base- 0 rest))))
+
 (define (base* a b)
   (sys:MUL a b))
 (define *
@@ -25,6 +46,52 @@
    ((a b) (base* a b))
    ((a b c) (base* (base* a b) c))
    (rest (reducer base* 0 rest))))
+
+(define (comparer f args)
+  (let loop ((args args))
+    (if (and (pair? args) (pair? (cdr args)))
+	(if (f (car args) (cadr args))
+	    (loop (cdr args))
+	    #f)
+	#t)))
+
+(define <
+  (case-lambda
+   ((a b) (base< a b))
+   (rest
+    (comparer (lambda (a b) (base< a b)) rest))))
+(define >
+  (case-lambda
+   ((a b) (base> a b))
+   (rest
+    (comparer (lambda (a b) (base> a b)) rest))))
+(define <=
+  (case-lambda
+   ((a b) (base<= a b))
+   (rest
+    (comparer (lambda (a b) (base<= a b)) rest))))
+(define >=
+  (case-lambda
+   ((a b) (base>= a b))
+   (rest
+    (comparer (lambda (a b) (base>= a b)) rest))))
+(define =
+  (case-lambda
+   ((a b) (base= a b))
+   (rest
+    (comparer (lambda (a b) (base= a b)) rest))))
+
+(define (base< a b)
+  (sys:LT a b))
+(define (base<= a b)
+  (sys:LTE a b))
+(define (base> a b)
+  (sys:GT a b))
+(define (base>= a b)
+  (sys:GTE a b))
+(define (base= a b)
+  (sys:NUM_EQ a b))
+
 
 (define (error msg . args)
   (display "Error:")
@@ -48,6 +115,12 @@
 	 ((2) (fun (car args) (cadr args)))
 	 ((3) (fun (car args) (cadr args) (caddr args)))
 	 ((4) (fun (car args) (cadr args) (caddr args) (cadddr args)))
+	 ((5)
+	  (let ((r (cddddr args)))
+	    (fun (car args) (cadr args) (caddr args) (cadddr args) (car r))))
+	 ((6)
+	  (let ((r (cddddr args)))
+	    (fun (car args) (cadr args) (caddr args) (cadddr args) (car r) (cadr r))))
 	 (else (error "bad apply len:" len)))))
     ((fun . lst)
      (let* ((rlst (reverse lst))
@@ -62,8 +135,71 @@
       (if (= cnt 0) n
 	  (loop (* num n) (- cnt 1)))))
 
+(define (remainder a b)
+  (sys:MOD a b))
+(define (modulo x y)
+  (let ((z (remainder x y)))
+    (if (negative? y)
+	(if (positive? z) (+ z y) z)
+	(if (negative? z) (+ z y) z))))
+
+(define min
+  (case-lambda
+   ((a b)
+    (let ((res (if (< a b) a b)))
+      (if (or (inexact? a) (inexact? b))
+	  (inexact res) res)))
+   (args
+    (let loop ((args args))
+      (if (eq? (length args) 1)
+	  (car args)
+	  (let* ((a (car args))
+		 (b (cadr args))
+		 (m (if (> a b) b a))
+		 (i (if (or (inexact? a) (inexact? b)) (inexact m) m)))
+	    (loop (cons i (cddr args)))))))))
+
+(define max
+  (case-lambda
+   ((a b)
+    (let ((res (if (> a b) a b)))
+      (if (or (inexact? a) (inexact? b))
+	  (inexact res) res)))
+   (args (let loop ((args args))
+	   (if (eq? (length args) 1)
+	       (car args)
+	       (let* ((a (car args))
+		      (b (cadr args))
+		      (m (if (< a b) b a))
+		      (i (if (or (inexact? a) (inexact? b)) (inexact m) m)))
+		 (loop (cons i (cddr args)))))))))
+
+(define gcd
+  (case-lambda
+   (() 0)
+   ((a) a)
+   ((a b)
+    (if (= b 0)
+      (abs a)
+      (gcd b (remainder a b))))
+   (args (let lp ((x (car args)) (ls (cdr args)))
+        (if (null? ls) x (lp (gcd x (car ls)) (cdr ls)))))))
+
+(define lcm
+  (case-lambda
+   (() 1)
+   ((a) a)
+   ((a b) (abs (quotient (* a b) (gcd a b))))
+   (args (let lp ((x (car args)) (ls (cdr args)))
+        (if (null? ls) x (lp (lcm x (car ls)) (cdr ls)))))))
+
+(define (odd? x)
+  (= 1 (modulo x 2)))
+
+(define (even? x)
+  (= 0 (modulo x 2)))
 (define (quotient a b) (sys:FOREIGN_CALL "SCM_DIV" a b))
-(define (min a b) (if (< a b) a b))
+
 (define (not a) (if a #f #t))
 (define (call-with-current-continuation x)
   (sys:FOREIGN_CALL "SCM_CALLCC" x))
@@ -84,10 +220,18 @@
   (car (cdr a)))
 (define (set-car! n v) (sys:FOREIGN_CALL "setcar" n v))
 (define (set-cdr! n v) (sys:FOREIGN_CALL "setcdr" n v))
-(define (append  n a) (sys:FOREIGN_CALL "append" n a))
+
 (define (cons  n a) (sys:FOREIGN_CALL "cons" n a))
 (define (vector-length n) (sys:FOREIGN_CALL "vector_length" n))
-(define (make-vector n) (sys:FOREIGN_CALL "make_vector" n))
+(define make-vector
+  (case-lambda
+   ((len) (make-vector len #f))
+   ((len obj)
+    (let ((vec (sys:FOREIGN_CALL "make_vector" len)))
+      (do ((i 0 (+ i 1)))
+	  ((= i len))
+	(vector-set! vec i obj))
+      vec))))
 (define (vector-ref v i) (sys:FOREIGN_CALL "vector_ref" v i))
 (define (vector-set! v i val) (sys:FOREIGN_CALL "vector_set" v i val))
 (define (display n)
@@ -154,8 +298,53 @@
 (define (symbol? x) (symbol? x))
 (define (vector? x) (vector? x))
 (define (flonum? x) (sys:FOREIGN_CALL "SCM_IS_FLONUM" x))
+(define (complex? x) #t)
+(define (real? x) #t)
+(define (real? x) #t)
+(define (rational? x) (fixnum? x))
+(define (fixnum? x) (fixnum? x))
+(define integer? fixnum?)
+(define (exact? x) (fixnum? x))
+(define (inexact? x) (flonum? x))
 
 ;; List
+(define (append2 a b)
+  (let loop ((a a) (b b))
+    (if (null? a)
+	b
+	(cons (car a) (loop (cdr a) b)))))
+
+(define append
+  (case-lambda
+    ((a b)
+     (append2 a b))
+    ((a b c) (append a (append b c)))
+    ((a b c d) (append a (append b (append c d))))
+   (lsts (if (null? lsts) '()
+      (let loop ((lsts lsts))
+	(if (null? (cdr lsts))
+	    (car lsts)
+	    (let copy ((node (car lsts)))
+	      (if (pair? node)
+		  (cons (car node) (copy (cdr node)))
+		  (loop (cdr lsts))))))))))
+
+(define (reverse lst)
+  (let loop ((lst lst) (res '()))
+    (if (pair? lst)
+	(loop (cdr lst) (cons (car lst) res))
+	res)))
+(define (list-ref lst n)
+  (let loop ((lst lst) (n n))
+    (if (zero? n)
+	(car lst)
+	(loop (cdr lst) (- n 1)))))
+(define (cons* first . rest)
+  (let recur ((x first) (rest rest))
+    (if (pair? rest)
+        (cons x (recur (car rest) (cdr rest)))
+        x)))
+
 (define (list . x) x)
 (define (list? x)
   (let loop ((fast x) (slow x))
@@ -291,6 +480,8 @@
 (define (eqv? a b)
   (or (eq? a b) (and (flonum? a) (flonum? b) (= a b))))
 
+(define (eq? a b)
+  (eq? a b))
 
 ;; CXR
 
@@ -319,3 +510,186 @@
 (define (cdadar e) (cdr (cadar e)))
 (define (caddar e) (car (cddar e)))
 (define (cdddar e) (cdr (cddar e)))
+
+;;;;;; vector
+(define (vector->list vec)
+  (let loop ((i (vector-length vec)) (l '()))
+    (if (= i 0)
+	l
+	(loop (- i 1) (cons (vector-ref vec (- i 1)) l)))))
+
+
+(define (list->vector lst)
+  (let* ((len (length lst))
+	 (v (make-vector len)))
+    (do ((i 0 (+ i 1))
+	 (p lst (cdr p)))
+	((= i len) v)
+      (vector-set! v i (car p)))))
+
+;;;;;;;;; char stuff
+(define char=?
+  (case-lambda
+   ((a b) (eq? a b))
+   (rest
+    (comparer eq? rest))))
+(define char>?
+  (case-lambda
+    ((a b) (> (char->integer a) (char->integer b)))
+    (rest
+     (comparer char>? rest))))
+(define char<?
+  (case-lambda
+    ((a b) (< (char->integer a) (char->integer b)))
+    (rest
+     (comparer (lambda (a b) (char<? a b)) rest))))
+(define char>=?
+  (case-lambda
+    ((a b) (>= (char->integer a) (char->integer b)))
+    (rest
+     (comparer (lambda (a b) (char>=? a b)) rest))))
+(define char<=?
+  (case-lambda
+    ((a b) (<= (char->integer a) (char->integer b)))
+    (rest
+     (comparer (lambda (a b) (char<=? a b)) rest))))
+(define (char-ci=? x y)
+  (char=? (char-downcase x) (char-downcase y)))
+(define (char-ci>? x y)
+  (char>? (char-downcase x) (char-downcase y)))
+(define (char-ci<? x y)
+  (char<? (char-downcase x) (char-downcase y)))
+(define (char-ci>=? x y)
+  (char>=? (char-downcase x) (char-downcase y)))
+(define (char-ci<=? x y)
+  (char<=? (char-downcase x) (char-downcase y)))
+(define (char-alphabetic? c)
+  (let ((n (char->integer c)))
+    (cond ((< n #x41) #f)		; A
+	  ((> n #x7a) #f)		; z
+	  ((> n #x60))		; a-1
+	  ((< n #x5b))		; Z+1
+	  (else #f))))
+(define (char-numeric? c)
+  (let ((n (char->integer c)))
+    (cond ((< n #x30) #f)		; 0
+	  ((> n #x39) #f)		; 9
+	  (else #t))))
+(define (char-upper-case? c)
+  (let ((n (char->integer c)))
+    (cond ((< n #x41) #f)		; A
+	  ((> n #x5a) #f)		; Z
+	  (else #t))))
+
+(define (char-lower-case? c)
+  (let ((n (char->integer c)))
+    (cond ((< n #x61) #f)		; a
+	  ((> n #x7a) #f)		; z
+	  (else #t))))
+
+(define (char-downcase c) 
+  (let ((n (char->integer c)))
+    (if (or (< n #x41)		; A
+	    (> n #x5a))		; Z
+	(integer->char n)
+	(integer->char (+ n 32)))))
+
+(define (char-upcase c)
+  (let ((n (char->integer c)))
+    (if (or (< n #x61)		; a
+	    (> n #x7a))		; z
+	(integer->char n)
+	(integer->char (- n 32)))))
+
+(define (char-whitespace? c)
+  (let ((n (char->integer c)))
+    (or (eq? n 32) (eq? n 9) (eq? n 12) (eq? n 10) (eq? n 13))))
+;;;;;;;;; string
+(define (strcmp eq? f a b eq lt gt)
+  (let loop ((pos 0) (rema (string-length a)) (remb (string-length b)))
+    (cond
+     ((and (= rema 0 ) (= remb 0))  eq)
+     ((= rema 0)  lt)
+     ((= remb 0)  gt)
+     ((eq? (string-ref a pos) (string-ref b pos))
+      (loop (+ pos 1) (- rema 1) (- remb 1)))
+     (else
+      (f (string-ref a pos) (string-ref b pos))))))
+
+(define (string<? a b) (strcmp char=? char<? a b #f #t #f))
+(define (string>? a b) (strcmp char=? char>? a b #f #f #f))
+(define (string<=? a b) (strcmp char=? char<=? a b #t #t #f))
+(define (string>=? a b) (strcmp char=? char>=? a b #t #f #f))
+(define (string-ci<? a b) (strcmp char-ci=? char-ci<? a b #f #t #f))
+(define (string-ci>? a b) (strcmp char-ci=? char-ci>? a b #f #f #f))
+(define (string-ci<=? a b) (strcmp char-ci=? char-ci<=? a b #t #t #f))
+(define (string-ci>=? a b) (strcmp char-ci=? char-ci>=? a b #t #f #f))
+(define (string-ci=? a b) (strcmp char-ci=? char-ci=? a b #t #f #f))
+(define (string=? a b) (strcmp char=? char=? a b #t #f #f))
+(define (string-ref str idx) (sys:FOREIGN_CALL "SCM_STRING_REF" str idx))
+(define (string-set! str idx val) (sys:FOREIGN_CALL "SCM_STRING_SET" str idx val))
+(define (string->list str)
+  (let ((n (string-length str)))
+    (let loop ((i (- n 1)) (lst '()))
+      (if (< i 0)
+	  lst
+	  (loop (- i 1) (cons (string-ref str i) lst))))))
+(define (string . chars) (list->string chars))
+(define (list->string chars)
+  (let* ((len (length chars))
+	 (c (make-string len)))
+    (let loop ((i 0) (chars chars))
+      (if (< i len)
+	  (begin
+	    (string-set! c i (car chars))
+	    (loop (+ i 1) (cdr chars)))))
+    c))
+(define string-copy
+  (case-lambda
+   ((string) (substring string 0 (string-length string)))
+   ((string start) (substring string start (string-length string)))
+   ((string start end) (substring string start end))))
+(define (substring s start end)
+  (let ((new (make-string (- end start))))
+    (str-copy new 0 s start end)
+    new))
+;;;;;;;
+(define (symbol->string a) (sys:FOREIGN_CALL "SCM_SYMBOL_STRING" a))
+(define (string->symbol str) (sys:FOREIGN_CALL "SCM_MAKE_SYMBOL" (string-copy str)))
+;;;;;;;;;;;;;;;;;;; number->string
+(define number->string
+  (case-lambda
+   ((num) (number->string num 10))
+   ((num base)
+    ;;(unless (and (number? num) (fixnum? base) (<= 1 base 16)) (error "bad number->string" num))
+    (let* ((buflen 100)
+	   (buffer (make-string buflen)))
+      (cond ((flonum? num) (flonum->string num))
+	    ;; ((bignum? num) (error "big-str" num))
+	    ;; ((ratnum? num) (error "numbratnum->str" num))
+	    ;; ((compnum? num) (string-append
+	    ;; 		     (number->string (real-part num))
+	    ;; 		     (if (not (or (negative? (imag-part num))
+	    ;; 				  (nan? (imag-part num))
+	    ;; 				  (infinite? (imag-part num))))
+	    ;; 			 "+" "")
+	    ;; 		     (number->string (imag-part num)) "i"))
+	    ((eq? num 0) "0")
+	    (else
+	     (let ((neg (negative? num)))
+	       (let loop ((p buflen) (n (if neg (- 0 num) num)))
+		 (cond ((eq? n 0)
+			(if neg
+			    (begin
+			      (set! p (- p 1))
+			      (string-set! buffer p #\-)))
+			(substring buffer p buflen))
+		       (else
+			(let ((q (quotient n base))
+			      (r (modulo n base))
+			      (p (- p 1)))
+			  (string-set! buffer p (integer->char (+ r (if (>= r 10) 55 48))))
+			  (loop p q))))))))))))
+
+(include "str2num.scm")
+
