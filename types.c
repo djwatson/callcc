@@ -930,7 +930,6 @@ __attribute__((naked)) void consargs_stub(gc_obj a, gc_obj b, gc_obj c, gc_obj d
 	       "push %rdi\n\t"
 	       "mov %rsp, %rdi\n\t"
 	       "call consargs\n\t"
-	       "add %rax, %rsp\n\t"
 	       "pop %rdi\n\t"
 	       "pop %rsi\n\t"
 	       "pop %rdx\n\t"
@@ -938,6 +937,7 @@ __attribute__((naked)) void consargs_stub(gc_obj a, gc_obj b, gc_obj c, gc_obj d
 	       "pop %r8\n\t"
 	       "pop %r9\n\t"
 	       "add $8, %rsp\n\t"
+	       "add %rax, %rsp\n\t"
 	       "ret\n\t");
 }
 
@@ -955,6 +955,8 @@ static size_t argcnt_to_slot(size_t arg) {
 __attribute__((used)) int64_t consargs(gc_obj* reg_args) {
   auto res = NIL;
 
+  // TODO: This would be much faster if we pre-reserve a bunch of
+  // space from the GC: (we don't have to read/write start_ptr and end_ptr so often)
   for(auto wanted = argcnt; wanted > wanted_argcnt; wanted--) {
     res = cons(reg_args[argcnt_to_slot(wanted - 1)], res);
   }
@@ -975,9 +977,12 @@ __attribute__((used)) int64_t consargs(gc_obj* reg_args) {
     auto prev_pop = ((argcnt-reg_arg_cnt)&~1)+1;
     auto new_pop = ((end_slot -argcnt_to_slot(reg_arg_cnt))&~1)+1;
     auto shift = (prev_pop - new_pop)*8;
-    size_t sz =  (intptr_t)&reg_args[end_slot] - (intptr_t)reg_args;
-    // We have to slide the whole stack up.
-    memmove((void *)((int64_t)reg_args + shift), reg_args, sz);
+    auto start = &reg_args[reg_arg_cnt];
+    size_t sz =  (intptr_t)&reg_args[end_slot] - (intptr_t)start;
+    // We have to slide the whole stack up, since tailcc has the args in reverse
+    // order.  This is non-ideal: but most varargs functions have few non-varargs
+    // arguments remaining on the stack.  So far this is less of a perf concern than it seems.
+    memmove((void *)((int64_t)start + shift), start, sz);
 
     return shift;
   }
