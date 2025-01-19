@@ -336,7 +336,7 @@ NOINLINE gc_obj SCM_LOAD_GLOBAL_FAIL(gc_obj a) {
   printf("Attempting to load undefined sym: %.*s\n", (int)to_fixnum(str->len), str->str);
   abort();
 }
-gc_obj SCM_LOAD_GLOBAL(gc_obj a) {
+INLINE gc_obj SCM_LOAD_GLOBAL(gc_obj a) {
   //assert(is_symbol(a));
   auto sym = to_symbol(a);
   auto val = sym->val;
@@ -346,7 +346,7 @@ gc_obj SCM_LOAD_GLOBAL(gc_obj a) {
   [[clang::musttail]] return SCM_LOAD_GLOBAL_FAIL(a);
 }
 
-void SCM_SET_GLOBAL(gc_obj a, gc_obj b) {
+INLINE void SCM_SET_GLOBAL(gc_obj a, gc_obj b) {
   auto sym = to_symbol(a);
   sym->val = b;
 }
@@ -362,7 +362,7 @@ NOINLINE void* SCM_LOAD_CLOSURE_PTR_FAIL(gc_obj a) {
   printf("\n");
   abort();
 }
-void* SCM_LOAD_CLOSURE_PTR(gc_obj a) {
+INLINE void* SCM_LOAD_CLOSURE_PTR(gc_obj a) {
   if (likely(is_closure(a))) {
     auto clo = to_closure(a);
     return (void*)clo->v[0].value;
@@ -702,24 +702,24 @@ INLINE gc_obj SCM_NUM_EQ(gc_obj a, gc_obj b) {
   [[clang::musttail]] return SCM_NUM_EQ_SLOW(a, b);
 }
 
-gc_obj car(gc_obj obj) {
+INLINE gc_obj car(gc_obj obj) {
   return to_cons(obj)->a;
 }
 
-gc_obj cdr(gc_obj obj) {
+INLINE gc_obj cdr(gc_obj obj) {
   return to_cons(obj)->b;
 }
 
-gc_obj setcar(gc_obj obj, gc_obj val) {
+INLINE gc_obj setcar(gc_obj obj, gc_obj val) {
   to_cons(obj)->a = val;
   return UNDEFINED;
 }
 
-gc_obj setcdr(gc_obj obj, gc_obj val) {
+INLINE gc_obj setcdr(gc_obj obj, gc_obj val) {
   to_cons(obj)->b = val;
   return UNDEFINED;
 }
-gc_obj cons(gc_obj a, gc_obj b) {
+INLINE gc_obj cons(gc_obj a, gc_obj b) {
   cons_s* c = rcimmix_alloc(sizeof(cons_s));
   c->a = a;
   c->b = b;
@@ -734,33 +734,33 @@ gc_obj append(gc_obj a, gc_obj b) {
   return b;
 }
 
-gc_obj SCM_GUARD(gc_obj a, int64_t type) {
+INLINE gc_obj SCM_GUARD(gc_obj a, int64_t type) {
   if (a.value == NIL.value) {
     return TRUE_REP;
   }
   return FALSE_REP;
 }
 
-gc_obj make_vector(gc_obj obj) {
+INLINE gc_obj make_vector(gc_obj obj) {
   vector_s* v = rcimmix_alloc(sizeof(vector_s) + to_fixnum(obj)*sizeof(gc_obj));
   v->len = obj;
   return tag_vector(v);
 }
 
-gc_obj vector_length(gc_obj vec) {
+INLINE gc_obj vector_length(gc_obj vec) {
   return to_vector(vec)->len;
 }
 
-gc_obj vector_ref(gc_obj vec, gc_obj idx) {
+INLINE gc_obj vector_ref(gc_obj vec, gc_obj idx) {
   return to_vector(vec)->v[to_fixnum(idx)];
 }
 
-gc_obj vector_set(gc_obj vec, gc_obj idx, gc_obj val) {
+INLINE gc_obj vector_set(gc_obj vec, gc_obj idx, gc_obj val) {
   to_vector(vec)->v[to_fixnum(idx)] = val;
   return UNDEFINED;
 }
 
-gc_obj SCM_CLOSURE(gc_obj p, uint64_t len) {
+INLINE gc_obj SCM_CLOSURE(gc_obj p, uint64_t len) {
   //  printf("make closure %li\n", len);
   closure_s* clo = rcimmix_alloc(sizeof(closure_s) + (len+1) * sizeof(gc_obj));
   clo->type = CLOSURE_TAG;
@@ -768,12 +768,12 @@ gc_obj SCM_CLOSURE(gc_obj p, uint64_t len) {
   return tag_closure(clo);
 }
 
-void SCM_CLOSURE_SET(gc_obj clo, gc_obj obj, uint64_t i) {
+INLINE void SCM_CLOSURE_SET(gc_obj clo, gc_obj obj, uint64_t i) {
   //    printf("Closure set %li\n", i);
   to_closure(clo)->v[i + 1] = obj;
 }
 
-gc_obj SCM_CLOSURE_GET(gc_obj clo, gc_obj i) {
+INLINE gc_obj SCM_CLOSURE_GET(gc_obj clo, gc_obj i) {
   //  printf("Closure get %li\n", to_fixnum(i));
   return to_closure(clo)->v[to_fixnum(i) + 1];
 }
@@ -992,12 +992,18 @@ __attribute__((used)) int64_t consargs(gc_obj* reg_args) {
     } else {
       end_slot += 1;
     }
-    // clang's tailcc always pops an odd number, eq or greater than the stack args:
-    // Round down to even, then add one.
     //
     // Calculate the difference between the new and old args, and shift the stack.
+#if defined(__x86_64__)
+    // clang's tailcc always pops an odd number, eq or greater than the stack args:
+    // Round down to even, then add one.
     auto prev_pop = ((argcnt-reg_arg_cnt)&~1)+1;
     auto new_pop = ((end_slot -argcnt_to_slot(reg_arg_cnt))&~1)+1;
+#elif defined(__aarch64__)
+    // aarch64 is always 16-byte aligned.
+    auto prev_pop = ((argcnt-reg_arg_cnt+1)&~1);
+    auto new_pop = ((end_slot -argcnt_to_slot(reg_arg_cnt)+1)&~1);
+#endif
     auto shift = (prev_pop - new_pop)*8;
     auto start = &reg_args[reg_arg_cnt];
     size_t sz =  (intptr_t)&reg_args[end_slot] - (intptr_t)start;
