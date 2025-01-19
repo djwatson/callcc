@@ -1,5 +1,6 @@
 
-* varargs, apply
+* apply
+* fixup r4rs case selection: need to load cases in letrec for all before codegen
 
 * fast globals
 * program-ify

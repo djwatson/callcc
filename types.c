@@ -735,10 +735,24 @@ gc_obj append(gc_obj a, gc_obj b) {
 }
 
 INLINE gc_obj SCM_GUARD(gc_obj a, int64_t type) {
-  if (a.value == NIL.value) {
-    return TRUE_REP;
+  type /= 8;
+  auto low_tag = type & TAG_MASK;
+  if (low_tag == LITERAL_TAG) {
+    if (type == get_imm_tag(a)) {
+      return TRUE_REP;
+    }
+    return FALSE_REP;
   }
-  return FALSE_REP;
+  if (low_tag != get_tag(a)) {
+    return FALSE_REP;
+  }
+  if (low_tag == PTR_TAG) {
+    if (type == get_ptr_tag(a)) {
+      return TRUE_REP;
+    }
+    return FALSE_REP;
+  }
+  return TRUE_REP;
 }
 
 INLINE gc_obj make_vector(gc_obj obj) {
@@ -1015,4 +1029,8 @@ __attribute__((used)) int64_t consargs(gc_obj* reg_args) {
     return shift;
   }
   return 0;
+}
+
+INLINE gc_obj SCM_STRING_LENGTH(gc_obj obj) {
+  return to_string(obj)->len;
 }

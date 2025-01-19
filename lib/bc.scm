@@ -94,10 +94,12 @@
 	     #t))
   (fun-cases-set! fun (reverse! (fun-cases fun))))
 
-(define (find-label-for-case lfun argcnt)
+(define (find-label-for-case lfun argcnt var)
   (let loop ((cases (fun-cases lfun)))
     (if (null? cases)
-	(error "Can't find case for call:" (fun-name lfun))
+	(begin (display (format "Warning: Can't find case for call:~a cnt ~a\n" (fun-name lfun) var) (current-error-port))
+	       var)
+					;(error "Can't find case for call:" (fun-name lfun) argcnt)
 	(let ((case (car cases)))
 	  (if (= argcnt (car case))
 	      (cdr case)
@@ -207,11 +209,12 @@
        (push-instr! fun (format "%v~a = ~a call tailcc i64 %v~a(~a)" id (if tail "musttail" "") clo-id arglist))
        (finish (format "%v~a" id))))
     ((label-call ,label ,args ___)
+     (display (format "LABEL_CALL:~a\n" sexp) (current-error-port))
      (let* ((args (omap arg args (emit arg env fun #f)))
 	    (arglist (join ", " (omap arg args (format "i64 ~a" arg))))
 	    (id (next-id))
 	    (lfun (cdr (assq label env)))
-	    (case-label (find-label-for-case lfun (length args))))
+	    (case-label (find-label-for-case lfun (length args) label)))
        (push-instr! fun (format "%v~a = ~a call tailcc i64 @\"~a\"(~a)" id (if tail "musttail" "") case-label arglist))
        (finish (format "%v~a" id))))
     ((let ((,vars ,vals) ___) ,body)
@@ -374,10 +377,11 @@ declare i64 @make_vector (i64)
 declare i64 @vector_length (i64)
 declare i64 @vector_ref (i64, i64)
 declare i64 @vector_set (i64, i64, i64)
+declare i64 @SCM_STRING_LENGTH (i64)
 declare void @gc_init ()
 @argcnt = dso_local global i64 0
 @wanted_argcnt = dso_local global i64 0
-attributes #0 = { noinline returns_twice \"thunk\" cold}
+attributes #0 = { noinline returns_twice \"thunk\" cold optnone}
 "))
 
 (define (split-arglist args)
