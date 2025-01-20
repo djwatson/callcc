@@ -812,3 +812,18 @@
           (promise-value-set! promise (promise-value promise*)))
         (force promise))))
 
+(define (call-with-values producer consumer)
+  (apply consumer (producer)))
+
+(define values
+  (case-lambda
+   ((a) a)
+   ((a b) (cons a (cons b '())))
+   ((a b c) (cons a (cons b (cons c '()))))
+   (rest rest)))
+
+(define (round d)
+  d)
+
+(define (flush-output-port x ) 1)
+(define (current-output-port ) 1)

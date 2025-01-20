@@ -1157,7 +1157,7 @@ INLINE gc_obj SCM_INEXACT(gc_obj fix) {
 }
 ////// records
 INLINE gc_obj SCM_MAKE_RECORD(gc_obj sz) {
-  record_s* r = rcimmix_alloc(sizeof(record_s) + to_fixnum(sz));
+  record_s* r = rcimmix_alloc(sizeof(record_s) + to_fixnum(sz)*sizeof(gc_obj));
   r->type = RECORD_TAG;
   
   return tag_ptr(r);

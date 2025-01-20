@@ -211,7 +211,7 @@
     ((closure (label ,label) ,args ___)
      (let* ((args (omap arg args (emit arg env fun #f)))
 	    (id (next-id)))
-       (push-instr! fun ( format "%v~a = call i64 @SCM_CLOSURE(i64 ptrtoint (ptr @~a to i64), i64 ~a)"
+       (push-instr! fun ( format "%v~a = call i64 @SCM_CLOSURE(i64 ptrtoint (ptr @\"~a\" to i64), i64 ~a)"
 			  id label (length args)))
        
        (for (arg i) (args (iota (length args)))
