@@ -471,7 +471,7 @@ INLINE gc_obj SCM_MUL(gc_obj a, gc_obj b) {
     if(likely(!__builtin_mul_overflow(a.value, b.value >> 3, &res.value))) {
       return res;
     } else {
-      [[clang::musttail]] return SCM_ADD_SLOW(a, b);
+      [[clang::musttail]] return SCM_MUL_SLOW(a, b);
     }
   } else if (likely((is_flonum_fast(a) & is_flonum_fast(b)) == 1)) {
     gc_obj res;

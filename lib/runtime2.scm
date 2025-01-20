@@ -123,6 +123,9 @@
 	 ((6)
 	  (let ((r (cddddr args)))
 	    (fun (car args) (cadr args) (caddr args) (cadddr args) (car r) (cadr r))))
+	 ((7)
+	  (let ((r (cddddr args)))
+	    (fun (car args) (cadr args) (caddr args) (cadddr args) (car r) (cadr r) (caddr r))))
 	 (else (error "bad apply len:" len)))))
     ((fun . lst)
      (let* ((rlst (reverse lst))
@@ -567,6 +570,11 @@
       (vector-set! v i (car p)))))
 
 ;;;;;;;;; char stuff
+(define (integer->char i)
+  (sys:INTEGER_CHAR i))
+
+(define (char->integer i)
+  (sys:CHAR_INTEGER i))
 (define char=?
   (case-lambda
    ((a b) (eq? a b))
@@ -827,3 +835,4 @@
 
 (define (flush-output-port x ) 1)
 (define (current-output-port ) 1)
+(define (open-input-file f) 0)

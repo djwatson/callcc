@@ -135,7 +135,7 @@
 				    "preserve_nonecc" "")
 				name argstr
 				(if (equal? "SCM_CALLCC" name)
-				    "#0" "")))
+				    "#0" "#1")))
        (finish (format "%v~a" id))))
     ((primcall ,var ,vals ___)
      (let* ((vals (omap val vals (emit val env fun #f)))
@@ -351,7 +351,8 @@
 			    id a b))
       (format "add (i64 ~a, i64 ptrtoint ({i64, i64}* @cons~a to i64))"
 	      cons-tag id)))
-   (else (error "Unknown Const: " c))))
+   (else (display (format "WARNING: Unknown Const: ~a\n" c) (current-error-port))
+	 0)))
 
 (define (emit-header)
   (display
