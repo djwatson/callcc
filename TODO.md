@@ -1,5 +1,10 @@
 
-* fixup r4rs case selection: need to load cases in letrec for all before codegen
+* r4rstest
+  * input/output
+  * large apply
+  * bignum
+  * inexact?
+  * delay
 
 * fast globals
 * program-ify

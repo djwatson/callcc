@@ -1,5 +1,7 @@
 (import (scheme r5rs) (prefix (flow sys) sys:) (scheme case-lambda) (scheme base))
 
+(include "memory_layout.scm")
+
 ;;;;;;;;math 
 (define (negative? p)
   (< p 0))
@@ -731,4 +733,82 @@
 (include "str2num.scm")
 
 (define (integer->char a) (integer->char a))
+
+;;;;;; Records
+(define (record-set! record index value)
+  (unless (record? record) (error "record-set!: not a record" record))
+  (sys:FOREIGN_CALL "SCM_RECORD_SET" record index value))
+(define (record-ref record index)
+  (unless (record? record) (error "record-ref: not a record" record))
+  (sys:FOREIGN_CALL "SCM_RECORD_REF" record index))
+(define (make-record sz)
+  (let ((rec (sys:FOREIGN_CALL "SCM_MAKE_RECORD" sz)))
+    (do ((i 0 (+ i 1)))
+	((= i (+ 1 sz)) rec)
+      (record-set! rec i #f))))
+(define (record? p)
+  (sys:GUARD p record-tag))
+
+(define :record-type (make-record 3))
+(record-set! :record-type 0 :record-type)	; Its type is itself.
+(record-set! :record-type 1 ':record-type)
+(record-set! :record-type 2 '(name field-tags))
+
+(define (make-record-type name field-tags)
+  (let ((rec (make-record 3)))
+    (record-set! rec 0 :record-type)
+    (record-set! rec 1 name)
+    (record-set! rec 2 field-tags)
+    rec))
+
+(define (record-type-name record-type)
+  (record-ref record-type 1))
+
+(define (record-type-field-tags record-type)
+  (record-ref record-type 2))
+
+(define (field-index type tag)
+  (let loop ((i 1) (tags (record-type-field-tags type)))
+    (cond ((null? tags)
+           (error "record type has no such field" type tag))
+          ((eq? tag (car tags))
+           i)
+          (else
+           (loop (+ i 1) (cdr tags))))))
+(define (record-constructor type tags)
+  (let ((size (length (record-type-field-tags type)))
+        (arg-count (length tags))
+        (indexes (map (lambda (tag)
+                        (field-index type tag))
+		      tags)))
+    (lambda args
+      (if (= (length args)
+	     arg-count)
+          (let ((new (make-record (+ size 1))))
+	    (record-set! new 0 type)
+	    (for-each (lambda (arg i)
+			(record-set! new i arg))
+		      args
+		      indexes)
+	    new)
+          (error "wrong number of arguments to constructor" type args)))))
+
+;;;;;;;;;; delay/promise
+(define-record-type promise (%make-promise done? value) promise?
+                    (done? promise-done? promise-done-set!)
+                    (value promise-value promise-value-set!))
+
+(define (make-promise obj)
+  (if (promise? obj) obj
+      (%make-promise #t obj)))
+
+(define (force promise)
+  (unless (promise? promise) (error "force: not a promise" promise))
+  (if (promise-done? promise)
+      (promise-value promise)
+      (let ((promise* ((promise-value promise))))
+        (unless (promise-done? promise)
+          (promise-done-set! promise (promise-done? promise*))
+          (promise-value-set! promise (promise-value promise*)))
+        (force promise))))
 

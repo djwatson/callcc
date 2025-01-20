@@ -123,13 +123,6 @@
        (push-instr! fun (format "call void @SCM_SET_GLOBAL(i64 ~a, i64 ~a)"
 				sym val)))
      (finish undefined-tag))
-    ((primcall ,op ,cell ,val ,loc)
-     (guard (memq op '(STORE STORE_CHAR)))
-     (let* ((val-cell (emit cell env fun #f))
-	    (val-reg (emit val env fun #f))
-	    (val-loc (emit loc env fun #f)))
-       (abort op)
-       (finish rg)))
     ;; TODO: callcc probably also needs to be musttail.
     ;; but, the calling conventions don't match.
     ((primcall FOREIGN_CALL ,name ,args ___)
@@ -406,6 +399,10 @@ declare i64 @SCM_STRING_SET(i64,i64,i64)
 declare i64 @SCM_STRING_REF(i64,i64)
 declare i64 @SCM_EXACT(i64)
 declare i64 @SCM_INEXACT(i64)
+declare i64 @SCM_MAKE_RECORD(i64)
+declare i64 @SCM_RECORD_SET(i64, i64, i64)
+declare i64 @SCM_RECORD_REF(i64, i64)
+
 declare void @gc_init ()
 @argcnt = dso_local global i64 0
 @wanted_argcnt = dso_local global i64 0

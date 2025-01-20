@@ -80,6 +80,11 @@ typedef struct vector_s {
   gc_obj v[];
 } vector_s;
 
+typedef struct record_s {
+  uint64_t type;
+  gc_obj v[];
+} record_s;
+
 typedef struct cons_s {
   gc_obj a;
   gc_obj b;
@@ -98,6 +103,7 @@ symbol *to_symbol(gc_obj obj) { return (symbol *)(obj.value - PTR_TAG); }
 int64_t to_fixnum(gc_obj obj) { return obj.value >> 3; }
 cons_s *to_cons(gc_obj obj) { return (cons_s *)(obj.value - CONS_TAG); }
 vector_s *to_vector(gc_obj obj) { return (vector_s *)(obj.value - VECTOR_TAG); }
+record_s *to_record(gc_obj obj) { return (record_s *)(obj.value - PTR_TAG); }
 closure_s *to_closure(gc_obj obj) { return (closure_s *)(obj.value - PTR_TAG); }
 char to_char(gc_obj obj) { return (char)(obj.value >> 8); }
 
@@ -1148,4 +1154,20 @@ INLINE gc_obj SCM_INEXACT(gc_obj fix) {
   f->type = FLONUM_TAG;
   f->x = d;
   return tag_ptr(f);
+}
+////// records
+INLINE gc_obj SCM_MAKE_RECORD(gc_obj sz) {
+  record_s* r = rcimmix_alloc(sizeof(record_s) + to_fixnum(sz));
+  r->type = RECORD_TAG;
+  
+  return tag_ptr(r);
+}
+
+INLINE gc_obj SCM_RECORD_REF(gc_obj r, gc_obj idx) {
+  return to_record(r)->v[to_fixnum(idx)];
+}
+
+INLINE gc_obj SCM_RECORD_SET(gc_obj r, gc_obj idx, gc_obj val) {
+  to_record(r)->v[to_fixnum(idx)] = val;
+  return UNDEFINED;
 }
