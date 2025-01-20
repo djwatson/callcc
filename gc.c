@@ -1,4 +1,5 @@
 #define _POSIX_C_SOURCE 200112L
+#define _GNU_SOURCE
 
 #include <assert.h>
 #include <stdint.h>
@@ -6,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <pthread.h>
 
 #include "alloc_table.h"
 #include "gc.h"
@@ -71,6 +73,24 @@ bool get_partial_range(uint64_t sz_class, freelist_s *fl) { return false; }
 
 void gc_init() {
   stacktop = (uint64_t *)__builtin_frame_address(0);
+
+  void* addr;
+#if __APPLE__
+  addr = pthread_get_stackaddr_np(pthread_self());
+#elif __linux__
+  size_t size;
+  pthread_attr_t attr;
+  pthread_attr_init(&attr);
+  pthread_getattr_np(pthread_self(), &attr);
+  pthread_attr_getstack(&attr, &addr, &size);
+  pthread_attr_destroy(&attr);
+  addr = (unsigned char*)addr + size;
+#else
+#error "Unknown OS: Can't get stack base"
+#endif
+  printf("frametop %p pthreadtop %p\n", stacktop, addr);
+  stacktop = addr;
+  
   // Set defaults so we don't have to check for wrapping in
   // the fastpath.
   for (uint64_t i = 0; i < size_classes; i++) {
@@ -194,8 +214,8 @@ __attribute__((noinline, preserve_none)) static void rcimmix_collect() {
       ((double)end.tv_sec - (double)start.tv_sec) * 1000.0; // sec to ms
   time_taken +=
       ((double)end.tv_nsec - (double)start.tv_nsec) / 1000000.0; // ns to ms
-  /* printf("COLLECT %.3f ms, there are %li slabs next %li\n", time_taken, */
-  /*        kv_size(all_slabs), next_collect); */
+  printf("COLLECT %.3f ms, there are %li slabs next %li\n", time_taken,
+         kv_size(all_slabs), next_collect);
 }
 
 static slab_info *alloc_slab(uint64_t sz_class) {

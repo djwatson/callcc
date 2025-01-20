@@ -195,7 +195,7 @@
        (push-instr! fun (format "%v~a = call ptr @SCM_LOAD_CLOSURE_PTR(i64 ~a)"
 				clo-id (car args)))
        (push-instr! fun (format "store i64 ~a, ptr @argcnt" (length args)))
-       (push-instr! fun (format "%v~a = ~a call tailcc i64 %v~a(~a)" id (if tail "musttail" "") clo-id arglist))
+       (push-instr! fun (format "%v~a = ~a call tailcc i64 %v~a(~a) #1" id (if tail "musttail" "") clo-id arglist))
        (finish (format "%v~a" id))))
     ((label-call ,label ,args ___)
      (let* ((args (omap arg args (emit arg env fun #f)))
