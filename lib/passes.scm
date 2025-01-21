@@ -263,11 +263,11 @@ TODO: boxes could be passed down through funcs
     (,var
      (guard (symbol? var))
      (cond
-      ((assq var boxes) => (lambda (x) `(call (lookup car) ,(cdr x))))
+      ((assq var boxes) => (lambda (x) `(primcall FOREIGN_CALL "SCM_CAR" ,(cdr x))))
       (else arg)))
     ((set! ,var ,(conv body))
      (cond
-      ((assq var boxes) => (lambda (x) `(call (lookup set-car!) ,(cdr x) ,body)))
+      ((assq var boxes) => (lambda (x) `(primcall FOREIGN_CALL "SCM_SETCAR" ,(cdr x) ,body)))
       (else `(set! ,var ,body))))
     ((case ,args ,body)
      (let* ((new-boxes (filter-map
@@ -279,7 +279,7 @@ TODO: boxes could be passed down through funcs
       (set! boxes (append new-boxes boxes))
       `(case ,args
 	 ,(build-let (map cdr new-boxes)
-		     (map (lambda (x) `(call (lookup cons) ,(car x) #f)) new-boxes)
+		     (map (lambda (x) `(primcall FOREIGN_CALL "SCM_CONS" ,(car x) #f)) new-boxes)
 		     (conv body))))))
   (conv x))
 
