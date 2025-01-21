@@ -10,12 +10,10 @@
 
 (define-syntax match/extract
   (syntax-rules (___ unquote)
-    ((_ ,(? cat sym) (sk ...) . ids)
-     (sk ... (sym sym-tmp) . ids ))
-    ((_ ,(cat sym) (sk ...) . ids)
-     (sk ... (sym sym-tmp) . ids ))
+    ((_ ,(cat sym syms ...) (sk ...) . ids)
+     (sk ... (sym (sym syms ...) sym-tmp) . ids ))
     ((_ ,sym (sk ...) . ids)
-     (sk ... (sym sym-tmp) . ids ))
+     (sk ... (sym (sym) sym-tmp) . ids ))
     ((_ #(a ...) sk . ids)
      (match/extract (a ...) sk . ids))
     ((_ () (sk ...) .  ids)
@@ -24,6 +22,21 @@
      (match/extract a (match/extract b sk) . ids))
     ((_ var (sk ...) . ids)
      (sk ... . ids))))
+
+(define-syntax multi-map
+  (syntax-rules ()
+    ((_ (var) lam init)
+     (map lam init))
+    ((_ (vars ...) lam init)
+     (multi-map "tmp" (vars ...) () () lam init))
+    ((_ "tmp" (var vars ...) (cur ...) (tmps ...) lam init)
+     (multi-map "tmp" (vars ...) (cur ... var) (tmps ... var-tmp) lam init))
+    ((_ "tmp" () (vars ...) (tmps ...) lam init)
+     (let loop ((tmps '()) ... (lst init))
+       (if (pair? lst)
+	   (let-values (((vars ...) (lam (car lst))))
+	     (loop (cons vars tmps) ... (cdr lst)))
+	   (values (reverse tmps) ...))))))
 
 (define (ilength lst)
   (define (ilength lst cnt)
@@ -35,32 +48,28 @@
   ;; Slightly complicated here because ,var looks like a list,
   ;; even though we want it as the atomic last pattern.
   (syntax-rules (___)
-		((_ pat ,tail exp sk fk (ids id-tmp) ...)
-		 (match/ellipsis "run" pat () ,tail exp sk fk (ids id-tmp) ...))
-		((_ pat (tail ... . ,fin) exp sk fk (ids id-tmp) ...)
-		 (match/ellipsis "run" pat (tail ...) (tail ... . ,fin) exp sk fk (ids id-tmp) ...))
-		((_ pat tail exp sk fk (ids id-tmp) ...)
-		 (match/ellipsis "run" pat tail tail exp sk fk (ids id-tmp) ...))
-		((_ "run" pat tail tail-pattern exp sk fk (ids id-tmp) ...)
+		((_ pat ,tail exp sk fk (ids cat-ids id-tmp) ...)
+		 (match/ellipsis "run" pat () ,tail exp sk fk (ids cat-ids id-tmp) ...))
+		((_ pat (tail ... . ,fin) exp sk fk (ids cat-ids id-tmp) ...)
+		 (match/ellipsis "run" pat (tail ...) (tail ... . ,fin) exp sk fk (ids cat-ids id-tmp) ...))
+		((_ pat tail exp sk fk (ids cat-ids id-tmp) ...)
+		 (match/ellipsis "run" pat tail tail exp sk fk (ids cat-ids id-tmp) ...))
+		((_ "run" pat tail tail-pattern exp sk fk (ids cat-ids id-tmp) ...)
 		 (let* ((tail-len (ilength 'tail))
 			(dot-len (- (ilength exp) tail-len)))
 		   (if (negative? dot-len) fk
 		       (let loop ((len dot-len) (exp exp) (id-tmp '()) ...)
 			 (if (= 0 len)
-			     (let ((ids (lambda () (map (lambda (x) (x)) (reverse id-tmp)))) ...)
+			     (let ((ids (lambda () (multi-map cat-ids (lambda (x) (x)) (reverse id-tmp)))) ...)
 			       (match/clause tail-pattern exp sk fk))
 			     (match/clause pat (car exp) (loop (- len 1) (cdr exp) (cons ids id-tmp) ...) fk))))))))
 
 (define-syntax match/clause
   (syntax-rules (quote quasiquote unquote and ___)
-    ;; Match sym with guard
-    ((_ ,(? guard sym) exp sk fk)
-     (if (not (guard exp))
-	 fk
-	 (let ((sym (lambda () exp))) sk)))
     ;; Match a quoted sym with catamorphism
-    ((_ ,(cat sym) exp sk fk)
-     (let ((sym (lambda () (cat exp)))) sk))
+    ((_ ,(cat sym syms ...) exp sk fk)
+     (let ((sym (lambda () (cat exp)))) sk)
+     )
     ;; Match a quoted sym
     ((_ ,sym exp sk fk)
      (let ((sym (lambda () exp))) sk))
@@ -91,8 +100,8 @@
 
 (define-syntax match/build-vars
   (syntax-rules ()
-    ((_ sk (ids id-tmp) ...)
-     (let ((ids (ids)) ...)
+    ((_ sk (ids cat-ids id-tmp) ...)
+     (let-values ((cat-ids (ids)) ...)
 	sk))))
 
 (define-syntax match/evaluated

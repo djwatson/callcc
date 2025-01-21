@@ -210,8 +210,8 @@ double to_double_fast(gc_obj obj) {
   return res;
 }
 
-gc_obj display(gc_obj obj);
-void print_obj(gc_obj obj, FILE *) { display(obj); }
+gc_obj SCM_DISPLAY(gc_obj obj);
+void print_obj(gc_obj obj, FILE *) { SCM_DISPLAY(obj); }
 
 void display_double(gc_obj obj) {
     char buffer[40];
@@ -226,7 +226,7 @@ void display_double(gc_obj obj) {
     printf("%s", buffer);
 }
 
-gc_obj display(gc_obj obj) {
+gc_obj SCM_DISPLAY(gc_obj obj) {
   auto tag = get_tag(obj);
   switch(tag) {
   case FIXNUM_TAG:
@@ -326,7 +326,7 @@ gc_obj display(gc_obj obj) {
       if (i != 0) {
 	printf(" ");
       }
-      display(v->v[i]);
+      SCM_DISPLAY(v->v[i]);
     }
     printf(")");
     break;
@@ -385,7 +385,7 @@ NOINLINE void SCM_ARGCNT_FAIL() {
 
 NOINLINE void* SCM_LOAD_CLOSURE_PTR_FAIL(gc_obj a) {
   printf("Attempting to call non-closure:");
-  display(a);
+  SCM_DISPLAY(a);
   printf("\n");
   abort();
 }
@@ -405,7 +405,7 @@ NOINLINE gc_obj SCM_ADD_SLOW(gc_obj a, gc_obj b) {
     fa = to_double(a);
   } else {
     printf("Add: not a number:");
-    display(a);
+    SCM_DISPLAY(a);
     printf("\n");
     abort();
   }
@@ -415,7 +415,7 @@ NOINLINE gc_obj SCM_ADD_SLOW(gc_obj a, gc_obj b) {
     fb = to_double(b);
   } else {
     printf("Add: not a number:");
-    display(b);
+    SCM_DISPLAY(b);
     printf("\n");
     abort();
   }
@@ -763,36 +763,28 @@ INLINE gc_obj SCM_NUM_EQ(gc_obj a, gc_obj b) {
   [[clang::musttail]] return SCM_NUM_EQ_SLOW(a, b);
 }
 
-INLINE gc_obj car(gc_obj obj) {
+INLINE gc_obj SCM_CAR(gc_obj obj) {
   return to_cons(obj)->a;
 }
 
-INLINE gc_obj cdr(gc_obj obj) {
+INLINE gc_obj SCM_CDR(gc_obj obj) {
   return to_cons(obj)->b;
 }
 
-INLINE gc_obj setcar(gc_obj obj, gc_obj val) {
+INLINE gc_obj SCM_SETCAR(gc_obj obj, gc_obj val) {
   to_cons(obj)->a = val;
   return UNDEFINED;
 }
 
-INLINE gc_obj setcdr(gc_obj obj, gc_obj val) {
+INLINE gc_obj SCM_SETCDR(gc_obj obj, gc_obj val) {
   to_cons(obj)->b = val;
   return UNDEFINED;
 }
-INLINE gc_obj cons(gc_obj a, gc_obj b) {
+INLINE gc_obj SCM_CONS(gc_obj a, gc_obj b) {
   cons_s* c = rcimmix_alloc(sizeof(cons_s));
   c->a = a;
   c->b = b;
   return tag_cons(c);
-}
-
-gc_obj append(gc_obj a, gc_obj b) {
-  if(is_cons(a)) {
-    auto p = to_cons(a);
-    return cons(p->a, append(p->b, b));
-  }
-  return b;
 }
 
 INLINE gc_obj SCM_GUARD(gc_obj a, int64_t type) {
@@ -816,21 +808,21 @@ INLINE gc_obj SCM_GUARD(gc_obj a, int64_t type) {
   return TRUE_REP;
 }
 
-INLINE gc_obj make_vector(gc_obj obj) {
+INLINE gc_obj SCM_MAKE_VECTOR(gc_obj obj) {
   vector_s* v = rcimmix_alloc(sizeof(vector_s) + to_fixnum(obj)*sizeof(gc_obj));
   v->len = obj;
   return tag_vector(v);
 }
 
-INLINE gc_obj vector_length(gc_obj vec) {
+INLINE gc_obj SCM_VECTOR_LENGTH(gc_obj vec) {
   return to_vector(vec)->len;
 }
 
-INLINE gc_obj vector_ref(gc_obj vec, gc_obj idx) {
+INLINE gc_obj SCM_VECTOR_REF(gc_obj vec, gc_obj idx) {
   return to_vector(vec)->v[to_fixnum(idx)];
 }
 
-INLINE gc_obj vector_set(gc_obj vec, gc_obj idx, gc_obj val) {
+INLINE gc_obj SCM_VECTOR_SET(gc_obj vec, gc_obj idx, gc_obj val) {
   to_vector(vec)->v[to_fixnum(idx)] = val;
   return UNDEFINED;
 }
@@ -1055,7 +1047,7 @@ __attribute__((used)) int64_t consargs(gc_obj* reg_args) {
   // TODO: This would be much faster if we pre-reserve a bunch of
   // space from the GC: (we don't have to read/write start_ptr and end_ptr so often)
   for(auto wanted = argcnt; wanted > wanted_argcnt; wanted--) {
-    res = cons(reg_args[argcnt_to_slot(wanted - 1)], res);
+    res = SCM_CONS(reg_args[argcnt_to_slot(wanted - 1)], res);
   }
   auto end_slot = argcnt_to_slot(wanted_argcnt);
   auto start_slot = argcnt_to_slot(argcnt-1);

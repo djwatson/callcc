@@ -12,4 +12,5 @@
      (match))
   (export r7-pass escapes-table)
   (include "qq.scm")
-  (include "passes.scm"))
+  (include "passes.scm")
+  (include "fix-letrec.scm"))

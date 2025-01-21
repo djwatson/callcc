@@ -211,10 +211,10 @@
 
 (define (car a)
   (unless (pair? a) (error "Trying to car not a pair" a))
-  (sys:FOREIGN_CALL "car" a))
+  (sys:FOREIGN_CALL "SCM_CAR" a))
 (define (cdr a)
   (unless (pair? a) (error "Trying to cdr not a pair" a))
-  (sys:FOREIGN_CALL "cdr" a))
+  (sys:FOREIGN_CALL "SCM_CDR" a))
 (define (cddr a)
   (cdr (cdr a)))
 (define (cdar a)
@@ -223,24 +223,24 @@
   (car (car a)))
 (define (cadr a)
   (car (cdr a)))
-(define (set-car! n v) (sys:FOREIGN_CALL "setcar" n v))
-(define (set-cdr! n v) (sys:FOREIGN_CALL "setcdr" n v))
+(define (set-car! n v) (sys:FOREIGN_CALL "SCM_SETCAR" n v))
+(define (set-cdr! n v) (sys:FOREIGN_CALL "SCM_SETCDR" n v))
 
-(define (cons  n a) (sys:FOREIGN_CALL "cons" n a))
-(define (vector-length n) (sys:FOREIGN_CALL "vector_length" n))
+(define (cons  n a) (sys:FOREIGN_CALL "SCM_CONS" n a))
+(define (vector-length n) (sys:FOREIGN_CALL "SCM_VECTOR_LENGTH" n))
 (define make-vector
   (case-lambda
    ((len) (make-vector len #f))
    ((len obj)
-    (let ((vec (sys:FOREIGN_CALL "make_vector" len)))
+    (let ((vec (sys:FOREIGN_CALL "SCM_MAKE_VECTOR" len)))
       (do ((i 0 (+ i 1)))
 	  ((= i len))
 	(vector-set! vec i obj))
       vec))))
-(define (vector-ref v i) (sys:FOREIGN_CALL "vector_ref" v i))
-(define (vector-set! v i val) (sys:FOREIGN_CALL "vector_set" v i val))
+(define (vector-ref v i) (sys:FOREIGN_CALL "SCM_VECTOR_REF" v i))
+(define (vector-set! v i val) (sys:FOREIGN_CALL "SCM_VECTOR_SET" v i val))
 (define (display n)
-  (sys:FOREIGN_CALL "display" n))
+  (sys:FOREIGN_CALL "SCM_DISPLAY" n))
 (define (zero? x)
   (= x 0))
 (define (newline)
@@ -289,10 +289,10 @@
 	      (loop (cdr strs) (+ place cur_len)))))
       newstr))))
 
-;;; IO
-(define write display)
+;; ;;; IO
 
-;;; types
+
+;; ;;; types
 (define (boolean? x) (boolean? x))
 (define (char? x) (char? x))
 (define (null? x) (null? x))
@@ -305,8 +305,9 @@
 (define (flonum? x) (sys:FOREIGN_CALL "SCM_IS_FLONUM" x))
 (define (complex? x) #t)
 (define (real? x) #t)
-(define (real? x) #t)
 (define (rational? x) (fixnum? x))
+(define write display)
+
 (define (fixnum? x) (fixnum? x))
 (define integer? fixnum?)
 (define (exact? x) (fixnum? x))
@@ -703,44 +704,6 @@
 ;;;;;;;
 (define (symbol->string a) (sys:FOREIGN_CALL "SCM_SYMBOL_STRING" a))
 (define (string->symbol str) (sys:FOREIGN_CALL "SCM_MAKE_SYMBOL" (string-copy str)))
-;;;;;;;;;;;;;;;;;;; number->string
-(define number->string
-  (case-lambda
-   ((num) (number->string num 10))
-   ((num base)
-    ;;(unless (and (number? num) (fixnum? base) (<= 1 base 16)) (error "bad number->string" num))
-    (let* ((buflen 100)
-	   (buffer (make-string buflen)))
-      (cond ((flonum? num) (flonum->string num))
-	    ;; ((bignum? num) (error "big-str" num))
-	    ;; ((ratnum? num) (error "numbratnum->str" num))
-	    ;; ((compnum? num) (string-append
-	    ;; 		     (number->string (real-part num))
-	    ;; 		     (if (not (or (negative? (imag-part num))
-	    ;; 				  (nan? (imag-part num))
-	    ;; 				  (infinite? (imag-part num))))
-	    ;; 			 "+" "")
-	    ;; 		     (number->string (imag-part num)) "i"))
-	    ((eq? num 0) "0")
-	    (else
-	     (let ((neg (negative? num)))
-	       (let loop ((p buflen) (n (if neg (- 0 num) num)))
-		 (cond ((eq? n 0)
-			(if neg
-			    (begin
-			      (set! p (- p 1))
-			      (string-set! buffer p #\-)))
-			(substring buffer p buflen))
-		       (else
-			(let ((q (quotient n base))
-			      (r (modulo n base))
-			      (p (- p 1)))
-			  (string-set! buffer p (integer->char (+ r (if (>= r 10) 55 48))))
-			  (loop p q))))))))))))
-
-(include "str2num.scm")
-
-(define (integer->char a) (integer->char a))
 
 ;;;;;; Records
 (define (record-set! record index value)
@@ -802,9 +765,9 @@
           (error "wrong number of arguments to constructor" type args)))))
 
 ;;;;;;;;;; delay/promise
-(define-record-type promise (%make-promise done? value) promise?
-                    (done? promise-done? promise-done-set!)
-                    (value promise-value promise-value-set!))
+;; (define-record-type promise (%make-promise done? value) promise?
+;;                     (done? promise-done? promise-done-set!)
+;;                     (value promise-value promise-value-set!))
 
 (define (make-promise obj)
   (if (promise? obj) obj
@@ -836,3 +799,43 @@
 (define (flush-output-port x ) 1)
 (define (current-output-port ) 1)
 (define (open-input-file f) 0)
+
+;;;;;;;;;
+
+;;;;;;;;;;;;;;;;;;; number->string
+(define number->string
+  (case-lambda
+   ((num) (number->string num 10))
+   ((num base)
+    ;;(unless (and (number? num) (fixnum? base) (<= 1 base 16)) (error "bad number->string" num))
+    (let* ((buflen 100)
+	   (buffer (make-string buflen)))
+      (cond ((flonum? num) (flonum->string num))
+	    ;; ((bignum? num) (error "big-str" num))
+	    ;; ((ratnum? num) (error "numbratnum->str" num))
+	    ;; ((compnum? num) (string-append
+	    ;; 		     (number->string (real-part num))
+	    ;; 		     (if (not (or (negative? (imag-part num))
+	    ;; 				  (nan? (imag-part num))
+	    ;; 				  (infinite? (imag-part num))))
+	    ;; 			 "+" "")
+	    ;; 		     (number->string (imag-part num)) "i"))
+	    ((eq? num 0) "0")
+	    (else
+	     (let ((neg (negative? num)))
+	       (let loop ((p buflen) (n (if neg (- 0 num) num)))
+		 (cond ((eq? n 0)
+			(if neg
+			    (begin
+			      (set! p (- p 1))
+			      (string-set! buffer p #\-)))
+			(substring buffer p buflen))
+		       (else
+			(let ((q (quotient n base))
+			      (r (modulo n base))
+			      (p (- p 1)))
+			  (string-set! buffer p (integer->char (+ r (if (>= r 10) 55 48))))
+			  (loop p q))))))))))))
+
+(include "str2num.scm")
+

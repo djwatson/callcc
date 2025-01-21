@@ -3,7 +3,7 @@
 ;; Used numeric-tests.scm to test conformance.
 ;; Should be r7rs compliant, but there's probably bugs.
 
-(define debug #f)
+;(define debug #f)
 
 (define-syntax make-state
   (syntax-rules ()

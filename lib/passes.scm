@@ -166,6 +166,25 @@ TODO: boxes could be passed down through funcs
      (-> (command arg) rest ...))
     ((_ arg) arg)))
 
+(define (make-a-program prog)
+  (define sexp (cdr prog))
+  (define (doit sexp defs)
+    (if (null? (cdr sexp))
+	`(letrec* ,(reverse defs)
+	   ,(car sexp))
+	(match (car sexp)
+	  ((define ,var ,val)
+	   (if (assq var defs)
+	       (begin
+		 (display (format "WARNING: multiple definition of ~a\n" var) (current-error-port))
+		 (doit (cdr sexp) (cons (list (gen-sym 'unused) `(set! ,var ,val)) defs)))
+	       (doit (cdr sexp) (cons
+				 (list (gen-sym 'unused) `(global-set! ,var ,var))
+				 (cons (list var val) defs)))))
+	  (,else
+	   (doit (cdr sexp) (cons (list (gen-sym 'unused) else) defs))))))
+  `(begin ,(doit sexp '())))
+
 
 ;; Requires alpha-renamed
 (define assigned (make-hash-table eq?))
@@ -215,37 +234,6 @@ TODO: boxes could be passed down through funcs
         (list uvar init)))
     vars
     inits))
-
-(define-pass fix-letrec
-  ((letrec* ((,v ,(fix-letrec init)) ___) ,(fix-letrec body))
-   (let* ((fixed (find-fixed v init))
-	  (fixed-vars (map car fixed))
-	  (fixed-vals (map second fixed))
-	  (set (find-not-fixed v init fixed))
-	  (set-vars (map car set))
-	  (set-vals (map second set)))
-     (build-let
-      set-vars
-      (make-list (length set) #f)
-      (build-fix fixed-vars fixed-vals
-		 (build-set! set-vars set-vals body)))))
-  ((letrec ((,v ,(fix-letrec init)) ___) ,(fix-letrec body))
-   (let* ((fixed (find-fixed v init))
-	  (fixed-vars (map car fixed))
-	  (fixed-vals (map second fixed))
-	  (set (find-not-fixed v init fixed))
-	  (set-vars (map car set))
-	  (set-vals (map second set))
-	  (set-tmp (omap _ set (gen-sym 'tmp))))
-     (for-each (lambda (x) (hash-table-set! assigned x #t)) (map car set))
-     (build-let
-      set-vars
-      (make-list (length set) #f)
-      (build-fix fixed-vars fixed-vals
-		 (build-let
-		  set-tmp
-		  set-vals
-		  (build-set! set-vars set-tmp body)))))))
 
 ;; Add 'lookup' to global variables.
 (define (find-globals x)
@@ -700,6 +688,7 @@ TODO: boxes could be passed down through funcs
       deep-copy
       parse-expanded
       integrate-r5rs
+      make-a-program
       fix-letrec
       find-assigned
       find-globals
