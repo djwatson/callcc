@@ -175,7 +175,7 @@ __attribute__((noinline, preserve_none)) static void rcimmix_collect() {
 
   // Mark symbol table: TODO cleaup types
   uint64_t* v = (uint64_t*)(symbol_table &~7);
-  auto len = *v;
+  auto len = (*v) >> 3;
   kv_push(markstack, ((range){&v[1], &v[1+len]}));
 
   // Run mark loop.
