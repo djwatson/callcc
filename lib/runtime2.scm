@@ -819,7 +819,7 @@
    (rest rest)))
 
 (define (round d)
-  d)
+  (sys:FOREIGN_CALL "SCM_ROUND" (inexact d)))
 
 (define (flush-output-port x ) 1)
 (define (current-output-port ) 1)

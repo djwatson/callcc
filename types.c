@@ -1224,5 +1224,16 @@ __attribute__((naked)) void SCM_APPLY(gc_obj f, gc_obj lst, gc_obj cnt) {
 ///////math
 INLINE gc_obj SCM_SIN(gc_obj f) {
   double d = to_double(f);
-  return double_to_gc_slow(d);
+  return double_to_gc_slow(sin(d));
+}
+
+INLINE gc_obj SCM_ROUND(gc_obj f) {
+  auto x = to_double(f);
+  double rounded = round(x);
+  if (fabs(x - rounded) == 0.5) {
+    if (fmod(rounded, 2.0) != 0.0) {
+      rounded = rounded + (x > 0 ? -1 : 1);
+    }
+  }
+  return double_to_gc_slow(round(rounded));
 }
