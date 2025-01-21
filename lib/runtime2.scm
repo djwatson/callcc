@@ -15,6 +15,12 @@
 
 (define (sin f)
   (sys:FOREIGN_CALL "SCM_SIN" (inexact f)))
+(define (cos f)
+  (sys:FOREIGN_CALL "SCM_COS" (inexact f)))
+(define (atan f)
+  (sys:FOREIGN_CALL "SCM_ATAN" (inexact f)))
+(define (sqrt f)
+  (sys:FOREIGN_CALL "SCM_SQRT" (inexact f)))
 
 (define (reducer f init args)
   (let loop ((init init) (args args))
@@ -132,7 +138,8 @@
 	 ((8)
 	  (let ((r (cddddr args)))
 	    (fun (car args) (cadr args) (caddr args) (cadddr args) (car r) (cadr r) (caddr r) (cadddr r))))
-	 (else (sys:FOREIGN_CALL "SCM_APPLY" fun args len)))))
+	 (else
+		  (sys:FOREIGN_CALL "SCM_APPLY" fun args len)))))
     ((fun . lst)
      (let* ((rlst (reverse lst))
 	    (unused (unless (list? (car rlst))

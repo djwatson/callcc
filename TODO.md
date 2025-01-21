@@ -1,4 +1,7 @@
 
+* failing:
+  * nucleic.  something to do with flonum math?
+
 * r4rstest
   * input/output
   * large apply
