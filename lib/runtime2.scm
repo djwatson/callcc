@@ -13,6 +13,9 @@
       (- p)
       p))
 
+(define (sin f)
+  (sys:FOREIGN_CALL "SCM_SIN" (inexact f)))
+
 (define (reducer f init args)
   (let loop ((init init) (args args))
     (if (pair? args)

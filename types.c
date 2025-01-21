@@ -189,6 +189,20 @@ bool double_to_gc(double d, gc_obj* res) {
   return false;
 }
 
+gc_obj double_to_gc_slow(double d) {
+  uint64_t di;
+  memcpy(&di, &d, sizeof(d));
+  di = __builtin_rotateleft64(di, 4);
+  di++; // Offset by one, so that we keep fixnum as 0 tag.
+  if (has_tag_5_or_4_or_1(di)) {
+    return (gc_obj){.value = di};
+  }
+  flonum_s* f = rcimmix_alloc(sizeof(flonum_s));
+  f->type = FLONUM_TAG;
+  f->x = d;
+  return tag_ptr(f);
+}
+
 double to_double(gc_obj obj) {
   if (is_ptr(obj)) {
     flonum_s* f = to_raw_ptr(obj);
@@ -338,20 +352,6 @@ gc_obj SCM_DISPLAY(gc_obj obj) {
   return UNDEFINED;
 }
 
-#if 0
-int main() {
-  gc_obj res = double_to_gc(0.0);
-  printf("Res was %lx, %f\n", res.value, to_double(res));
-  res = double_to_gc(1.0);
-  printf("Res was %lx, %f\n", res.value, to_double(res));
-  res = double_to_gc(-1.0);
-  printf("Res was %lx, %f\n", res.value, to_double(res));
-  res = double_to_gc(11111111111111.11111111111111);
-  printf("Res was %lx, %f\n", res.value, to_double(res));
-  return 0;
-}
-#endif
-
 ////////////// MATH
 #define likely(x) __builtin_expect(x, 1)
 #define unlikely(x) __builtin_expect(x, 0)
@@ -419,11 +419,7 @@ NOINLINE gc_obj SCM_ADD_SLOW(gc_obj a, gc_obj b) {
     printf("\n");
     abort();
   }
-  gc_obj res;
-  if(double_to_gc(fa + fb, &res)) {
-    return res;
-  }
-  abort();
+  return double_to_gc_slow(fa + fb);
 }
 
 INLINE gc_obj SCM_ADD(gc_obj a, gc_obj b) {
@@ -468,11 +464,7 @@ NOINLINE gc_obj SCM_MUL_SLOW(gc_obj a, gc_obj b) {
     printf("\n");
     abort();
   }
-  gc_obj res;
-  if(double_to_gc(fa * fb, &res)) {
-    return res;
-  }
-  abort();
+  return double_to_gc_slow(fa * fb);
 }
 
 INLINE gc_obj SCM_MUL(gc_obj a, gc_obj b) {
@@ -507,11 +499,8 @@ NOINLINE __attribute__((preserve_most)) gc_obj SCM_SUB_SLOW(gc_obj a, gc_obj b) 
   } else {
     fb = to_double(b);
   }
-  gc_obj res;
-  if(double_to_gc(fa - fb, &res)) {
-    return res;
-  }
-  abort();
+
+  return double_to_gc_slow(fa - fb);
 }
 
 INLINE  gc_obj SCM_SUB(gc_obj a, gc_obj b) {
@@ -547,11 +536,8 @@ NOINLINE gc_obj SCM_DIV_SLOW(gc_obj a, gc_obj b) {
   } else {
     fb = to_double(b);
   }
-  gc_obj res;
-  if(double_to_gc(fa / fb, &res)) {
-    return res;
-  }
-  abort();
+
+  return double_to_gc_slow(fa / fb);
 }
 
 INLINE gc_obj SCM_DIV(gc_obj a, gc_obj b) {
@@ -1234,3 +1220,9 @@ __attribute__((naked)) void SCM_APPLY(gc_obj f, gc_obj lst, gc_obj cnt) {
 }
 #elif defined(__aarch64__)
 #endif
+
+///////math
+INLINE gc_obj SCM_SIN(gc_obj f) {
+  double d = to_double(f);
+  return double_to_gc_slow(d);
+}

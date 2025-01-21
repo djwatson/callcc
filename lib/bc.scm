@@ -421,6 +421,7 @@ declare i64 @SCM_MAKE_RECORD(i64)
 declare i64 @SCM_RECORD_SET(i64, i64, i64)
 declare i64 @SCM_RECORD_REF(i64, i64)
 declare i64 @SCM_GET_SYM_TABLE()
+declare i64 @SCM_SIN(i64)
 declare i64 @SCM_APPLY(i64, i64, i64)
 
 declare void @gc_init ()
