@@ -1,11 +1,14 @@
 
 * r4rstest
+  * fix string->symbol
+    * also need to GC symbols
   * input/output
   * large apply
+    * should also fix inexact?
   * bignum
-  * inexact?
-  * delay
 
+* Maybe go back to shadow arg stack? ret imm16 is kinda slow on zen3.
+  * and args are in backwards order, necessitating shift.
 * fast globals
 * program-ify
 * better letrec
@@ -24,6 +27,9 @@
 * gc fd's.
 * gset check
 * bignums, compnums, ratnums
+
+* recheck GC get stack top
+* gc generational-lazy marking
 
 * DONE self-tagging: experiment with better double tagging
 

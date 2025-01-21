@@ -224,7 +224,6 @@ TODO: boxes could be passed down through funcs
 	  (set (find-not-fixed v init fixed))
 	  (set-vars (map car set))
 	  (set-vals (map second set)))
-     (for-each (lambda (x) (hash-table-set! assigned x #t)) (map car set))
      (build-let
       set-vars
       (make-list (length set) #f)
@@ -701,8 +700,8 @@ TODO: boxes could be passed down through funcs
       deep-copy
       parse-expanded
       integrate-r5rs
-      find-assigned
       fix-letrec
+      find-assigned
       find-globals
       assignment-conversion
       recover-let
