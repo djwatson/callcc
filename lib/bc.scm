@@ -421,6 +421,7 @@ declare i64 @SCM_MAKE_RECORD(i64)
 declare i64 @SCM_RECORD_SET(i64, i64, i64)
 declare i64 @SCM_RECORD_REF(i64, i64)
 declare i64 @SCM_GET_SYM_TABLE()
+declare i64 @SCM_APPLY(i64, i64, i64)
 
 declare void @gc_init ()
 @argcnt = dso_local global i64 0
@@ -455,7 +456,7 @@ attributes #1 = { returns_twice}
       (display (format "Compiling ~a\n" file) (current-error-port))
 					;(pretty-print lowered (current-error-port))
       )
-    ;;(exit)
+					;;(exit)
 					(emit lowered '() main-fun #t)
     (emit-header)
 

@@ -1179,3 +1179,58 @@ extern gc_obj symbol_table;
 INLINE gc_obj SCM_GET_SYM_TABLE() {
   return symbol_table;
 }
+
+////////// Generic apply.  cnt >= reg_arg_cnt, and is already checked with list?.
+#if defined(__x86_64__)
+__attribute__((naked)) void SCM_APPLY(gc_obj f, gc_obj lst, gc_obj cnt) {
+  asm volatile(
+    "shr $3, %rdx\n\t" // to_fixnum
+    
+    "mov %rdx, %r10\n\t" // r10 contains stack arg cnt
+    "sub $5, %r10\n\t" // reg args, minus closure.
+
+    // Round down to even, and add one
+    "andq $-2, %r10\n\t"
+    "add $1, %r10\n\t"
+    
+    "add $1, %rdx\n\t" // add closure ptr
+    "mov %rdx, argcnt(%rip)\n\t"
+
+    "mov %rsi, %rax\n\t"
+    "mov -3(%rax), %rsi\n\t"
+    "mov 5(%rax), %rax\n\t"
+
+    "mov -3(%rax), %rdx\n\t"
+    "mov 5(%rax), %rax\n\t"
+    
+    "mov -3(%rax), %rcx\n\t"
+    "mov 5(%rax), %rax\n\t"
+
+    "mov -3(%rax), %r8\n\t"
+    "mov 5(%rax), %rax\n\t"
+    
+    "mov -3(%rax), %r9\n\t"
+    "mov 5(%rax), %rax\n\t"
+
+    "lea (,%r10, 8), %r10\n\t"
+    "sub %r10, %rsp\n\t"
+    "mov $0, %r10\n\t"
+
+    "1:\n\t"
+    "cmpq  $0x16, %rax\n\t"
+    "je 2f\n\t"
+    "mov -3(%rax), %r11\n\t"
+    "mov %r11, (%rsp, %r10, 8)\n\t"
+    "add $1, %r10\n\t"
+    "mov 5(%rax), %rax\n\t"
+    "jmp 1b\n\t"
+
+    "2:\n\t"
+    "mov 6(%rdi), %rax\n\t"
+    // TODO: make this a tailcall instead.
+    "call *%rax\n\t"
+    "ret\n\t"
+		);
+}
+#elif defined(__aarch64__)
+#endif

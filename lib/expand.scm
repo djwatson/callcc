@@ -836,6 +836,8 @@ TODO: also maybe go back to pre-resolving idents? only internal
   (set-path input file-dir)
   input)
 
+(define (features) '())
+
 ;; TODO should this match identifiers instead of symbols??
 ;; Would be easier to write in syntax-case?
 (define (expand-cond-expand sexp)
@@ -846,7 +848,7 @@ TODO: also maybe go back to pre-resolving idents? only internal
     (match f
       ((library ,name) (error "no cond-expand lib feature"))
       ((and ,features ___) (every (map parse-feature features)))
-      ((or ,features ___) (any (map parse-feature features)))
+      ((or ,features ___) (any (lambda (x) x) (map parse-feature features)))
       ((not ,feature) (not (parse-feature feature)))
       (else #t)
       (,feature (memq feature (features)))))

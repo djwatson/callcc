@@ -129,7 +129,7 @@
 	 ((8)
 	  (let ((r (cddddr args)))
 	    (fun (car args) (cadr args) (caddr args) (cadddr args) (car r) (cadr r) (caddr r) (cadddr r))))
-	 (else (error "bad apply len:" len)))))
+	 (else (sys:FOREIGN_CALL "SCM_APPLY" fun args len)))))
     ((fun . lst)
      (let* ((rlst (reverse lst))
 	    (unused (unless (list? (car rlst))
@@ -207,6 +207,7 @@
 (define (even? x)
   (= 0 (modulo x 2)))
 (define (quotient a b) (sys:FOREIGN_CALL "SCM_DIV" a b))
+
 
 (define (not a) (if a #f #t))
 (define (call-with-current-continuation x)
@@ -312,7 +313,8 @@
 (define write display)
 
 (define (fixnum? x) (fixnum? x))
-(define integer? fixnum?)
+(define (integer? x) (fixnum? x))
+(define (exact-integer? x) (fixnum? x))
 (define (exact? x) (fixnum? x))
 (define (inexact? x) (flonum? x))
 
@@ -365,7 +367,14 @@
         (cons x (recur (car rest) (cdr rest)))
         x)))
 
-(define (list . x) x)
+(define list
+  (case-lambda
+   ((a) (cons a '()))
+   ((a b) (cons a (cons b '())))
+   ((a b c) (cons a (cons b (cons c '()))))
+   ((a b c d) (cons a (cons b (cons c (cons d '())))))
+   (rest rest)))
+
 (define (list? x)
   (let loop ((fast x) (slow x))
     (or (null? fast)
