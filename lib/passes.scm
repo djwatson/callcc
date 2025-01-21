@@ -670,6 +670,27 @@ TODO: boxes could be passed down through funcs
 	  (else (imap (lambda (f) (update f replace)) f)))))
   (imap (lambda (f) (update f '())) sexp))
 
+(define global-defs (make-hash-table eq?))
+(define global-labels (make-hash-table eq?))
+
+(define-pass find-global-labels sexp
+  ((define ,var (labels ((,label ,lam)) ,body))
+   (if (hash-table-exists? assigned var)
+       (display (format "Global assigned:~a\n" var) (current-error-port))
+       (begin
+	 (display (format "Record global ~a\n" var) (current-error-port))
+	 (hash-table-set! global-defs var label)
+	 (hash-table-set! global-labels label lam)))
+   sexp))
+
+(define-pass programify sexp
+  ((call (lookup ,global) ,(programify args) ___)
+   (if (hash-table-exists? global-defs global)
+       `(label-call ,(hash-table-ref global-defs global) (lookup ,global) ,args ___)
+       (begin
+	 (display (format "Global not found:~a\n" global) (current-error-port))
+	 sexp))))
+
 (define (debug-print x)
   (pretty-print x)
   x)
@@ -683,7 +704,6 @@ TODO: boxes could be passed down through funcs
       x))
 
 (define (r7-pass x pic)
-  (define pic-func (if pic lift-symbols (lambda (x) x)))
   (-> x
       deep-copy
       parse-expanded
@@ -704,6 +724,9 @@ TODO: boxes could be passed down through funcs
       final-free
 
       closure-conversion-scc
+
+      find-global-labels
+      programify
       ))
 
 

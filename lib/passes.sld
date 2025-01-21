@@ -10,7 +10,7 @@
      (util)
      (third-party pp)
      (match))
-  (export r7-pass escapes-table)
+  (export r7-pass escapes-table global-labels)
   (include "qq.scm")
   (include "passes.scm")
   (include "fix-letrec.scm"))

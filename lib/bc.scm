@@ -214,7 +214,9 @@
      (let* ((args (omap arg args (emit arg env fun #f)))
 	    (arglist (join ", " (omap arg args (format "i64 ~a" arg))))
 	    (id (next-id))
-	    (lfun (cdr (assq label env)))
+	    (lfun (cond
+		   ((assq label env) => cdr)
+		   (else (hash-table-ref global-labels label))))
 	    (case-label (find-label-for-case lfun (length args) label)))
        ;; TODO: varargs inline calls
        (when (equal? case-label label)
@@ -445,16 +447,16 @@ attributes #1 = { returns_twice}
 	 (unused (expander-init libman))
 	 (runtime (expand-program runtime-input "" libman))
 	 (prog (expand-program input "PROG-" libman))
-	 (lowered (r7-pass `(begin	,@runtime
+	 (lowered (r7-pass `(begin 	,@runtime
 					,@prog
 					) #f))
 	 (main-fun (make-fun "main")))
     (when verbose
       (display (format "Compiling ~a\n" file) (current-error-port))
-;      (pretty-print lowered (current-error-port))
+					;(pretty-print lowered (current-error-port))
       )
-
-    (emit lowered '() main-fun #t)
+    ;;(exit)
+					(emit lowered '() main-fun #t)
     (emit-header)
 
     (let ((sym-vec (emit-const (list->vector symbol-table))))

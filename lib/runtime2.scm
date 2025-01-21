@@ -320,12 +320,12 @@
   (if (flonum? a) 
       (sys:FOREIGN_CALL "SCM_EXACT" a)
       a))
-(define exact inexact->exact)
+(define (exact x) (inexact->exact x))
 (define (exact->inexact a)
   (if (fixnum? a)
       (sys:FOREIGN_CALL "SCM_INEXACT" a)
       a))
-(define inexact exact->inexact)
+(define (inexact x) (exact->inexact x))
 
 ;; List
 (define (append2 a b)

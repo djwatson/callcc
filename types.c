@@ -450,13 +450,23 @@ NOINLINE gc_obj SCM_MUL_SLOW(gc_obj a, gc_obj b) {
   double fa, fb;
   if (is_fixnum(a)) {
     fa = to_fixnum(a);
-  } else {
+  } else if (is_flonum(a)) {
     fa = to_double(a);
+  } else {
+    printf("MUL: not a number:");
+    SCM_DISPLAY(a);
+    printf("\n");
+    abort();
   }
   if (is_fixnum(b)) {
     fb = to_fixnum(b);
-  } else {
+  } else if (is_flonum(b)) {
     fb = to_double(b);
+  } else {
+    printf("MUL: not a number:");
+    SCM_DISPLAY(b);
+    printf("\n");
+    abort();
   }
   gc_obj res;
   if(double_to_gc(fa * fb, &res)) {
