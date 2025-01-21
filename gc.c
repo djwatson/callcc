@@ -145,6 +145,8 @@ static void mark() {
   }
 }
 
+extern int64_t symbol_table;
+
 __attribute__((noinline, preserve_none)) static void rcimmix_collect() {
   struct timespec start;
   struct timespec end;
@@ -160,7 +162,8 @@ __attribute__((noinline, preserve_none)) static void rcimmix_collect() {
   // Init mark stack
   kv_init(markstack);
 
-  // Mark roots
+  // Mark C roots
+  // TODO: unnecessary with conservative collection.
   for (uint64_t i = 0; i < kv_size(roots); i++) {
     auto root = kv_A(roots, i);
     kv_push(markstack, ((range){root, root + 1}));
@@ -169,6 +172,13 @@ __attribute__((noinline, preserve_none)) static void rcimmix_collect() {
   // Mark stack
   uint64_t *sp = (uint64_t *)__builtin_frame_address(0);
   kv_push(markstack, ((range){sp, stacktop}));
+
+  // Mark symbol table: TODO cleaup types
+  uint64_t* v = (uint64_t*)(symbol_table &~7);
+  auto len = *v;
+  kv_push(markstack, ((range){&v[1], &v[1+len]}));
+
+  // Run mark loop.
   mark();
 
   // Sweep empty blocks.

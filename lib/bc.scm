@@ -25,8 +25,11 @@
 (define functions '())
 (define consts '())
 (define const-hash (make-hash-table equal?))
+(define symbol-table '())
 
 (define (emit-const c)
+  (when (symbol? c)
+    (push! symbol-table c))
   (cond
    ((hash-table-ref/default const-hash c #f))
    (else
@@ -213,6 +216,9 @@
 	    (id (next-id))
 	    (lfun (cdr (assq label env)))
 	    (case-label (find-label-for-case lfun (length args) label)))
+       ;; TODO: varargs inline calls
+       (when (equal? case-label label)
+	 (push-instr! fun (format "store i64 ~a, ptr @argcnt" (length args))))
        (push-instr! fun (format "%v~a = ~a call tailcc i64 @\"~a\"(~a)" id (if tail "musttail" "") case-label arglist))
        (finish (format "%v~a" id))))
     ((let ((,vars ,vals) ___) ,body)
@@ -412,6 +418,7 @@ declare i64 @SCM_INEXACT(i64)
 declare i64 @SCM_MAKE_RECORD(i64)
 declare i64 @SCM_RECORD_SET(i64, i64, i64)
 declare i64 @SCM_RECORD_REF(i64, i64)
+declare i64 @SCM_GET_SYM_TABLE()
 
 declare void @gc_init ()
 @argcnt = dso_local global i64 0
@@ -450,9 +457,13 @@ attributes #1 = { returns_twice}
     (emit lowered '() main-fun #t)
     (emit-header)
 
-    (for const (reverse! consts)
-	 (display const)
-	 (newline))
+    (let ((sym-vec (emit-const (list->vector symbol-table))))
+      (for const (reverse! consts)
+	   (display const)
+	   (newline))
+
+      (display (format "@symbol_table = constant i64 ~a\n"
+		       sym-vec)))
 
     (set! functions (reverse! (cons main-fun functions)))
     (for func functions
@@ -474,8 +485,7 @@ attributes #1 = { returns_twice}
 		  (for phi (loop-var-phis line)
 		       (display (format "  ~a\n" phi)))
 		  (display (format "  ~a\n" line))))
-	 (display "}\n"))
-    ))
+	 (display "}\n"))))
 
 (for file (cdr (command-line))
      (compile file #t))

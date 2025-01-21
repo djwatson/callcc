@@ -1163,3 +1163,9 @@ INLINE gc_obj SCM_RECORD_SET(gc_obj r, gc_obj idx, gc_obj val) {
   to_record(r)->v[to_fixnum(idx)] = val;
   return UNDEFINED;
 }
+
+////////// Symbol table
+extern gc_obj symbol_table;
+INLINE gc_obj SCM_GET_SYM_TABLE() {
+  return symbol_table;
+}

@@ -703,7 +703,17 @@
     new))
 ;;;;;;;
 (define (symbol->string a) (sys:FOREIGN_CALL "SCM_SYMBOL_STRING" a))
-(define (string->symbol str) (sys:FOREIGN_CALL "SCM_MAKE_SYMBOL" (string-copy str)))
+(define scm-symbol-table '())
+(define (string->symbol str)
+  (when (null? scm-symbol-table)
+    (let ((table (sys:FOREIGN_CALL "SCM_GET_SYM_TABLE")))
+      (set! scm-symbol-table (map (lambda (x) (cons (symbol->string x) x)) (vector->list table)))))
+  (cond
+   ((assoc str scm-symbol-table) => cdr)
+   (else (let* ((strcopy (string-copy str))
+		(new-sym (sys:FOREIGN_CALL "SCM_MAKE_SYMBOL" strcopy)))
+	   (set! scm-symbol-table (cons (cons strcopy new-sym) scm-symbol-table))
+	   new-sym))))
 
 ;;;;;; Records
 (define (record-set! record index value)
@@ -765,9 +775,9 @@
           (error "wrong number of arguments to constructor" type args)))))
 
 ;;;;;;;;;; delay/promise
-;; (define-record-type promise (%make-promise done? value) promise?
-;;                     (done? promise-done? promise-done-set!)
-;;                     (value promise-value promise-value-set!))
+(define-record-type promise (%make-promise done? value) promise?
+                    (done? promise-done? promise-done-set!)
+                    (value promise-value promise-value-set!))
 
 (define (make-promise obj)
   (if (promise? obj) obj

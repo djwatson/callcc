@@ -1,7 +1,5 @@
 
 * r4rstest
-  * fix string->symbol
-    * also need to GC symbols
   * input/output
   * large apply
     * should also fix inexact?
