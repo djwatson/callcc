@@ -8,12 +8,9 @@
 * Maybe go back to shadow arg stack? ret imm16 is kinda slow on zen3.
   * and args are in backwards order, necessitating shift.
 * fast globals
-* program-ify
-* better letrec
-* program-ify letrec????
+* program-ify - fixup bugs
 
 * figure out strategy for intrinsics????
-  * can generate declare's.  Prefix all with SCM_
 * cleanup runtime
 * inliner?? 
 * apply - real apply
