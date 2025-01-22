@@ -1,8 +1,13 @@
 
+* aarch64 failling:
+  * Go back to shadow stack
+  * tailcc won't work, we can't garantee how much shit is on stack in stubs.
+  * we could remove noopt in stubs using lookaside stack anyway.
+  * Maybe go back to shadow arg stack? ret imm16 is kinda slow on zen3.
+    * and args are in backwards order, necessitating shift.
+  * removes asm need for rest args & apply.
+
 * failing:
-  * nucleic.  something to do with flonum math?
-  * pnpoly - incorrect result
-  * lattice - not a list
   
   * need: read, /, truncate (quicksort?)
   * string: abort - large size class
@@ -12,14 +17,11 @@
   * large apply - aarch64
   * bignum
 
-* Maybe go back to shadow arg stack? ret imm16 is kinda slow on zen3.
-  * and args are in backwards order, necessitating shift.
 * fast globals
 
 * figure out strategy for intrinsics????
 * cleanup runtime
 * inliner?? 
-* apply - real apply
 
 * self-compile
 * fix loop-in-loop

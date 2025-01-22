@@ -674,7 +674,9 @@ TODO: boxes could be passed down through funcs
 (define global-labels (make-hash-table eq?))
 
 (define-pass find-global-labels sexp
-  ((define ,var (labels ((,label ,lam)) ,body))
+  ((define ,var (labels ((,label ,lam)) (let ((,closure (const-closure (label ,label2))))
+					  (begin ,closure))))
+   (guard (eq? label label2))
    (if (hash-table-exists? assigned var)
        (display (format "Global assigned:~a\n" var) (current-error-port))
        (begin
