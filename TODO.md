@@ -7,10 +7,18 @@
     * and args are in backwards order, necessitating shift.
   * removes asm need for rest args & apply.
 
-* failing:
-  
-  * need: read, /, truncate (quicksort?)
-  * string: abort - large size class
+* benchmarks:
+  * Size class fail: string fft compiler array1
+  * need input/output: wc tail sum1 slatex read1 ray parsing dynamic cat
+  * /: simplex scheme 
+  * truncate: quicksort
+  * exact-integer-sqrt: pi
+  * complex: mbrotZ
+  * slow records: gcbench
+  * stack size check: earley, divrec
+  * floor: chudnovsky
+  * bignums: pi chudnovsky
+  * equal
 
 * r4rstest
   * input/output

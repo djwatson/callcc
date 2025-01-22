@@ -227,8 +227,8 @@ __attribute__((noinline, preserve_none)) static void rcimmix_collect() {
       ((double)end.tv_sec - (double)start.tv_sec) * 1000.0; // sec to ms
   time_taken +=
       ((double)end.tv_nsec - (double)start.tv_nsec) / 1000000.0; // ns to ms
-  printf("COLLECT %.3f ms, there are %li slabs next %li\n", time_taken,
-         kv_size(all_slabs), next_collect);
+  /* printf("COLLECT %.3f ms, there are %li slabs next %li\n", time_taken, */
+  /*        kv_size(all_slabs), next_collect); */
 }
 
 static slab_info *alloc_slab(uint64_t sz_class) {
@@ -268,7 +268,10 @@ NOINLINE __attribute__((preserve_most)) static void *rcimmix_alloc_slow(uint64_t
       // TODO hack hack hack
       collect_cnt += sz;
       auto f = kv_pop(large_free);
-      assert(f->class >= sz_class);
+      if(f->class >= sz_class) {
+	printf("INVALID SIZE CLASS BIGNESS\n");
+	abort();
+      }
       return f->start;
     } else {
       sz = align(sz, PAGE_SIZE);
