@@ -545,7 +545,7 @@ INLINE gc_obj SCM_DIV(gc_obj a, gc_obj b) {
     return tag_fixnum(to_fixnum(a) / to_fixnum(b));
   } else if (likely((is_flonum_fast(a) & is_flonum_fast(b)) == 1)) {
     gc_obj res;
-    if(likely(double_to_gc(to_double_fast(a) + to_double_fast(b), &res))) {
+    if(likely(double_to_gc(to_double_fast(a) / to_double_fast(b), &res))) {
       return res;
     } else {
       [[clang::musttail]] return SCM_DIV_SLOW(a, b);
