@@ -1,24 +1,26 @@
 
 * failing:
   * nucleic.  something to do with flonum math?
+  * pnpoly - incorrect result
+  * lattice - not a list
+  
+  * need: read, /, truncate (quicksort?)
+  * string: abort - large size class
 
 * r4rstest
   * input/output
-  * large apply
-    * should also fix inexact?
+  * large apply - aarch64
   * bignum
 
 * Maybe go back to shadow arg stack? ret imm16 is kinda slow on zen3.
   * and args are in backwards order, necessitating shift.
 * fast globals
-* program-ify - fixup bugs
 
 * figure out strategy for intrinsics????
 * cleanup runtime
 * inliner?? 
 * apply - real apply
 
-* r4rs, r5rs*
 * self-compile
 * fix loop-in-loop
 * outpout/input buffering

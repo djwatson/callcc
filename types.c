@@ -1219,6 +1219,11 @@ __attribute__((naked)) void SCM_APPLY(gc_obj f, gc_obj lst, gc_obj cnt) {
 		);
 }
 #elif defined(__aarch64__)
+__attribute__((naked)) void SCM_APPLY(gc_obj f, gc_obj lst, gc_obj cnt) {
+  asm volatile(
+	       "ret"
+	       );
+}
 #endif
 
 ///////math
@@ -1250,5 +1255,5 @@ INLINE gc_obj SCM_ROUND(gc_obj f) {
       rounded = rounded + (x > 0 ? -1 : 1);
     }
   }
-  return double_to_gc_slow(round(rounded));
+  return double_to_gc_slow(rounded);
 }
