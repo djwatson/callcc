@@ -1,15 +1,20 @@
 
 * benchmarks:
   * Size class fail: string fft compiler array1
+  
   * need input/output: wc tail sum1 slatex read1 ray parsing dynamic cat
+  
   * /: simplex scheme 
   * truncate: quicksort
-  * exact-integer-sqrt: pi
   * complex: mbrotZ
+  
   * slow records: gcbench
   * stack size check: earley, divrec
+
+  * exact-integer-sqrt: pi
   * floor: chudnovsky
   * bignums: pi chudnovsky
+
   * equal
 
 * r4rstest

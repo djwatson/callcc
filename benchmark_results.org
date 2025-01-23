@@ -21,9 +21,9 @@
 | fibfp      |  1.072 | 2.564 |  -139.17910 | *WIN* |                                              |
 | fib        |  2.588 |  3.63 |  -40.262751 | *WIN* |                                              |
 | gcbench    |  5.251 |       |        100. |       | records are slow                             |
-| graphs     |   3.44 | 1.787 |   48.052326 |       | memv inlining, loop in loop                  |
-| lattice    |  8.147 | 2.808 |   65.533325 |       | gc                                           |
-| matrix     |  1.266 | 1.124 |   11.216430 |       | memv, loop in loop                           |
+| graphs     |   3.44 | 1.787 |   48.052326 |       | GC???                                        |
+| lattice    |  8.147 | 2.808 |   65.533325 |       | car/cdr checks?? need noreturn on error      |
+| matrix     |  1.266 | 1.124 |   11.216430 |       |                                              |
 | mazefun    |  1.525 | 1.783 |  -16.918033 | *WIN* |                                              |
 | maze       |   .621 |       |        100. |       |                                              |
 | mbrot      |  2.275 | 4.521 |  -98.725275 | *WIN* |                                              |

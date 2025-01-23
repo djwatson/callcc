@@ -217,10 +217,10 @@
   (sys:FOREIGN_CALL "SCM_CALLCC" x))
 
 (define (car a)
-  (unless (pair? a) (error "Trying to car not a pair" a))
+  ;(unless (pair? a) (error "Trying to car not a pair" a))
   (sys:FOREIGN_CALL "SCM_CAR" a))
 (define (cdr a)
-  (unless (pair? a) (error "Trying to cdr not a pair" a))
+  ;(unless (pair? a) (error "Trying to cdr not a pair" a))
   (sys:FOREIGN_CALL "SCM_CDR" a))
 (define (cddr a)
   (cdr (cdr a)))

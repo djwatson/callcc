@@ -760,19 +760,31 @@ INLINE gc_obj SCM_NUM_EQ(gc_obj a, gc_obj b) {
 }
 
 INLINE gc_obj SCM_CAR(gc_obj obj) {
+  if (!is_cons(obj)) {
+    abort();
+  }
   return to_cons(obj)->a;
 }
 
 INLINE gc_obj SCM_CDR(gc_obj obj) {
+  if (!is_cons(obj)) {
+    abort();
+  }
   return to_cons(obj)->b;
 }
 
 INLINE gc_obj SCM_SETCAR(gc_obj obj, gc_obj val) {
+  if (!is_cons(obj)) {
+    abort();
+  }
   to_cons(obj)->a = val;
   return UNDEFINED;
 }
 
 INLINE gc_obj SCM_SETCDR(gc_obj obj, gc_obj val) {
+  if (!is_cons(obj)) {
+    abort();
+  }
   to_cons(obj)->b = val;
   return UNDEFINED;
 }
@@ -899,6 +911,8 @@ static gc_obj ccresthunk(gc_obj unused, gc_obj n) {
                : "r"(tmpstack), "r"(stack_bottom), "r"(saved_stack),
                  "r"(saved_sz), "r"(n)
                : "memory", "x19", "x20", "x0", "x1", "x2");
+#else
+  #error "Arch not supported for CALLCC"
 #endif
   __builtin_unreachable();
   return n;
