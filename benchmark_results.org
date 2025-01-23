@@ -12,7 +12,7 @@
 | ctak       |  1.019 |  .478 |   53.091266 |       | cont capture??                               |
 | deriv      |  1.494 | 1.038 |   30.522088 |       |  memv inlining, loop in loop                                            |
 | destruc    |  1.383 | 1.389 | -0.43383948 | *WIN* |                                              |
-| diviter    |  1.332 | 1.075 |   19.294294 |       |                                              |
+| diviter    |  1.332 | 1.075 |   19.294294 |       | inlining of cddr                             |
 | divrec     |  2.561 | 1.896 |   25.966419 |       |                                              |
 | dynamic    |        | 1.644 |  -164.4 / 0 | BAD   |                                              |
 | earley     |        | 3.151 |  -315.1 / 0 | BAD   |                                              |

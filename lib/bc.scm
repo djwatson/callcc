@@ -56,6 +56,7 @@
 
   (when (hash-table-exists? escapes-table var)
     (fun-thunk-set! fun #t)
+    (fun-args-set! fun default-param-list)
     (push-instr! fun (format "%argcnt = load i64, ptr @argcnt"))
     (for (case i) (cases (iota (length cases)))
 	 (let ((id (next-id))
@@ -65,15 +66,26 @@
 	   (if (list? (second case))
 	       (push-instr! fun (format "%v~a = icmp eq i64 %argcnt, ~a" id (length (second case))))
 	       (push-instr! fun (format "%v~a = icmp uge i64 %argcnt, ~a" id (- (length (to-proper (second case))) 1))))
-	   (push-instr! fun (format "br i1 %v~a, label %~a, label %~a" id true-label false-label))
-	   (push-instr! fun (format "~a:" true-label))
-	   (unless (list? (second case))
-	     (push-instr! fun (format "store i64 ~a, ptr @wanted_argcnt" (- (length (to-proper (second case))) 1)))
-	     (push-instr! fun (format "call void @consargs_stub()")))
-	   (push-instr! fun (format "%v~a = musttail call tailcc i64 @\"~a\"()"
-				    call-res (format "~a_case~a" var i)))
+	   (push-instr! fun (format "br i1 %v~a, label %l~a, label %l~a" id true-label false-label))
+	   (push-instr! fun (format "l~a:" true-label))
+	   (let ((arglist
+		  (if (list? (second case))
+		      default-param-list
+		      (let* ((len (length (to-proper (second case))))
+			     (argpos (next-id)))
+			(push-instr! fun (format "store i64 ~a, ptr @wanted_argcnt" (- len 1)))
+			(push-instr! fun (format "%v~a = call i64 @consargs_stub(~a)" argpos
+						 (join ", "
+						       (omap arg default-param-list
+							     (format "i64 ~a" arg)))))
+			(if (> len max-reg-args)
+			    default-param-list
+			    (append (take default-param-list (- len 1)) (list (format "%v~a" argpos))))))))
+	     (push-instr! fun (format "%v~a = musttail call i64 @\"~a\"(~a)"
+				      call-res (format "~a_case~a" var i)
+				      (reg-args-to-call-list arglist))))
 	   (push-instr! fun (format "ret i64 %v~a" call-res))
-	   (push-instr! fun (format "~a:" false-label)))))
+	   (push-instr! fun (format "l~a:" false-label)))))
   (push-instr! fun (format "%res = call i64 @SCM_ARGCNT_FAIL()"))
   (push-instr! fun (format "ret i64 %res"))
   
@@ -106,10 +118,47 @@
 		  (format "~a_case~a" var i)
 		  (loop (cdr cases) (+ i 1)))
 	      (if (>= argcnt (- (length (to-proper arglist)) 1))
-		  ;; TODO
+		  ;; TODO: package up varargs.  For now, return thunk.
 		  var
-		  (loop (cdr cases) (+ i 1))
-		  ))))))
+		  (loop (cdr cases) (+ i 1))))))))
+
+
+
+;;;;;;;;;; Arglist management
+
+(define (split-arglist args)
+  (if (> (length args) max-reg-args)
+      (split-at args max-reg-args)
+      (values args '())))
+
+;; Pad out param list to max-reg-args.
+(define (reg-args-to-param-list args)
+  (join ", "
+	(omap arg (append args (if (< (length args) max-reg-args)
+				   (make-list (- max-reg-args (length args)) "")
+				   '()))
+	      (format "i64 ~a" arg))))
+
+(define (reg-args-to-call-list args)
+  (join ", "
+	(omap arg (append args (if (< (length args) max-reg-args)
+				   (make-list (- max-reg-args (length args)) "undef")
+				   '()))
+	      (format "i64 ~a" arg))))
+
+(define default-param-list (omap arg (iota max-reg-args)
+				 (format "%a~a" arg)))
+
+;;;;;;;; Main emit
+
+(define (emit-call fun tail label args)
+  (let ((id (next-id)))
+    (let-values (((reg-args stack-args) (split-arglist args)))
+      (for (arg i) (stack-args (iota (length stack-args)))
+	   (push-instr! fun (format "call void @SCM_WRITE_SHADOW_STACK(i64 ~a, i64 ~a)" (* 8 i) arg)))
+      (push-instr! fun (format "%v~a = ~a call i64 ~a(~a) #0"
+			       id (if tail "musttail" "") label (reg-args-to-call-list reg-args))))
+    (format "%v~a" id)))
 
 (define (emit sexp env fun tail)
   (define (finish res)
@@ -136,19 +185,29 @@
        (push-instr! fun (format "call void @SCM_SET_GLOBAL(i64 ~a, i64 ~a)"
 				sym val)))
      (finish undefined-tag))
+    ((primcall APPLY ,args ___)
+     (let* ((args (omap arg args (emit arg env fun #f)))
+	    (clo-id (next-id))
+	    (len (car args))
+	    (funp (cadr args))
+	    (stack-args (cdr args))
+	    (lenshift (next-id)))
+       (push-instr! fun (format "%v~a = call ptr @SCM_LOAD_CLOSURE_PTR(i64 ~a)"
+				clo-id funp))
+       (push-instr! fun (format "%v~a = ashr i64 ~a, 3" lenshift len))
+       (push-instr! fun (format "store i64 %v~a, ptr @argcnt" lenshift))
+       (finish (emit-call fun tail (format "%v~a" clo-id) stack-args))))
     ;; TODO: callcc probably also needs to be musttail.
     ;; but, the calling conventions don't match.
     ((primcall FOREIGN_CALL ,name ,args ___)
      (let* ((id (next-id))
 	    (args (omap arg args (format "i64 ~a" (emit arg env fun #f))))
 	    (argstr (join ", " args)))
-       (push-instr! fun (format "%v~a = call ~a i64 @\"~a\"(~a) ~a"
+       (push-instr! fun (format "%v~a = call ~a i64 @\"~a\"(~a) #0"
 				id
 				(if (equal? "SCM_CALLCC" name)
 				    "preserve_nonecc" "")
-				name argstr
-				(if (equal? "SCM_CALLCC" name)
-				    "#0" "#1")))
+				name argstr))
        (finish (format "%v~a" id))))
     ((primcall ,var ,vals ___)
      (let* ((vals (omap val vals (emit val env fun #f)))
@@ -202,17 +261,13 @@
        #f))
     ((call ,args ___)
      (let* ((args (omap arg args (emit arg env fun #f)))
-	    (arglist (join ", " (omap arg args (format "i64 ~a" arg))))
-	    (id (next-id))
 	    (clo-id (next-id)))
        (push-instr! fun (format "%v~a = call ptr @SCM_LOAD_CLOSURE_PTR(i64 ~a)"
 				clo-id (car args)))
        (push-instr! fun (format "store i64 ~a, ptr @argcnt" (length args)))
-       (push-instr! fun (format "%v~a = ~a call tailcc i64 %v~a(~a) #1" id (if tail "musttail" "") clo-id arglist))
-       (finish (format "%v~a" id))))
+       (finish (emit-call fun tail (format "%v~a" clo-id) args))))
     ((label-call ,label ,args ___)
      (let* ((args (omap arg args (emit arg env fun #f)))
-	    (arglist (join ", " (omap arg args (format "i64 ~a" arg))))
 	    (id (next-id))
 	    (lfun (cond
 		   ((assq label env) => cdr)
@@ -221,8 +276,7 @@
        ;; TODO: varargs inline calls
        (when (equal? case-label label)
 	 (push-instr! fun (format "store i64 ~a, ptr @argcnt" (length args))))
-       (push-instr! fun (format "%v~a = ~a call tailcc i64 @\"~a\"(~a)" id (if tail "musttail" "") case-label arglist))
-       (finish (format "%v~a" id))))
+       (finish (emit-call fun tail (format "@\"~a\"" case-label) args))))
     ((let ((,vars ,vals) ___) ,body)
      (let ((args (omap val vals (emit val env fun #f))))
        (emit body (append (map cons vars args) env) fun tail)))
@@ -425,20 +479,15 @@ declare i64 @SCM_SIN(i64)
 declare i64 @SCM_COS(i64)
 declare i64 @SCM_ATAN(i64)
 declare i64 @SCM_SQRT(i64)
-declare i64 @SCM_APPLY(i64, i64, i64)
 declare i64 @SCM_ROUND(i64)
+declare i64 @SCM_READ_SHADOW_STACK(i64)
+declare void @SCM_WRITE_SHADOW_STACK(i64, i64)
 
 declare void @gc_init ()
 @argcnt = dso_local global i64 0
 @wanted_argcnt = dso_local global i64 0
-attributes #0 = { noinline returns_twice \"thunk\" cold optnone}
-attributes #1 = { returns_twice}
+attributes #0 = { returns_twice}
 "))
-
-(define (split-arglist args)
-  (if (> (length args) max-reg-args)
-      (split-at args max-reg-args)
-      (values args '())))
 
 (define (compile file verbose)
   (set! functions '())
@@ -453,7 +502,7 @@ attributes #1 = { returns_twice}
 	 (unused (expander-init libman))
 	 (runtime (expand-program runtime-input "" libman))
 	 (prog (expand-program input "PROG-" libman))
-	 (lowered (r7-pass `(begin 	,@runtime
+	 (lowered (r7-pass `(begin  	,@runtime
 					,@prog
 					) #f))
 	 (main-fun (make-fun "main")))
@@ -479,21 +528,24 @@ attributes #1 = { returns_twice}
 
 	 (newline)
 
-	 (display (format "define ~a i64 @\"~a\"(~a) ~a {\n" 
-			  (if (equal? (fun-name func) "main")
-			      "tailcc" "internal tailcc")
-			  (fun-name func)
-			  (join ", " (omap arg (fun-args func) (format "i64 ~a" arg)))
-			  (if (fun-thunk func) "#0" "#1")))
-	 (display (format " entry:\n"))
-	 (when (equal? "main" (fun-name func))
-	   (display (format "  call void @gc_init()\n")))
-	 (for line (fun-code func)
-	      (if (loop-var? line)
-		  (for phi (loop-var-phis line)
-		       (display (format "  ~a\n" phi)))
-		  (display (format "  ~a\n" line))))
-	 (display "}\n"))))
+	 (let-values (((reg-args stack-args) (split-arglist (fun-args func))))
+	   (display (format "define ~a i64 @\"~a\"(~a) #0 {\n" 
+			    (if (equal? (fun-name func) "main")
+				"" "internal")
+			    (fun-name func)
+			    (reg-args-to-param-list reg-args)))
+	   (display (format " entry:\n"))
+	   (when (equal? "main" (fun-name func))
+	     (display (format "  call void @gc_init()\n")))
+	   (for (arg i) (stack-args (iota (length stack-args)))
+		(display (format "  ~a = call i64 @SCM_READ_SHADOW_STACK(i64 ~a)\n"
+				 arg i)))
+	   (for line (fun-code func)
+		(if (loop-var? line)
+		    (for phi (loop-var-phis line)
+			 (display (format "  ~a\n" phi)))
+		    (display (format "  ~a\n" line))))
+	   (display "}\n")))))
 
 (for file (cdr (command-line))
      (compile file #t))

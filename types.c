@@ -980,104 +980,71 @@ SCM_CALLCC(gc_obj cont) {
 
 /////////////////////// CONSARGS for varargs functions
 
-// Spill arguments to stack, call stub.
-// TODO: stack adjustment.
-#if defined(__x86_64__)
 static const uint64_t reg_arg_cnt = 6;
-__attribute__((naked)) void consargs_stub(gc_obj a, gc_obj b, gc_obj c, gc_obj d, gc_obj e, gc_obj f) {
-  asm volatile(
-	       "sub $8, %rsp\n\t"
-	       "push %r9\n\t"
-	       "push %r8\n\t"
-	       "push %rcx\n\t"
-	       "push %rdx\n\t"
-	       "push %rsi\n\t"
-	       "push %rdi\n\t"
-	       "mov %rsp, %rdi\n\t"
-	       "call consargs\n\t"
-	       "pop %rdi\n\t"
-	       "pop %rsi\n\t"
-	       "pop %rdx\n\t"
-	       "pop %rcx\n\t"
-	       "pop %r8\n\t"
-	       "pop %r9\n\t"
-	       "add $8, %rsp\n\t"
-	       "add %rax, %rsp\n\t"
-	       "ret\n\t");
-}
-#elif defined(__aarch64__)
-static const uint64_t reg_arg_cnt = 8;
-__attribute__((naked)) void consargs_stub(gc_obj a, gc_obj b, gc_obj c, gc_obj d, gc_obj e, gc_obj f) {
-  asm volatile(
-	       "stp x29, x30, [sp, #-16]!\n\t"
-	       "stp x6, x7, [sp, #-16]!\n\t"
-	       "stp x4, x5, [sp, #-16]!\n\t"
-	       "stp x2, x3, [sp, #-16]!\n\t"
-	       "stp x0, x1, [sp, #-16]!\n\t"
-	       "mov x0, sp\n\t"
-	       "bl consargs\n\t"
-	       "mov x8, x0\n\t"
-	       "ldp x0, x1, [sp], #16\n\t"
-	       "ldp x2, x3, [sp], #16\n\t"
-	       "ldp x4, x5, [sp], #16\n\t"
-	       "ldp x6, x7, [sp], #16\n\t"
-	       "ldp x29, x30, [sp], #16\n\t"
-	       "add sp, sp, x8\n\t"
-	       "ret\n\t");
-}
-#endif
+/* #if defined(__x86_64__) */
+/* static const uint64_t reg_arg_cnt = 6; */
+/* #elif defined(__aarch64__) */
+/* static const uint64_t reg_arg_cnt = 8; */
+/* #endif */
 
-// Skip over the *two* frames that are in the way: one for the call
-// itself, and one for consargs_stub (return address + frame pointer
-// (or alignment)).
-static size_t argcnt_to_slot(size_t arg) {
-  if (arg >= reg_arg_cnt) {
-    return arg + 4;
-  }
-  return arg;
-}
-
-__attribute__((used)) int64_t consargs(gc_obj* reg_args) {
-  auto res = NIL;
-
-  // TODO: This would be much faster if we pre-reserve a bunch of
-  // space from the GC: (we don't have to read/write start_ptr and end_ptr so often)
-  for(auto wanted = argcnt; wanted > wanted_argcnt; wanted--) {
-    res = SCM_CONS(reg_args[argcnt_to_slot(wanted - 1)], res);
-  }
-  auto end_slot = argcnt_to_slot(wanted_argcnt);
-  auto start_slot = argcnt_to_slot(argcnt-1);
-  reg_args[end_slot] = res;
-
-  if (start_slot > reg_arg_cnt) {
-    if (end_slot < reg_arg_cnt) {
-      end_slot = argcnt_to_slot(reg_arg_cnt);
-    } else {
-      end_slot += 1;
+// TODO: gc shadow_stack
+static gc_obj shadow_stack[100];
+gc_obj consargs_stub(gc_obj a0, gc_obj a1, gc_obj a2, gc_obj a3, gc_obj a4, gc_obj a5) {
+  auto cnt = argcnt - wanted_argcnt;
+  auto cur = argcnt;
+  gc_obj head = NIL;
+  gc_obj* tail = &head;
+  switch(wanted_argcnt) {
+  case 0:
+    if (cnt-- == 0) {
+      return head;
     }
-    //
-    // Calculate the difference between the new and old args, and shift the stack.
-#if defined(__x86_64__)
-    // clang's tailcc always pops an odd number, eq or greater than the stack args:
-    // Round down to even, then add one.
-    auto prev_pop = ((argcnt-reg_arg_cnt)&~1)+1;
-    auto new_pop = ((end_slot -argcnt_to_slot(reg_arg_cnt))&~1)+1;
-#elif defined(__aarch64__)
-    // aarch64 is always 16-byte aligned.
-    auto prev_pop = ((argcnt-reg_arg_cnt+1)&~1);
-    auto new_pop = ((end_slot -argcnt_to_slot(reg_arg_cnt)+1)&~1);
-#endif
-    auto shift = (prev_pop - new_pop)*8;
-    auto start = &reg_args[reg_arg_cnt];
-    size_t sz =  (intptr_t)&reg_args[end_slot] - (intptr_t)start;
-    // We have to slide the whole stack up, since tailcc has the args in reverse
-    // order.  This is non-ideal: but most varargs functions have few non-varargs
-    // arguments remaining on the stack.  So far this is less of a perf concern than it seems.
-    memmove((void *)((int64_t)start + shift), start, sz);
-
-    return shift;
+    *tail = SCM_CONS(a0, NIL); 
+    tail = &to_cons(*tail)->b;
+  case 1:
+    if (cnt-- == 0) {
+      return head;
+    }
+    *tail = SCM_CONS(a1, NIL);
+    tail = &to_cons(*tail)->b;
+  case 2:
+    if (cnt-- == 0) {
+      return head;
+    }
+    *tail = SCM_CONS(a2, NIL);
+    tail = &to_cons(*tail)->b;
+  case 3:
+    if (cnt-- == 0) {
+      return head;
+    }
+    *tail = SCM_CONS(a3, NIL);
+    tail = &to_cons(*tail)->b;
+  case 4:
+    if (cnt-- == 0) {
+      return head;
+    }
+    *tail = SCM_CONS(a4, NIL);
+    tail = &to_cons(*tail)->b;
+  case 5:
+    if (cnt-- == 0) {
+      return head;
+    }
+    *tail = SCM_CONS(a5, NIL);
+    tail = &to_cons(*tail)->b;
+  default:
   }
-  return 0;
+  auto res = NIL;
+  while(cur > reg_arg_cnt) {
+    if (cur <= wanted_argcnt) {
+      *tail = res;
+      shadow_stack[cur-reg_arg_cnt] = head;
+      return head;
+    }
+    res = SCM_CONS(shadow_stack[cur-reg_arg_cnt-1], res);
+    cur--;
+  }
+  *tail = res;
+  return head;
 }
 
 INLINE gc_obj SCM_STRING_LENGTH(gc_obj obj) { return to_string(obj)->len; }
@@ -1166,66 +1133,6 @@ INLINE gc_obj SCM_GET_SYM_TABLE() {
   return symbol_table;
 }
 
-////////// Generic apply.  cnt >= reg_arg_cnt, and is already checked with list?.
-#if defined(__x86_64__)
-__attribute__((naked)) void SCM_APPLY(gc_obj f, gc_obj lst, gc_obj cnt) {
-  asm volatile(
-    "shr $3, %rdx\n\t" // to_fixnum
-    
-    "mov %rdx, %r10\n\t" // r10 contains stack arg cnt
-    "sub $5, %r10\n\t" // reg args, minus closure.
-
-    // Round down to even, and add one
-    "andq $-2, %r10\n\t"
-    "add $1, %r10\n\t"
-    
-    "add $1, %rdx\n\t" // add closure ptr
-    "mov %rdx, argcnt(%rip)\n\t"
-
-    "mov %rsi, %rax\n\t"
-    "mov -3(%rax), %rsi\n\t"
-    "mov 5(%rax), %rax\n\t"
-
-    "mov -3(%rax), %rdx\n\t"
-    "mov 5(%rax), %rax\n\t"
-    
-    "mov -3(%rax), %rcx\n\t"
-    "mov 5(%rax), %rax\n\t"
-
-    "mov -3(%rax), %r8\n\t"
-    "mov 5(%rax), %rax\n\t"
-    
-    "mov -3(%rax), %r9\n\t"
-    "mov 5(%rax), %rax\n\t"
-
-    "lea (,%r10, 8), %r10\n\t"
-    "sub %r10, %rsp\n\t"
-    "mov $0, %r10\n\t"
-
-    "1:\n\t"
-    "cmpq  $0x16, %rax\n\t"
-    "je 2f\n\t"
-    "mov -3(%rax), %r11\n\t"
-    "mov %r11, (%rsp, %r10, 8)\n\t"
-    "add $1, %r10\n\t"
-    "mov 5(%rax), %rax\n\t"
-    "jmp 1b\n\t"
-
-    "2:\n\t"
-    "mov 6(%rdi), %rax\n\t"
-    // TODO: make this a tailcall instead.
-    "call *%rax\n\t"
-    "ret\n\t"
-		);
-}
-#elif defined(__aarch64__)
-__attribute__((naked)) void SCM_APPLY(gc_obj f, gc_obj lst, gc_obj cnt) {
-  asm volatile(
-	       "ret"
-	       );
-}
-#endif
-
 ///////math
 INLINE gc_obj SCM_SIN(gc_obj f) {
   double d = to_double(f);
@@ -1256,4 +1163,14 @@ INLINE gc_obj SCM_ROUND(gc_obj f) {
     }
   }
   return double_to_gc_slow(rounded);
+}
+
+///// Shadow stack
+
+INLINE void SCM_WRITE_SHADOW_STACK(gc_obj pos, gc_obj obj) {
+  shadow_stack[to_fixnum(pos)] = obj;
+}
+
+INLINE gc_obj SCM_READ_SHADOW_STACK(uint64_t pos) {
+  return shadow_stack[pos];
 }
