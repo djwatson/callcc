@@ -397,7 +397,7 @@ INLINE void* SCM_LOAD_CLOSURE_PTR(gc_obj a) {
   [[clang::musttail]] return SCM_LOAD_CLOSURE_PTR_FAIL(a);
 }
 
-NOINLINE gc_obj SCM_ADD_SLOW(gc_obj a, gc_obj b) {
+NOINLINE __attribute__((preserve_most)) gc_obj SCM_ADD_SLOW(gc_obj a, gc_obj b) {
   double fa, fb;
   if (is_fixnum(a)) {
     fa = to_fixnum(a);
@@ -428,17 +428,17 @@ INLINE gc_obj SCM_ADD(gc_obj a, gc_obj b) {
     if(likely(!__builtin_add_overflow(a.value, b.value, &res.value))) {
       return res;
     } else {
-      [[clang::musttail]] return SCM_ADD_SLOW(a, b);
+      return SCM_ADD_SLOW(a, b);
     }
   } else if (likely((is_flonum_fast(a) & is_flonum_fast(b)) == 1)) {
     gc_obj res;
     if(likely(double_to_gc(to_double_fast(a) + to_double_fast(b), &res))) {
       return res;
     } else {
-      [[clang::musttail]] return SCM_ADD_SLOW(a, b);
+      return SCM_ADD_SLOW(a, b);
     }
   } else {
-    [[clang::musttail]] return SCM_ADD_SLOW(a, b);
+    return SCM_ADD_SLOW(a, b);
   }
 }
 
@@ -725,7 +725,7 @@ INLINE gc_obj SCM_GTE(gc_obj a, gc_obj b) {
   [[clang::musttail]] return SCM_GTE_SLOW(a, b);
 }
 
-NOINLINE gc_obj SCM_NUM_EQ_SLOW(gc_obj a, gc_obj b) {
+NOINLINE __attribute__((preserve_most)) gc_obj SCM_NUM_EQ_SLOW(gc_obj a, gc_obj b) {
   double fa, fb;
   if (is_fixnum(a)) {
     fa = to_fixnum(a);
@@ -756,7 +756,7 @@ INLINE gc_obj SCM_NUM_EQ(gc_obj a, gc_obj b) {
     }
     return FALSE_REP;
   }
-  [[clang::musttail]] return SCM_NUM_EQ_SLOW(a, b);
+  return SCM_NUM_EQ_SLOW(a, b);
 }
 
 INLINE gc_obj SCM_CAR(gc_obj obj) {
