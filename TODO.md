@@ -1,12 +1,4 @@
 
-* aarch64 failling:
-  * Go back to shadow stack
-  * tailcc won't work, we can't garantee how much shit is on stack in stubs.
-  * we could remove noopt in stubs using lookaside stack anyway.
-  * Maybe go back to shadow arg stack? ret imm16 is kinda slow on zen3.
-    * and args are in backwards order, necessitating shift.
-  * removes asm need for rest args & apply.
-
 * benchmarks:
   * Size class fail: string fft compiler array1
   * need input/output: wc tail sum1 slatex read1 ray parsing dynamic cat
@@ -22,7 +14,6 @@
 
 * r4rstest
   * input/output
-  * large apply - aarch64
   * bignum
 
 * fast globals

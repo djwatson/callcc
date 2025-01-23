@@ -1,29 +1,29 @@
 | benchmark  | callcc |  chez |        diff | win   | reason                                       |
 |------------+--------+-------+-------------+-------+----------------------------------------------|
-| ack        |  2.523 | 2.294 |   9.0764962 |       | callee-cleans                                |
+| ack        |  2.759 |  2.82 |  -2.2109460 | *WIN* |                                              |
 | array1     |        |   4.6 |     -460./0 | BAD   |                                              |
-| browse     |  1.001 | 1.146 |  -14.485514 | *WIN* |                                              |
+| browse     |   .925 | 1.146 |  -23.891892 | *WIN* |                                              |
 | bv2string  |        |  .634 |   -63.4 / 0 | BAD   |                                              |
 | cat        |        | 1.373 |  -137.3 / 0 | BAD   |                                              |
 | chudnovsky |        |       |        0./0 | BAD   |                                              |
 | compiler   |        | 2.284 |  -228.4 / 0 | BAD   |                                              |
 | conform    |   2.49 | 2.946 |  -18.313253 | *WIN* |                                              |
-| cpstak     |  3.273 |  2.52 |   23.006416 |       | xmm mov opt is slower for closure creation?? |
+| cpstak     |  3.273 | 3.148 |   3.8191262 |       | xmm mov opt is slower for closure creation?? |
 | ctak       |  1.019 |  .478 |   53.091266 |       | cont capture??                               |
-| deriv      |  1.494 | 1.038 |   30.522088 |       |  memv inlining, loop in loop                                            |
+| deriv      |  1.494 | 1.220 |   18.340027 |       | memv inlining, loop in loop                  |
 | destruc    |  1.383 | 1.389 | -0.43383948 | *WIN* |                                              |
 | diviter    |  1.332 | 1.075 |   19.294294 |       | inlining of cddr                             |
-| divrec     |  2.561 | 1.896 |   25.966419 |       |                                              |
+| divrec     |   2.22 | 2.370 |  -6.7567568 | *WIN* |                                              |
 | dynamic    |        | 1.644 |  -164.4 / 0 | BAD   |                                              |
 | earley     |        | 3.151 |  -315.1 / 0 | BAD   |                                              |
 | fft        |        | 1.423 |  -142.3 / 0 | BAD   |                                              |
 | fibc       |   .467 |  .684 |  -46.466809 | *WIN* |                                              |
 | fibfp      |  1.072 | 2.564 |  -139.17910 | *WIN* |                                              |
-| fib        |  3.876 | 2.851 |   26.444788 |       | callee-cleans                                |
+| fib        |  2.588 |  3.63 |  -40.262751 | *WIN* |                                              |
 | gcbench    |  5.251 |       |        100. |       | records are slow                             |
 | graphs     |   3.44 | 1.787 |   48.052326 |       | memv inlining, loop in loop                  |
 | lattice    |  8.147 | 2.808 |   65.533325 |       | gc                                           |
-| matrix     |  1.266 | 1.124 |   11.216430 |       |    memv, loop in loop                        |
+| matrix     |  1.266 | 1.124 |   11.216430 |       | memv, loop in loop                           |
 | mazefun    |  1.525 | 1.783 |  -16.918033 | *WIN* |                                              |
 | maze       |   .621 |       |        100. |       |                                              |
 | mbrot      |  2.275 | 4.521 |  -98.725275 | *WIN* |                                              |
@@ -31,7 +31,7 @@
 | mperm      |  2.707 |  7.36 |  -171.88770 | *WIN* |                                              |
 | nboyer     |  1.441 | 1.608 |  -11.589174 | *WIN* |                                              |
 | nqueens    |  3.768 | 3.751 |  0.45116773 |       |                                              |
-| ntakl      |  2.651 | 3.242 |  -22.293474 | *WIN* |                                              |
+| ntakl      |  2.382 |  3.56 |  -49.454240 | *WIN* |                                              |
 | nucleic    |  1.613 | 2.304 |  -42.839430 | *WIN* |                                              |
 | paraffins  |   3.71 | 4.204 |  -13.315364 | *WIN* |                                              |
 | parsing    |        | 2.283 |  -228.3 / 0 | BAD   |                                              |
@@ -43,7 +43,7 @@
 | quicksort  |        |       |        0./0 | BAD   |                                              |
 | ray        |        | 2.423 |  -242.3 / 0 | BAD   |                                              |
 | read1      |        |  .610 |      -61./0 | BAD   |                                              |
-| sboyer     |  1.036 |  .783 |   24.420849 |       |                                              |
+| sboyer     |   .935 |  .912 |   2.4598930 |       |                                              |
 | scheme     |        | 2.425 |  -242.5 / 0 | BAD   |                                              |
 | simplex    |        | 2.331 |  -233.1 / 0 | BAD   |                                              |
 | slatex     |        | 2.338 |  -233.8 / 0 | BAD   |                                              |
@@ -52,8 +52,8 @@
 | sumfp      |  1.736 | 3.874 |  -123.15668 | *WIN* |                                              |
 | sum        |   .680 |  .858 |  -26.176471 | *WIN* |                                              |
 | tail       |        |       |        0./0 | BAD   |                                              |
-| takl       |  2.462 | 3.116 |  -26.563769 | *WIN* |                                              |
-| tak        |  1.479 | 1.438 |   2.7721433 |       | callee-cleans                                |
+| takl       |   2.35 | 3.771 |  -60.468085 | *WIN* |                                              |
+| tak        |  1.532 | 1.695 |  -10.639687 | *WIN* |                                              |
 | triangl    |  1.185 | 1.349 |  -13.839662 | *WIN* |                                              |
 | wc         |        | 1.106 |  -110.6 / 0 | BAD   |                                              |
 | equal      |        |       |        0./0 | BAD   |                                              |
