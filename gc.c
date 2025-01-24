@@ -29,19 +29,23 @@ static alloc_table atable;
 static uint64_t *stacktop;
 
 uint64_t *gc_get_stack_top() { return stacktop; }
-typedef struct freelist_s {
-  uint64_t start_ptr;
-  uint64_t end_ptr;
-} freelist_s;
+
+static constexpr uint64_t mark_word_cnt = (default_slab_size / 8) / 64;
 
 typedef struct slab_info {
   uint32_t class;
-  bool marked;
-  uint64_t markbits[(default_slab_size / 8) / 64];
+  uint32_t marked;
+  uint64_t markbits[mark_word_cnt];
   uint8_t *end;
   uint8_t *start;
   list_head link;
 } slab_info;
+
+typedef struct freelist_s {
+  uint64_t start_ptr;
+  uint64_t end_ptr;
+  slab_info* slab;
+} freelist_s;
 
 static uintptr_t align(uintptr_t val, uintptr_t alignment) {
   return (val + alignment - 1) & ~(alignment - 1);
@@ -64,8 +68,7 @@ static bool bt(uint64_t const *bits, uint64_t bit) {
 }
 
 static freelist_s freelist[size_classes];
-static slab_info *partials[size_classes];
-static slab_info *cur_slab[size_classes];
+static kvec_t(slab_info*) partials[size_classes];
 static LIST_HEAD(live_slabs);
 static kvec_t(uint64_t *) roots;
 
@@ -78,7 +81,81 @@ static uint16_t sz_to_page_class(uint64_t sz) {
   return zeros - 12; // Page bits.
 }
 
-bool get_partial_range(uint64_t sz_class, freelist_s *fl) { return false; }
+bool find_next_bit(uint64_t const* bits, uint64_t maxbit, uint64_t bit, bool invert, uint64_t* result) {
+  auto word = bit / 64;
+  auto b = bit % 64;
+  /* printf("find_next_bit word %li b %li\n", word, b); */
+
+  if (bit >= maxbit) {
+    return false;
+  }
+
+  uint64_t search = bits[word] >> b;
+  if (invert) {
+    search = ~search;
+  }
+
+  auto res = __builtin_ffsll(search);
+  if(res && res <= (64 - b)) {
+    bit += res - 1;
+    *result = bit;
+    if (invert) {
+      assert(!bt(bits, bit));
+    } else {
+      assert(bt(bits, bit));
+    }
+    return true;
+  }
+  bit += 64 - b;
+  assert((bit % 64) == 0);
+  [[clang::musttail]] return find_next_bit(bits, maxbit, bit, invert, result);
+}
+
+bool get_partial_range(uint64_t sz_class, freelist_s *fl) {
+  auto slab = fl->slab;
+  /* if (sz_class != 2) { */
+  /*   return false; */
+  /* } */
+  //return false;
+ again:
+  int64_t end_index = -1;
+  if (!slab || fl->end_ptr >= (uint64_t)slab->end) {
+    if (kv_size(partials[sz_class]) > 0) {
+      slab = kv_pop(partials[sz_class]);
+      /* printf("New slab %i\n", slab->marked); */
+      assert(slab->class == sz_class);
+      fl->slab = slab;      
+    } else {
+      return false;
+    }
+  } else {
+    assert(fl->start_ptr >= slab->start && fl->end_ptr <= slab->end);
+    end_index = ((fl->end_ptr - (uint64_t)slab->start)) / (slab->class *8);
+    /* printf("Cont slab end_indx %li\n", end_index); */
+  }
+  /* printf("CHECKING for partial %lx\n", slab->markbits[(end_index+1)/64]); */
+  uint64_t maxbit = ((slab->end - slab->start)) / (slab->class * 8);
+  uint64_t new_start;
+  if(!find_next_bit(slab->markbits, maxbit, end_index + 1, true, &new_start)) {
+    slab = nullptr;
+    /* printf("No free start\n"); */
+    goto again;
+  }
+  /* if (new_start > 0 && new_start < maxbit-1) { */
+  /*   printf("New start %li %i %i %i\n", new_start, bt(slab->markbits, new_start-1), */
+  /* 	   bt(slab->markbits, new_start), */
+  /* 	   bt(slab->markbits, new_start+1)); */
+  /* } */
+  uint64_t new_end = maxbit-1;
+  find_next_bit(slab->markbits, maxbit, new_start+1, false, &new_end);
+  for(uint64_t i = new_start; i<new_end; i++) {
+    assert(!bt(slab->markbits, i));
+  }
+  /* printf("End index was %li, new start %li, new end %li\n", end_index, new_start, new_end); */
+  fl->start_ptr = (uint64_t)slab->start + new_start * slab->class * 8;
+  fl->end_ptr = (uint64_t)slab->start + new_end * slab->class * 8;
+  return true;
+}
 
 void gc_init() {
   stacktop = (uint64_t *)__builtin_frame_address(0);
@@ -105,6 +182,8 @@ void gc_init() {
   for (uint64_t i = 0; i < size_classes; i++) {
     freelist[i].start_ptr = default_slab_size;
     freelist[i].end_ptr = default_slab_size;
+    freelist[i].slab = nullptr;
+    kv_init(partials[i]);
   }
   kv_init(roots);
   for(uint64_t i = 0; i < page_classes; i++) {
@@ -144,13 +223,13 @@ static void mark() {
         uint64_t base_ptr = (uint64_t)slab->start + (slab->class * 8 * index);
         if (!bt(slab->markbits, index)) {
           totsize += slab->class * 8;
+	  slab->marked += slab->class * 8;
           bts(slab->markbits, index);
           // printf("Marking %p cls %i\n", base_ptr, slab->class);
           kv_push(markstack,
                   ((range){(uint64_t *)base_ptr,
                            (uint64_t *)(base_ptr + slab->class * 8)}));
         }
-        slab->marked = true;
       }
       r.start++;
     }
@@ -181,14 +260,15 @@ __attribute__((noinline, preserve_none)) static void rcimmix_collect() {
   clock_gettime(CLOCK_MONOTONIC, &start);
   totsize = 0;
 
-  printf("COLLECT...\n");
-
   // Clear marks
   list_head *itr;
   list_for_each (itr, &live_slabs) {
     slab_info *slab = container_of(itr, slab_info, link);
     memset(slab->markbits, 0, sizeof(slab->markbits));
-    slab->marked = false;
+    slab->marked = 0;
+  }
+  for (uint64_t i = 0; i < size_classes; i++) {
+    kv_clear(partials[i]);
   }
 
   // Init mark stack
@@ -224,35 +304,48 @@ __attribute__((noinline, preserve_none)) static void rcimmix_collect() {
     auto next_itr = itr->next;
     auto slab = container_of(itr, slab_info, link);
     assert(!list_empty(&slab->link));
-    if (!slab->marked) {
+    if (slab->marked == 0) {
       list_del(itr);
       merge_and_free_slab(slab);
-      freed_bytes += slab->class *8UL;
+      freed_bytes += slab->end - slab->start;
+    } else {
+      auto tot_size = slab->end - slab->start;
+      /* if (slab->marked != tot_size) { */
+      /* 	printf("Frag %i clss %i %% %f\n", slab->marked, slab->class, 100.0*(double)(tot_size - slab->marked) / (double)tot_size); */
+      /* } */
+      if (slab->class < size_classes) {
+	if (slab->marked < tot_size/2) {
+	  kv_push(partials[slab->class], slab);
+	}
+      }
     }
-    total_bytes += slab->class *8UL;
+    total_bytes += slab->end - slab->start;
     itr = next_itr;
   }
   for (uint64_t i = 0; i < size_classes; i++) {
-    cur_slab[i] = nullptr;
     freelist[i].start_ptr = default_slab_size;
     freelist[i].end_ptr = default_slab_size;
+    freelist[i].slab = nullptr;
   }
   uint64_t live_bytes = total_bytes - freed_bytes;
 
-  if (freed_bytes < (total_bytes /2)) {
-    next_collect *= 2;
+  if (next_collect < totsize) {
+    next_collect = totsize;
   }
 
   kv_destroy(markstack);
 
   clock_gettime(CLOCK_MONOTONIC, &end);
+  auto rem_bytes = total_bytes - freed_bytes;
   double time_taken =
       ((double)end.tv_sec - (double)start.tv_sec) * 1000.0; // sec to ms
   time_taken +=
       ((double)end.tv_nsec - (double)start.tv_nsec) / 1000000.0; // ns to ms
   printf(
-	 "COLLECT %.3f ms, total %li, free%% %f, next_collect %li\n",
-	 time_taken, total_bytes, 100.0 * (double)freed_bytes / (double)total_bytes, next_collect);
+	 "COLLECT %.3f ms, %li total %li, free%% %f, next_collect %li, totsize %li rembytes %li, frag %% %f\n",
+	 time_taken, totsize, total_bytes, 100.0 * (double)freed_bytes / (double)total_bytes, next_collect,
+	 totsize, rem_bytes,
+	 100.0 * (double) (rem_bytes - totsize) / (double)rem_bytes);
 }
 
 static slab_info *alloc_slab(uint64_t sz_class) {
@@ -306,11 +399,12 @@ rcimmix_alloc_slow(uint64_t sz) {
   // It's in a small slab.
   //  assert(freelist[sz_class].start_ptr >= freelist[sz_class].end_ptr);
   if (get_partial_range(sz_class, &freelist[sz_class])) {
-    abort();
+    
   } else {
     auto slab = alloc_slab(sz_class);
     freelist[sz_class].start_ptr = (uint64_t)slab->start;
     freelist[sz_class].end_ptr = (uint64_t)slab->end;
+    freelist[sz_class].slab = slab;
     collect_cnt += freelist[sz_class].end_ptr - freelist[sz_class].start_ptr;
   }
   return rcimmix_alloc(sz);

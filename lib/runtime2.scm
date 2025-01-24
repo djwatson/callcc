@@ -874,5 +874,12 @@
 			  (string-set! buffer p (integer->char (+ r (if (>= r 10) 55 48))))
 			  (loop p q))))))))))))
 
+(define make-list
+  (case-lambda
+    ((k) (make-list k '()))
+    ((k fill) (if (= k 0)
+		  '()
+		  (cons fill (make-list (- k 1) fill))))))
+
 (include "str2num.scm")
 
