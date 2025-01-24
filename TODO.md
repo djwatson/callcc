@@ -1,6 +1,7 @@
 
 * benchmarks:
-  * GC fragmentation: graphs, paraffins
+  * GC needs defrag/generational: graphs
+  * also needs inliner to remove alloc: graphs
   
   * need input/output: wc tail sum1 slatex read1 ray parsing dynamic cat
   

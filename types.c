@@ -1002,7 +1002,7 @@ static const uint64_t reg_arg_cnt = 6;
 /* #endif */
 
 // TODO: gc shadow_stack
-static gc_obj shadow_stack[100];
+gc_obj shadow_stack[100];
 gc_obj consargs_stub(gc_obj a0, gc_obj a1, gc_obj a2, gc_obj a3, gc_obj a4, gc_obj a5) {
   auto cnt = argcnt - wanted_argcnt;
   auto cur = argcnt;

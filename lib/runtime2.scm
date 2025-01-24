@@ -750,10 +750,7 @@
   (unless (record? record) (error "record-ref: not a record" record))
   (sys:FOREIGN_CALL "SCM_RECORD_REF" record index))
 (define (make-record sz)
-  (let ((rec (sys:FOREIGN_CALL "SCM_MAKE_RECORD" sz)))
-    (do ((i 0 (+ i 1)))
-	((= i (+ 1 sz)) rec)
-      (record-set! rec i #f))))
+  (sys:FOREIGN_CALL "SCM_MAKE_RECORD" sz))
 (define (record? p)
   (sys:GUARD p record-tag))
 

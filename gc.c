@@ -113,7 +113,7 @@ bool find_next_bit(uint64_t const* bits, uint64_t maxbit, uint64_t bit, bool inv
 
 bool get_partial_range(uint64_t sz_class, freelist_s *fl) {
   auto slab = fl->slab;
-  /* if (sz_class != 2) { */
+  /* if (sz_class != 6) { */
   /*   return false; */
   /* } */
   //return false;
@@ -122,7 +122,7 @@ bool get_partial_range(uint64_t sz_class, freelist_s *fl) {
   if (!slab || fl->end_ptr >= (uint64_t)slab->end) {
     if (kv_size(partials[sz_class]) > 0) {
       slab = kv_pop(partials[sz_class]);
-      /* printf("New slab %i\n", slab->marked); */
+      //printf("New slab %i %p %p\n", slab->marked, slab->start, slab->end);
       assert(slab->class == sz_class);
       fl->slab = slab;      
     } else {
@@ -151,7 +151,7 @@ bool get_partial_range(uint64_t sz_class, freelist_s *fl) {
   for(uint64_t i = new_start; i<new_end; i++) {
     assert(!bt(slab->markbits, i));
   }
-  /* printf("End index was %li, new start %li, new end %li\n", end_index, new_start, new_end); */
+  //printf("End index was %li, new start %li, new end %li\n", end_index, new_start, new_end);
   fl->start_ptr = (uint64_t)slab->start + new_start * slab->class * 8;
   fl->end_ptr = (uint64_t)slab->start + new_end * slab->class * 8;
   return true;
@@ -237,6 +237,7 @@ static void mark() {
 }
 
 extern int64_t symbol_table;
+extern  int64_t shadow_stack[100];
 
 static void merge_and_free_slab(slab_info* slab) {
   // TODO: actual merge.
@@ -264,6 +265,7 @@ __attribute__((noinline, preserve_none)) static void rcimmix_collect() {
   list_head *itr;
   list_for_each (itr, &live_slabs) {
     slab_info *slab = container_of(itr, slab_info, link);
+      
     memset(slab->markbits, 0, sizeof(slab->markbits));
     slab->marked = 0;
   }
@@ -292,6 +294,7 @@ __attribute__((noinline, preserve_none)) static void rcimmix_collect() {
     uint64_t *symbol = (uint64_t *)(v[1 + i] & ~7);
     kv_push(markstack, ((range){&symbol[1], &symbol[3]}));
   }
+  kv_push(markstack, ((range){&shadow_stack[0], &shadow_stack[100]}));
 
   // Run mark loop.
   mark();
