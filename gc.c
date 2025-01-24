@@ -2,12 +2,12 @@
 #define _GNU_SOURCE
 
 #include <assert.h>
+#include <pthread.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
-#include <pthread.h>
 
 #include "alloc_table.h"
 #include "gc.h"
@@ -28,9 +28,7 @@ static alloc_table atable;
 
 static uint64_t *stacktop;
 
-uint64_t* gc_get_stack_top() {
-  return stacktop;
-}
+uint64_t *gc_get_stack_top() { return stacktop; }
 typedef struct freelist_s {
   uint64_t start_ptr;
   uint64_t end_ptr;
@@ -74,7 +72,7 @@ bool get_partial_range(uint64_t sz_class, freelist_s *fl) { return false; }
 void gc_init() {
   stacktop = (uint64_t *)__builtin_frame_address(0);
 
-  void* addr;
+  void *addr;
 #if __APPLE__
   addr = pthread_get_stackaddr_np(pthread_self());
 #elif __linux__
@@ -84,13 +82,13 @@ void gc_init() {
   pthread_getattr_np(pthread_self(), &attr);
   pthread_attr_getstack(&attr, &addr, &size);
   pthread_attr_destroy(&attr);
-  addr = (unsigned char*)addr + size;
+  addr = (unsigned char *)addr + size;
 #else
 #error "Unknown OS: Can't get stack base"
 #endif
   printf("frametop %p pthreadtop %p\n", stacktop, addr);
   stacktop = addr;
-  
+
   // Set defaults so we don't have to check for wrapping in
   // the fastpath.
   for (uint64_t i = 0; i < size_classes; i++) {
@@ -114,6 +112,7 @@ typedef struct range {
   uint64_t *end;
 } range;
 
+static uint64_t totsize;
 static kvec_t(range) markstack;
 static void mark() {
   while (kv_size(markstack) > 0) {
@@ -125,13 +124,14 @@ static void mark() {
     while (r.start < r.end) {
       uint8_t *val = (uint8_t *)*r.start;
       slab_info *slab;
-      bool found = alloc_table_lookup(&atable, val, (void**)&slab);
+      bool found = alloc_table_lookup(&atable, val, (void **)&slab);
       if (found && slab && (val >= slab->start) && (val < slab->end)) {
         // Find the start of the object
         uint64_t index =
             ((uint64_t)val - (uint64_t)slab->start) / (slab->class * 8);
         uint64_t base_ptr = (uint64_t)slab->start + (slab->class * 8 * index);
         if (!bt(slab->markbits, index)) {
+          totsize += slab->class * 8;
           bts(slab->markbits, index);
           // printf("Marking %p cls %i\n", base_ptr, slab->class);
           kv_push(markstack,
@@ -151,6 +151,7 @@ __attribute__((noinline, preserve_none)) static void rcimmix_collect() {
   struct timespec start;
   struct timespec end;
   clock_gettime(CLOCK_MONOTONIC, &start);
+  totsize = 0;
 
   // Clear marks
   for (uint64_t i = 0; i < kv_size(all_slabs); i++) {
@@ -174,10 +175,10 @@ __attribute__((noinline, preserve_none)) static void rcimmix_collect() {
   kv_push(markstack, ((range){sp, stacktop}));
 
   // Mark symbol table: TODO cleaup types
-  uint64_t* v = (uint64_t*)(symbol_table &~7);
+  uint64_t *v = (uint64_t *)(symbol_table & ~7);
   auto len = (*v) >> 3;
-  for(uint64_t i = 0; i < len; i++) {
-    uint64_t* symbol = (uint64_t*)(v[1 + i]&~7);
+  for (uint64_t i = 0; i < len; i++) {
+    uint64_t *symbol = (uint64_t *)(v[1 + i] & ~7);
     kv_push(markstack, ((range){&symbol[1], &symbol[3]}));
   }
 
@@ -207,7 +208,8 @@ __attribute__((noinline, preserve_none)) static void rcimmix_collect() {
       }
     }
   }
-  /* printf("Free blocks: %li all blocks: %li\n", free_blocks, kv_size(all_slabs)); */
+  /* printf("Free blocks: %li all blocks: %li\n", free_blocks,
+   * kv_size(all_slabs)); */
   for (uint64_t i = 0; i < size_classes; i++) {
     cur_slab[i] = nullptr;
     freelist[i].start_ptr = default_slab_size;
@@ -227,8 +229,10 @@ __attribute__((noinline, preserve_none)) static void rcimmix_collect() {
       ((double)end.tv_sec - (double)start.tv_sec) * 1000.0; // sec to ms
   time_taken +=
       ((double)end.tv_nsec - (double)start.tv_nsec) / 1000000.0; // ns to ms
-  /* printf("COLLECT %.3f ms, there are %li slabs next %li\n", time_taken, */
-  /*        kv_size(all_slabs), next_collect); */
+  printf(
+      "COLLECT %.3f ms, there are %li slabs next %li totsize %li free%% %f\n",
+      time_taken, kv_size(all_slabs), next_collect, totsize / (1024 * 1024),
+      100.0 - 100.0 * totsize / (kv_size(all_slabs) * default_slab_size));
 }
 
 static slab_info *alloc_slab(uint64_t sz_class) {
@@ -253,7 +257,8 @@ static uintptr_t align(uintptr_t val, uintptr_t alignment) {
   return (val + alignment - 1) & ~(alignment - 1);
 }
 
-NOINLINE __attribute__((preserve_most)) static void *rcimmix_alloc_slow(uint64_t sz) {
+NOINLINE __attribute__((preserve_most)) static void *
+rcimmix_alloc_slow(uint64_t sz) {
   if (collect_cnt >= next_collect) {
     collect_cnt = 0;
     rcimmix_collect();
@@ -268,9 +273,9 @@ NOINLINE __attribute__((preserve_most)) static void *rcimmix_alloc_slow(uint64_t
       // TODO hack hack hack
       collect_cnt += sz;
       auto f = kv_pop(large_free);
-      if(f->class >= sz_class) {
-	printf("INVALID SIZE CLASS BIGNESS\n");
-	abort();
+      if (f->class >= sz_class) {
+        printf("INVALID SIZE CLASS BIGNESS\n");
+        abort();
       }
       return f->start;
     } else {
@@ -305,14 +310,14 @@ void *rcimmix_alloc(uint64_t sz) {
   assert((sz & 0x7) == 0);
   uint64_t sz_class = sz / 8;
   if (unlikely(sz_class >= size_classes)) {
-     return rcimmix_alloc_slow(sz);
+    return rcimmix_alloc_slow(sz);
   } else {
     auto fl = &freelist[sz_class];
 
     auto s = fl->start_ptr;
     auto start = fl->start_ptr + sz_class * 8;
     if (unlikely(start > fl->end_ptr)) {
-       return rcimmix_alloc_slow(sz);
+      return rcimmix_alloc_slow(sz);
     } else {
 
       fl->start_ptr = start;

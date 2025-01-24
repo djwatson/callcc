@@ -1,6 +1,7 @@
 
 * benchmarks:
   * Size class fail: string fft compiler array1
+  * GC fragmentation: graphs, paraffins
   
   * need input/output: wc tail sum1 slatex read1 ray parsing dynamic cat
   
@@ -16,6 +17,11 @@
   * bignums: pi chudnovsky
 
   * equal
+  
+* cpstak:
+  * global linking doesn't work quite right
+  * argcnt needs a register, ugh.  Too slow otherwise.
+* ack: register usage is whack
 
 * r4rstest
   * input/output
@@ -25,7 +31,7 @@
 
 * figure out strategy for intrinsics????
 * cleanup runtime
-* inliner?? 
+* inliner?? appears to be unnecessary!!!! yay
 
 * self-compile
 * fix loop-in-loop
