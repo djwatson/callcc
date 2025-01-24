@@ -31,3 +31,10 @@ bool list_empty(list_head *list);
 #define container_of(ptr, type, member) ({				\
 	void *__mptr = (void *)(ptr);					\
 	((type *)(__mptr - offsetof(type, member))); })
+
+static inline int list_is_head(const struct list_head *list, const struct list_head *head)
+{
+	return list == head;
+}
+#define list_for_each(pos, head)					\
+	for (pos = (head)->next; !list_is_head(pos, (head)); pos = pos->next)

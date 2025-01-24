@@ -1,6 +1,5 @@
 
 * benchmarks:
-  * Size class fail: string fft compiler array1
   * GC fragmentation: graphs, paraffins
   
   * need input/output: wc tail sum1 slatex read1 ray parsing dynamic cat

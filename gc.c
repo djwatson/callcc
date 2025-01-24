@@ -43,6 +43,10 @@ typedef struct slab_info {
   list_head link;
 } slab_info;
 
+static uintptr_t align(uintptr_t val, uintptr_t alignment) {
+  return (val + alignment - 1) & ~(alignment - 1);
+}
+
 static void bts(uint64_t *bits, uint64_t bit) {
   auto word = bit / 64;
   auto b = bit % 64;
@@ -62,10 +66,17 @@ static bool bt(uint64_t const *bits, uint64_t bit) {
 static freelist_s freelist[size_classes];
 static slab_info *partials[size_classes];
 static slab_info *cur_slab[size_classes];
-static kvec_t(slab_info *) all_slabs;
+static LIST_HEAD(live_slabs);
 static kvec_t(uint64_t *) roots;
-static LIST_HEAD(free_slabs);
-static kvec_t(slab_info *) large_free;
+
+static constexpr uint16_t page_classes = 16;
+static kvec_t(slab_info *) pages_free[page_classes];
+
+static uint16_t sz_to_page_class(uint64_t sz) {
+  assert(sz >= PAGE_SIZE);
+  uint32_t zeros = 32 - __builtin_clz(sz-1); // Find next-largest power of two.
+  return zeros - 12; // Page bits.
+}
 
 bool get_partial_range(uint64_t sz_class, freelist_s *fl) { return false; }
 
@@ -95,9 +106,10 @@ void gc_init() {
     freelist[i].start_ptr = default_slab_size;
     freelist[i].end_ptr = default_slab_size;
   }
-  kv_init(all_slabs);
   kv_init(roots);
-  kv_init(large_free);
+  for(uint64_t i = 0; i < page_classes; i++) {
+    kv_init(pages_free[i]);
+  }
 }
 
 void gc_add_root(uint64_t *rootp) { kv_push(roots, rootp); }
@@ -125,7 +137,7 @@ static void mark() {
       uint8_t *val = (uint8_t *)*r.start;
       slab_info *slab;
       bool found = alloc_table_lookup(&atable, val, (void **)&slab);
-      if (found && slab && (val >= slab->start) && (val < slab->end)) {
+      if (found && (slab != nullptr) && (val >= slab->start) && (val < slab->end)) {
         // Find the start of the object
         uint64_t index =
             ((uint64_t)val - (uint64_t)slab->start) / (slab->class * 8);
@@ -147,15 +159,34 @@ static void mark() {
 
 extern int64_t symbol_table;
 
+static void merge_and_free_slab(slab_info* slab) {
+  // TODO: actual merge.
+  auto page_class = sz_to_page_class(slab->end - slab->start);
+  //printf("Page class %i sz class %i\n", page_class, slab->class);
+  if (page_class > page_classes) {
+    // Direct free
+    //printf("Freeing huge %i\n", slab->class*8);
+    free(slab->start);
+    free(slab);
+    return;
+  }
+  init_list_head(&slab->link);
+  //printf("Freeing slab %i\n", slab->class);
+  kv_push(pages_free[page_class], slab);
+}
+
 __attribute__((noinline, preserve_none)) static void rcimmix_collect() {
   struct timespec start;
   struct timespec end;
   clock_gettime(CLOCK_MONOTONIC, &start);
   totsize = 0;
 
+  printf("COLLECT...\n");
+
   // Clear marks
-  for (uint64_t i = 0; i < kv_size(all_slabs); i++) {
-    slab_info *slab = kv_A(all_slabs, i);
+  list_head *itr;
+  list_for_each (itr, &live_slabs) {
+    slab_info *slab = container_of(itr, slab_info, link);
     memset(slab->markbits, 0, sizeof(slab->markbits));
     slab->marked = false;
   }
@@ -186,40 +217,30 @@ __attribute__((noinline, preserve_none)) static void rcimmix_collect() {
   mark();
 
   // Sweep empty blocks.
-  kv_destroy(large_free);
-  kv_init(large_free);
-  uint64_t free_blocks = 0;
-  for (uint64_t i = 0; i < kv_size(all_slabs); i++) {
-    auto slab = kv_A(all_slabs, i);
-    if (!list_empty(&slab->link)) {
-      // It's already an empty block.
-      free_blocks++;
-      continue;
-    }
+  uint64_t freed_bytes = 0;
+  uint64_t total_bytes = 0;
+  itr = live_slabs.next;
+  while(!list_is_head(itr, &live_slabs)) {
+    auto next_itr = itr->next;
+    auto slab = container_of(itr, slab_info, link);
+    assert(!list_empty(&slab->link));
     if (!slab->marked) {
-      // TODO free large
-      if (slab->class >= size_classes) {
-        // free(slab->start);
-        // slab->start = nullptr;
-        kv_push(large_free, slab);
-      } else {
-        list_add(&slab->link, &free_slabs);
-        free_blocks++;
-      }
+      list_del(itr);
+      merge_and_free_slab(slab);
+      freed_bytes += slab->class *8UL;
     }
+    total_bytes += slab->class *8UL;
+    itr = next_itr;
   }
-  /* printf("Free blocks: %li all blocks: %li\n", free_blocks,
-   * kv_size(all_slabs)); */
   for (uint64_t i = 0; i < size_classes; i++) {
     cur_slab[i] = nullptr;
     freelist[i].start_ptr = default_slab_size;
     freelist[i].end_ptr = default_slab_size;
   }
+  uint64_t live_bytes = total_bytes - freed_bytes;
 
-  auto new_next_collect =
-      (kv_size(all_slabs) - free_blocks) * default_slab_size * 2;
-  if (new_next_collect > next_collect) {
-    next_collect = new_next_collect;
+  if (freed_bytes < (total_bytes /2)) {
+    next_collect *= 2;
   }
 
   kv_destroy(markstack);
@@ -230,32 +251,40 @@ __attribute__((noinline, preserve_none)) static void rcimmix_collect() {
   time_taken +=
       ((double)end.tv_nsec - (double)start.tv_nsec) / 1000000.0; // ns to ms
   printf(
-      "COLLECT %.3f ms, there are %li slabs next %li totsize %li free%% %f\n",
-      time_taken, kv_size(all_slabs), next_collect, totsize / (1024UL * 1024),
-      100.0 - (100.0 * ((double)totsize /
-                        ((double)(kv_size(all_slabs))*default_slab_size))));
+	 "COLLECT %.3f ms, total %li, free%% %f, next_collect %li\n",
+	 time_taken, total_bytes, 100.0 * (double)freed_bytes / (double)total_bytes, next_collect);
 }
 
 static slab_info *alloc_slab(uint64_t sz_class) {
-  slab_info *free = list_first_entry_or_null(&free_slabs, slab_info, link);
-  if (free) {
-    free->class = sz_class;
-    list_del(&free->link);
-  } else {
-    free = calloc(1, sizeof(slab_info));
-    free->class = sz_class;
-    init_list_head(&free->link);
+  auto sz = sz_class < size_classes ? default_slab_size : align(sz_class * 8, PAGE_SIZE);
+  auto page_class = sz_to_page_class(sz);
 
-    posix_memalign((void **)&free->start, PAGE_SIZE, default_slab_size);
-    free->end = free->start + default_slab_size;
-    kv_push(all_slabs, free);
+  // TODO: split the range here based on actual size.
+  // TODO: check larger bins & split.
+  if (page_class < page_classes && kv_size(pages_free[page_class])) {
+    slab_info* free = kv_pop(pages_free[page_class]);
+    if (free) {
+      //printf("Found free slab class %li %i %i\n", sz_class, free->class, page_class);
+      free->class = sz_class;
+      alloc_table_set_range(&atable, free, free->start,
+                            free->end - free->start);
+      list_add(&free->link, &live_slabs);
+      return free;
+    }
+  } else {
+    //printf("Allocing slab: %li\n", sz_class*8);
   }
+  
+  slab_info* free = calloc(1, sizeof(slab_info));
+  free->class = sz_class;
+  init_list_head(&free->link);
+
+  posix_memalign((void **)&free->start, PAGE_SIZE, sz);
+  free->end = free->start + sz;
+  list_add(&free->link, &live_slabs);
+
   alloc_table_set_range(&atable, free, free->start, free->end - free->start);
   return free;
-}
-
-static uintptr_t align(uintptr_t val, uintptr_t alignment) {
-  return (val + alignment - 1) & ~(alignment - 1);
 }
 
 NOINLINE __attribute__((preserve_most)) static void *
@@ -268,31 +297,11 @@ rcimmix_alloc_slow(uint64_t sz) {
   assert((sz & 0x7) == 0);
 
   uint64_t sz_class = sz / 8;
-  // It has to be a large slab.
+  // It is a large slab.
   if (sz_class >= size_classes) {
-    if (kv_size(large_free)) {
-      // TODO hack hack hack
-      collect_cnt += sz;
-      auto f = kv_pop(large_free);
-      if (f->class >= sz_class) {
-        printf("INVALID SIZE CLASS BIGNESS\n");
-        abort();
-      }
-      return f->start;
-    }
-
-    sz = align(sz, PAGE_SIZE);
-    slab_info *info = malloc(sizeof(slab_info));
-    sz_class = sz / 8;
-    info->class = sz_class;
-    init_list_head(&info->link);
-    posix_memalign((void **)&info->start, PAGE_SIZE, sz);
-    info->end = info->start + sz;
-    alloc_table_set_range(&atable, info, info->start, sz);
+    auto slab = alloc_slab(sz_class);
     collect_cnt += sz;
-    kv_push(all_slabs, info);
-
-    return info->start;
+    return slab->start;
   }
   // It's in a small slab.
   //  assert(freelist[sz_class].start_ptr >= freelist[sz_class].end_ptr);
