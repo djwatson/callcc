@@ -53,7 +53,7 @@ static void btr(uint64_t *bits, uint64_t bit) {
   auto b = bit % 64;
   bits[word] &= ~(1UL << b);
 }
-static bool bt(uint64_t *bits, uint64_t bit) {
+static bool bt(uint64_t const *bits, uint64_t bit) {
   auto word = bit / 64;
   auto b = bit % 64;
   return bits[word] & (1UL << b);
@@ -102,7 +102,7 @@ void gc_init() {
 
 void gc_add_root(uint64_t *rootp) { kv_push(roots, rootp); }
 
-void gc_pop_root(uint64_t *rootp) {
+void gc_pop_root(uint64_t const *rootp) {
   auto old_rootp = kv_pop(roots);
   assert(old_rootp == rootp);
 }
@@ -231,8 +231,9 @@ __attribute__((noinline, preserve_none)) static void rcimmix_collect() {
       ((double)end.tv_nsec - (double)start.tv_nsec) / 1000000.0; // ns to ms
   printf(
       "COLLECT %.3f ms, there are %li slabs next %li totsize %li free%% %f\n",
-      time_taken, kv_size(all_slabs), next_collect, totsize / (1024 * 1024),
-      100.0 - 100.0 * totsize / (kv_size(all_slabs) * default_slab_size));
+      time_taken, kv_size(all_slabs), next_collect, totsize / (1024UL * 1024),
+      100.0 - (100.0 * ((double)totsize /
+                        ((double)(kv_size(all_slabs))*default_slab_size))));
 }
 
 static slab_info *alloc_slab(uint64_t sz_class) {
@@ -278,20 +279,20 @@ rcimmix_alloc_slow(uint64_t sz) {
         abort();
       }
       return f->start;
-    } else {
-      sz = align(sz, PAGE_SIZE);
-      slab_info *info = malloc(sizeof(slab_info));
-      sz_class = sz / 8;
-      info->class = sz_class;
-      init_list_head(&info->link);
-      posix_memalign((void **)&info->start, PAGE_SIZE, sz);
-      info->end = info->start + sz;
-      alloc_table_set_range(&atable, info, info->start, sz);
-      collect_cnt += sz;
-      kv_push(all_slabs, info);
-
-      return info->start;
     }
+
+    sz = align(sz, PAGE_SIZE);
+    slab_info *info = malloc(sizeof(slab_info));
+    sz_class = sz / 8;
+    info->class = sz_class;
+    init_list_head(&info->link);
+    posix_memalign((void **)&info->start, PAGE_SIZE, sz);
+    info->end = info->start + sz;
+    alloc_table_set_range(&atable, info, info->start, sz);
+    collect_cnt += sz;
+    kv_push(all_slabs, info);
+
+    return info->start;
   }
   // It's in a small slab.
   //  assert(freelist[sz_class].start_ptr >= freelist[sz_class].end_ptr);
@@ -311,17 +312,15 @@ void *rcimmix_alloc(uint64_t sz) {
   uint64_t sz_class = sz / 8;
   if (unlikely(sz_class >= size_classes)) {
     return rcimmix_alloc_slow(sz);
-  } else {
-    auto fl = &freelist[sz_class];
-
-    auto s = fl->start_ptr;
-    auto start = fl->start_ptr + sz_class * 8;
-    if (unlikely(start > fl->end_ptr)) {
-      return rcimmix_alloc_slow(sz);
-    } else {
-
-      fl->start_ptr = start;
-      return (void *)s;
-    }
   }
+  auto fl = &freelist[sz_class];
+
+  auto s = fl->start_ptr;
+  auto start = fl->start_ptr + (sz_class * 8);
+  if (unlikely(start > fl->end_ptr)) {
+    return rcimmix_alloc_slow(sz);
+  }
+
+  fl->start_ptr = start;
+  return (void *)s;
 }
