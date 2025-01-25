@@ -17,11 +17,33 @@
   (sys:FOREIGN_CALL "SCM_SIN" (inexact f)))
 (define (cos f)
   (sys:FOREIGN_CALL "SCM_COS" (inexact f)))
+(define (asin f)
+  (sys:FOREIGN_CALL "SCM_ASIN" (inexact f)))
+(define (acos f)
+  (sys:FOREIGN_CALL "SCM_ACOS" (inexact f)))
+(define (tan f)
+  (sys:FOREIGN_CALL "SCM_TAN" (inexact f)))
 (define (atan f)
   (sys:FOREIGN_CALL "SCM_ATAN" (inexact f)))
 (define (sqrt f)
   (sys:FOREIGN_CALL "SCM_SQRT" (inexact f)))
+(define (floor f)
+  (sys:FOREIGN_CALL "SCM_FLOOR" (inexact f)))
+(define (ceiling f)
+  (sys:FOREIGN_CALL "SCM_CEILING" (inexact f)))
 
+(define (truncate x)
+  (if (negative? x)
+      (ceiling x)
+      (floor x)))
+
+(define (exp num) (sys:FOREIGN_CALL "SCM_EXP" (inexact num)))
+
+(define log
+  (case-lambda
+    ((num) (sys:FOREIGN_CALL "SCM_LOG" (inexact num)))
+    ((num base) (/ (sys:FOREIGN_CALL "SCM_LOG" (inexact num))
+			 (sys:FOREIGN_CALL "SCM_LOG" (inexact base))))))
 (define (reducer f init args)
   (let loop ((init init) (args args))
     (if (pair? args)
@@ -57,6 +79,15 @@
    ((a b) (base* a b))
    ((a b c) (base* (base* a b) c))
    (rest (reducer base* 0 rest))))
+
+(define (base/ a b)
+  (sys:DIV a b))
+(define /
+  (case-lambda
+   ((a) (base/ (inexact 1) a))
+   ((a b) (base/ (inexact a) b))
+   ((a b c) (base/ (base/ (inexact a) b) c))
+   ((a . rest) (reducer base/ (inexact a) rest))))
 
 (define (comparer f args)
   (let loop ((args args))
@@ -257,7 +288,14 @@
     (if (null? x)
 	n
 	(loop (+ n 1) (cdr x)))))
-
+(define (vector-map proc . vecs)
+  (let* ((len (apply min (map vector-length vecs)))
+	 (vec (make-vector len)))
+    (do ((i 0 (+ i 1)))
+	((= i len) vec)
+      (vector-set!
+       vec i
+       (apply proc (map (lambda (x) (vector-ref x i)) vecs))))))
 
 ;; strings
 (define (string-length n) (sys:FOREIGN_CALL "SCM_STRING_LENGTH" n))
@@ -880,3 +918,6 @@
 
 (include "str2num.scm")
 
+;;;;;;;;;;;;; IO
+(define (call-with-input-file a) (error "call-with-input-file"))
+(define (call-with-output-file a) (error "call-with-output-file"))

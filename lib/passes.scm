@@ -114,7 +114,6 @@ TODO: boxes could be passed down through funcs
 	      (= . NUM_EQ)
 	      (+ . ADD)
 	      (- . SUB)
-	      (/ . DIV)
 	      (* . MUL)
 	      (eq? . EQ)
 	      (char=? . EQ)))

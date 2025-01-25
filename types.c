@@ -374,6 +374,7 @@ INLINE gc_obj SCM_LOAD_GLOBAL(gc_obj a) {
 }
 
 INLINE void SCM_SET_GLOBAL(gc_obj a, gc_obj b) {
+  // TODO gclog
   auto sym = to_symbol(a);
   sym->val = b;
 }
@@ -774,6 +775,7 @@ INLINE gc_obj SCM_CDR(gc_obj obj) {
 }
 
 INLINE gc_obj SCM_SETCAR(gc_obj obj, gc_obj val) {
+  // TODO gclog
   if (!is_cons(obj)) {
     abort();
   }
@@ -782,6 +784,7 @@ INLINE gc_obj SCM_SETCAR(gc_obj obj, gc_obj val) {
 }
 
 INLINE gc_obj SCM_SETCDR(gc_obj obj, gc_obj val) {
+  // TODO gclog
   if (!is_cons(obj)) {
     abort();
   }
@@ -831,6 +834,7 @@ INLINE gc_obj SCM_VECTOR_REF(gc_obj vec, gc_obj idx) {
 }
 
 INLINE gc_obj SCM_VECTOR_SET(gc_obj vec, gc_obj idx, gc_obj val) {
+  // TODO gclog
   to_vector(vec)->v[to_fixnum(idx)] = val;
   return UNDEFINED;
 }
@@ -845,6 +849,7 @@ INLINE gc_obj SCM_CLOSURE(gc_obj p, uint64_t len) {
 
 INLINE void SCM_CLOSURE_SET(gc_obj clo, gc_obj obj, uint64_t i) {
   //    printf("Closure set %li\n", i);
+  // TODO gclog
   to_closure(clo)->v[i + 1] = obj;
 }
 
@@ -1137,6 +1142,7 @@ INLINE gc_obj SCM_RECORD_REF(gc_obj r, gc_obj idx) {
 }
 
 INLINE gc_obj SCM_RECORD_SET(gc_obj r, gc_obj idx, gc_obj val) {
+  // TODO gclog
   to_record(r)->v[to_fixnum(idx)] = val;
   return UNDEFINED;
 }
@@ -1158,6 +1164,22 @@ INLINE gc_obj SCM_COS(gc_obj f) {
   return double_to_gc_slow(cos(d));
 }
 
+INLINE gc_obj SCM_ASIN(gc_obj f) {
+  double d = to_double(f);
+  return double_to_gc_slow(asin(d));
+}
+
+INLINE gc_obj SCM_ACOS(gc_obj f) {
+  double d = to_double(f);
+  return double_to_gc_slow(acos(d));
+}
+
+
+INLINE gc_obj SCM_TAN(gc_obj f) {
+  double d = to_double(f);
+  return double_to_gc_slow(tan(d));
+}
+
 INLINE gc_obj SCM_ATAN(gc_obj f) {
   double d = to_double(f);
   return double_to_gc_slow(atan(d));
@@ -1177,6 +1199,26 @@ INLINE gc_obj SCM_ROUND(gc_obj f) {
     }
   }
   return double_to_gc_slow(rounded);
+}
+
+INLINE gc_obj SCM_FLOOR(gc_obj f) {
+  double d = to_double(f);
+  return double_to_gc_slow(floor(d));
+}
+
+INLINE gc_obj SCM_CEILING(gc_obj f) {
+  double d = to_double(f);
+  return double_to_gc_slow(ceil(d));
+}
+
+INLINE gc_obj SCM_EXP(gc_obj f) {
+  double d = to_double(f);
+  return double_to_gc_slow(exp(d));
+}
+
+INLINE gc_obj SCM_LOG(gc_obj f) {
+  double d = to_double(f);
+  return double_to_gc_slow(log(d));
 }
 
 ///// Shadow stack
