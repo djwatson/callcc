@@ -237,7 +237,7 @@
 (define (vector-length n) (sys:FOREIGN_CALL "SCM_VECTOR_LENGTH" n))
 (define make-vector
   (case-lambda
-   ((len) (make-vector len #f))
+   ((len) (sys:FOREIGN_CALL "SCM_MAKE_VECTOR" len))
    ((len obj)
     (let ((vec (sys:FOREIGN_CALL "SCM_MAKE_VECTOR" len)))
       (do ((i 0 (+ i 1)))
@@ -744,7 +744,7 @@
 
 ;;;;;; Records
 (define (record-set! record index value)
-  (unless (record? record) (error "record-set!: not a record" record))
+  ;(unless (record? record) (error "record-set!: not a record" record))
   (sys:FOREIGN_CALL "SCM_RECORD_SET" record index value))
 (define (record-ref record index)
   (unless (record? record) (error "record-ref: not a record" record))

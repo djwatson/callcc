@@ -513,6 +513,7 @@
     (record-set! int)
     (record-accessor int)
     (record-constructor int)
+    (make-record int)
     (cons* int) ;; quasiquote
     (%make-promise int) ;; lazy promise
     (make-ident int) ;; syntax expansion, hygienic macros
@@ -960,8 +961,13 @@
 	     (begin
 	       (define type
 		 (make-record-type 'type '(field-tag ...)))
-	       (define constructor
-		 (record-constructor type '(constructor-tag ...)))
+	       (define (constructor constructor-tag ...)
+		 (let ((r (make-record (+ (length '(field-tag ...)) 1))))
+		   (record-set! r 0 type)
+		   (record-set! r index constructor-tag) ...
+		   r)
+		 ;(record-constructor type '(constructor-tag ...))
+		 )
 	       (define (predicate thing)
 		 (and (record? thing)
 		      (eq? (record-ref thing 0) type)))
@@ -976,18 +982,18 @@
 	((define-record-field type index field-tag predicate accessor)
 	 ;(define accessor (record-accessor type 'field-tag))
 	 (define (accessor thing)
-	   (unless (predicate thing)
-	     (error "Invalid accessor" thing))
+	   ;; (unless (predicate thing)
+	   ;;   (error "Invalid accessor" thing))
 	   (record-ref thing index)))
 	((define-record-field type index field-tag predicate accessor modifier)
 	 (begin
 	   (define (accessor thing)
-	     (unless (predicate thing)
-	       (error "Invalid accessor" thing))
+	     ;; (unless (predicate thing)
+	     ;;   (error "Invalid accessor" thing))
 	     (record-ref thing index))
 	   (define (modifier thing value)
-	     (unless (predicate thing)
-	       (error "Invalid modifier"))
+	     ;; (unless (predicate thing)
+	     ;;   (error "Invalid modifier"))
 	     (record-set! thing index value))))))))
 
 ;; Everthing gets lumped in a 'flow all' namespace, then

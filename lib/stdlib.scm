@@ -328,6 +328,7 @@
         (record-set! . record-set!)
         (record-accessor . record-accessor)
         (record-constructor . record-constructor)
+        (make-record . make-record)
         (cons* . cons*)
         (%make-promise . %make-promise)
         (make-ident . make-ident)

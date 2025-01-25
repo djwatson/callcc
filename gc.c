@@ -294,7 +294,7 @@ __attribute__((noinline, preserve_none)) static void rcimmix_collect() {
     uint64_t *symbol = (uint64_t *)(v[1 + i] & ~7);
     kv_push(markstack, ((range){&symbol[1], &symbol[3]}));
   }
-  kv_push(markstack, ((range){&shadow_stack[0], &shadow_stack[100]}));
+  kv_push(markstack, ((range){(uint64_t*)&shadow_stack[0], (uint64_t*)&shadow_stack[100]}));
 
   // Run mark loop.
   mark();
@@ -344,11 +344,11 @@ __attribute__((noinline, preserve_none)) static void rcimmix_collect() {
       ((double)end.tv_sec - (double)start.tv_sec) * 1000.0; // sec to ms
   time_taken +=
       ((double)end.tv_nsec - (double)start.tv_nsec) / 1000000.0; // ns to ms
-  printf(
-	 "COLLECT %.3f ms, %li total %li, free%% %f, next_collect %li, totsize %li rembytes %li, frag %% %f\n",
-	 time_taken, totsize, total_bytes, 100.0 * (double)freed_bytes / (double)total_bytes, next_collect,
-	 totsize, rem_bytes,
-	 100.0 * (double) (rem_bytes - totsize) / (double)rem_bytes);
+  /* printf( */
+  /* 	 "COLLECT %.3f ms, %li total %li, free%% %f, next_collect %li, totsize %li rembytes %li, frag %% %f\n", */
+  /* 	 time_taken, totsize, total_bytes, 100.0 * (double)freed_bytes / (double)total_bytes, next_collect, */
+  /* 	 totsize, rem_bytes, */
+  /* 	 100.0 * (double) (rem_bytes - totsize) / (double)rem_bytes); */
 }
 
 static slab_info *alloc_slab(uint64_t sz_class) {
