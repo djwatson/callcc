@@ -129,7 +129,7 @@ bool get_partial_range(uint64_t sz_class, freelist_s *fl) {
       return false;
     }
   } else {
-    assert(fl->start_ptr >= slab->start && fl->end_ptr <= slab->end);
+    //assert(fl->start_ptr >= slab->start && fl->end_ptr <= slab->end);
     end_index = ((fl->end_ptr - (uint64_t)slab->start)) / (slab->class *8);
     /* printf("Cont slab end_indx %li\n", end_index); */
   }

@@ -1,3 +1,6 @@
+* super GC bench: paraffins, mperm, graphs, nboyer, gcbench, earley
+
+
 
 * benchmarks:
   * GC needs defrag/generational: graphs, earley, gcbench
