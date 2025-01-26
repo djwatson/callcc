@@ -1230,3 +1230,11 @@ INLINE void SCM_WRITE_SHADOW_STACK(gc_obj pos, gc_obj obj) {
 INLINE gc_obj SCM_READ_SHADOW_STACK(uint64_t pos) {
   return shadow_stack[pos];
 }
+
+#include <nmmintrin.h>
+INLINE gc_obj SCM_EQ_HASH(gc_obj h) {
+  return tag_fixnum(_mm_crc32_u32(0, h.value >> 3));
+}
+INLINE gc_obj SCM_AND(gc_obj num, gc_obj mask) {
+  return (gc_obj){.value = num.value & mask.value};
+}

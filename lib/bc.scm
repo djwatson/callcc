@@ -487,6 +487,8 @@ declare i64 @SCM_FLOOR(i64)
 declare i64 @SCM_CEILING(i64)
 declare i64 @SCM_EXP(i64)
 declare i64 @SCM_LOG(i64)
+declare i64 @SCM_EQ_HASH(i64)
+declare i64 @SCM_AND(i64, i64)
 declare i64 @SCM_READ_SHADOW_STACK(i64)
 declare void @SCM_WRITE_SHADOW_STACK(i64, i64)
 

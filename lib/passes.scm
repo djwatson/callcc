@@ -687,7 +687,7 @@ TODO: boxes could be passed down through funcs
 (define-pass programify sexp
   ((call (lookup ,global) ,(programify args) ___)
    (if (hash-table-exists? global-defs global)
-       `(label-call ,(hash-table-ref global-defs global) (lookup ,global) ,args ___)
+       `(label-call ,(hash-table-ref global-defs global) #f ,args ___)
        (begin
 	 (display (format "Global not found:~a\n" global) (current-error-port))
 	 sexp))))

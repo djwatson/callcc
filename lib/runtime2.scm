@@ -785,7 +785,7 @@
   ;(unless (record? record) (error "record-set!: not a record" record))
   (sys:FOREIGN_CALL "SCM_RECORD_SET" record index value))
 (define (record-ref record index)
-  (unless (record? record) (error "record-ref: not a record" record))
+  ;(unless (record? record) (error "record-ref: not a record" record))
   (sys:FOREIGN_CALL "SCM_RECORD_REF" record index))
 (define (make-record sz)
   (sys:FOREIGN_CALL "SCM_MAKE_RECORD" sz))
@@ -921,3 +921,5 @@
 ;;;;;;;;;;;;; IO
 (define (call-with-input-file a) (error "call-with-input-file"))
 (define (call-with-output-file a) (error "call-with-output-file"))
+(include "hashtable.scm")
+(include "equal.scm")

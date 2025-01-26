@@ -6,19 +6,13 @@
   
   * complex: mbrotZ
   
-  * slow records: gcbench
   * stack size check: earley, divrec
 
   * exact-integer-sqrt: pi
   * bignums: pi chudnovsky
 
-  * equal
-
-* both of these fixed by pgo?
 * cpstak:
-  * global linking doesn't work quite right
   * argcnt needs a register, ugh.  Too slow otherwise.
-* ack: register usage is whack
 
 * r4rstest
   * input/output
