@@ -1046,7 +1046,7 @@
     res))
 
 (define (flush-output-port port)
-  #f)
+  ((port-fillflush port) port))
 
 (define (delete-file filename)
   (when (sys:FOREIGN_CALL "unlink" '(int32 (string)) filename)

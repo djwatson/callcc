@@ -1075,6 +1075,9 @@
     (when (eq? #\newline ch)
       ((port-fillflush port) port)))))
 
+(define (file-exists? name)
+  (sys:FOREIGN_CALL "SCM_FILE_EXISTS" name))
+
 ;;;;;;; equals?, hash tables.
 
 (include "hashtable.scm")

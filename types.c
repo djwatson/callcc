@@ -1285,3 +1285,16 @@ INLINE gc_obj SCM_CLOSE_FD(gc_obj fd) {
   }
   return tag_fixnum(res);
 }
+
+INLINE gc_obj SCM_FILE_EXISTS(gc_obj scmname) {
+  auto str = to_string(scmname);
+  char name[256];
+  memcpy(name, str->str, to_fixnum(str->len));
+  assert(to_fixnum(str->len) < 255);
+  name[to_fixnum(str->len)] = '\0';
+  auto res = access(name, F_OK);
+  if (res == 0) {
+    return TRUE_REP;
+  }
+  return FALSE_REP;
+}
