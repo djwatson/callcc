@@ -10,12 +10,13 @@
 
   * exact-integer-sqrt: pi
   * bignums: pi chudnovsky
+  
+* faster symbol table using hashtable
 
 * cpstak:
   * argcnt needs a register, ugh.  Too slow otherwise.
 
 * r4rstest
-  * input/output
   * bignum
 
 * fast globals

@@ -224,10 +224,7 @@ double to_double_fast(gc_obj obj) {
   return res;
 }
 
-gc_obj SCM_DISPLAY(gc_obj obj);
-void print_obj(gc_obj obj, FILE *) { SCM_DISPLAY(obj); }
-
-void display_double(gc_obj obj) {
+static void display_double(gc_obj obj, int fd) {
     char buffer[40];
     double d = to_double(obj);
     snprintf(buffer, 40 - 3, "%g", d);
@@ -237,48 +234,49 @@ void display_double(gc_obj obj) {
       buffer[len + 1] = '0';
       buffer[len + 2] = '\0';
     }
-    printf("%s", buffer);
+    dprintf(fd, "%s", buffer);
 }
 
-gc_obj SCM_DISPLAY(gc_obj obj) {
+gc_obj SCM_DISPLAY(gc_obj obj, gc_obj scmfd) {
+  int fd = (int)to_fixnum(scmfd);
   auto tag = get_tag(obj);
   switch(tag) {
   case FIXNUM_TAG:
-    printf("%li", to_fixnum(obj));
+    dprintf(fd, "%li", to_fixnum(obj));
     break;
   case FLONUM1_TAG:
   case FLONUM2_TAG:
   case FLONUM3_TAG:
-    display_double(obj);
+    display_double(obj, fd);
     break;
   case PTR_TAG: {
     auto ptr_tag = get_ptr_tag(obj);
     switch(ptr_tag) {
     case STRING_TAG: {
       auto str = to_string(obj);
-      printf("%.*s", (int)to_fixnum(str->len), str->str);
+      dprintf(fd, "%.*s", (int)to_fixnum(str->len), str->str);
       break;
     }
     case SYMBOL_TAG: {
       auto sym = to_symbol(obj);
       auto str = to_string(sym->name);
-      printf("%.*s", (int)to_fixnum(str->len), str->str);
+      dprintf(fd, "%.*s", (int)to_fixnum(str->len), str->str);
       break;
     }
     case RECORD_TAG: {
-      printf("#<record>");
+      dprintf(fd, "#<record>");
       break;
     }
     case CLOSURE_TAG: {
-      printf("#<closure>");
+      dprintf(fd, "#<closure>");
       break;
     }
     case CONT_TAG: {
-      printf("#<cont>");
+      dprintf(fd, "#<cont>");
       break;
     }
     case FLONUM_TAG: {
-      display_double(obj);
+      display_double(obj, fd);
       break;
     }
     default:
@@ -288,43 +286,42 @@ gc_obj SCM_DISPLAY(gc_obj obj) {
     break;
   }
   case CONS_TAG: {
-    auto file = stdout;
     auto c = to_cons(obj);
-    fputc('(', file);
+    dprintf(fd, "(");
     while (is_cons(c->b)) {
-      print_obj(c->a, file);
+      SCM_DISPLAY(c->a, scmfd);
       c = to_cons(c->b);
-      fputc(' ', file);
+      dprintf(fd, " ");
     }
-    print_obj(c->a, file);
+    SCM_DISPLAY(c->a, scmfd);
     if (c->b.value != NIL_TAG) {
-      fputs(" . ", file);
-      print_obj(c->b, file);
+      dprintf(fd, " . ");
+      SCM_DISPLAY(c->b, scmfd);
     }
-    fputc(')', file);
+    dprintf(fd, ")");
     break;
   }
   case LITERAL_TAG: {
     auto lit_tag = get_imm_tag(obj);
     switch(lit_tag) {
     case CHAR_TAG: {
-      printf("%c", to_char(obj));
+      dprintf(fd, "%c", to_char(obj));
       break;
     }
     case BOOL_TAG: {
       if (obj.value == TRUE_REP.value) {
-	printf("#t");
+	dprintf(fd, "#t");
       } else if (obj.value == FALSE_REP.value) {
-	printf("#f");
+	dprintf(fd, "#f");
       }
       break;
     }
     case NIL_TAG: {
-      printf("'()");
+      dprintf(fd, "()");
       break;
     }
     case UNDEFINED_TAG: {
-	printf("#<undef>");
+      dprintf(fd, "#<undef>");
 	break;
     }
     default:
@@ -335,14 +332,14 @@ gc_obj SCM_DISPLAY(gc_obj obj) {
   }
   case VECTOR_TAG: {
     auto v = to_vector(obj);
-    printf("#(");
+    dprintf(fd, "#(");
     for(uint64_t i = 0; i < to_fixnum(v->len); i++) {
       if (i != 0) {
-	printf(" ");
+	dprintf(fd, " ");
       }
-      SCM_DISPLAY(v->v[i]);
+      SCM_DISPLAY(v->v[i], scmfd);
     }
-    printf(")");
+    dprintf(fd, ")");
     break;
   }
   default:
@@ -386,7 +383,7 @@ NOINLINE void SCM_ARGCNT_FAIL() {
 
 NOINLINE void* SCM_LOAD_CLOSURE_PTR_FAIL(gc_obj a) {
   printf("Attempting to call non-closure:");
-  SCM_DISPLAY(a);
+  SCM_DISPLAY(a, tag_fixnum(0));
   printf("\n");
   abort();
 }
@@ -406,7 +403,7 @@ NOINLINE __attribute__((preserve_most)) gc_obj SCM_ADD_SLOW(gc_obj a, gc_obj b) 
     fa = to_double(a);
   } else {
     printf("Add: not a number:");
-    SCM_DISPLAY(a);
+    SCM_DISPLAY(a, tag_fixnum(0));
     printf("\n");
     abort();
   }
@@ -416,7 +413,7 @@ NOINLINE __attribute__((preserve_most)) gc_obj SCM_ADD_SLOW(gc_obj a, gc_obj b) 
     fb = to_double(b);
   } else {
     printf("Add: not a number:");
-    SCM_DISPLAY(b);
+    SCM_DISPLAY(b, tag_fixnum(0));
     printf("\n");
     abort();
   }
@@ -451,7 +448,7 @@ NOINLINE gc_obj SCM_MUL_SLOW(gc_obj a, gc_obj b) {
     fa = to_double(a);
   } else {
     printf("MUL: not a number:");
-    SCM_DISPLAY(a);
+    SCM_DISPLAY(a, tag_fixnum(0));
     printf("\n");
     abort();
   }
@@ -461,7 +458,7 @@ NOINLINE gc_obj SCM_MUL_SLOW(gc_obj a, gc_obj b) {
     fb = to_double(b);
   } else {
     printf("MUL: not a number:");
-    SCM_DISPLAY(b);
+    SCM_DISPLAY(b, tag_fixnum(0));
     printf("\n");
     abort();
   }
@@ -1237,4 +1234,54 @@ INLINE gc_obj SCM_EQ_HASH(gc_obj h) {
 }
 INLINE gc_obj SCM_AND(gc_obj num, gc_obj mask) {
   return (gc_obj){.value = num.value & mask.value};
+}
+
+////////////// IO
+
+#include <fcntl.h>
+#include <unistd.h>
+
+INLINE gc_obj SCM_OPEN_FD(gc_obj filename, gc_obj input) {
+  auto str = to_string(filename);
+  char name[256];
+  memcpy(name, str->str, to_fixnum(str->len));
+  assert(to_fixnum(str->len) < 255);
+  name[to_fixnum(str->len)] = '\0';
+  auto readonly = input.value == TRUE_REP.value;
+  return tag_fixnum(open(name, readonly ? O_RDONLY : O_WRONLY | O_CREAT | O_TRUNC, 0777));
+}
+
+INLINE gc_obj SCM_READ_FD(gc_obj scmfd, gc_obj scmbuf) {
+  auto buf = to_string(scmbuf);
+  int fd = (int)to_fixnum(scmfd);
+  auto res = read(fd, buf->str, to_fixnum(buf->len));
+  if (res < 0) {
+    printf("SCM_READ_FD error: %li\n", res);
+    exit(-1);
+  }
+  return tag_fixnum(res);
+}
+
+INLINE gc_obj SCM_WRITE_FD(gc_obj scmfd, gc_obj scmlen, gc_obj scmbuf) {
+  int fd = (int)to_fixnum(scmfd);
+  auto len = to_fixnum(scmlen);
+  auto buf = to_string(scmbuf);
+  auto res = write(fd, buf->str, len);
+  if (res != len) {
+    printf("Could not write %li bytes to fd %i\n", len, fd);
+    exit(-1);
+  }
+  return UNDEFINED;
+}
+
+#include <errno.h>
+
+INLINE gc_obj SCM_CLOSE_FD(gc_obj fd) {
+  auto res = close((int)to_fixnum(fd));
+  if (res != 0) {
+    printf("Error closing fd %li, res %i, errno %i\n", to_fixnum(fd), res, errno);
+    perror("foo");
+    exit(-1);
+  }
+  return tag_fixnum(res);
 }

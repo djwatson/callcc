@@ -277,12 +277,58 @@
       vec))))
 (define (vector-ref v i) (sys:FOREIGN_CALL "SCM_VECTOR_REF" v i))
 (define (vector-set! v i val) (sys:FOREIGN_CALL "SCM_VECTOR_SET" v i val))
-(define (display n)
-  (sys:FOREIGN_CALL "SCM_DISPLAY" n))
+(define display
+  (case-lambda
+   ((n) (display n (current-output-port)))
+   ((n port)
+    ((port-fillflush port) port)
+    (sys:FOREIGN_CALL "SCM_DISPLAY" n (port-fd port)))))
+
+(define write
+  (case-lambda
+   ((arg) (write arg (current-output-port)))
+   ((arg port)
+    (cond
+     ((null? arg) (display "()" port))
+     ((pair? arg)
+      (display "(" port)
+      (let loop ((arg arg))
+	(if (not (pair? arg)) (begin (display ". " port) (write arg port))
+	    (begin (write (car arg) port) 
+		   (if (not (null? (cdr arg)))
+		       (begin
+			 (display " " port)
+			 (loop (cdr arg)))))))
+      (display ")" port))
+     ((vector? arg)
+      (display "#" port)
+      (write (vector->list arg) port))
+     ((char? arg)
+      (cond
+       ((char=? #\newline arg) (display "#\\newline" port))
+       ((char=? #\tab arg) (display "#\\tab" port))
+       ((char=? #\space arg) (display "#\\space" port))
+       ((char=? #\return arg) (display "#\\return" port))
+       (else (display "#\\" port) (display arg port))))
+     ((string? arg)
+      (display "\"" port) 
+      (for-each 
+       (lambda (chr) 
+	 (cond
+	  ((char=? #\" chr) (display "\\\"" port))
+	  ((char=? #\\ chr) (display "\\\\" port))
+	  (else (display chr port))))
+       (string->list arg))
+      (display "\"" port))
+     (else 
+      (display arg port))))))
+
 (define (zero? x)
   (= x 0))
-(define (newline)
-  (display "\n"))
+(define newline
+  (case-lambda
+   (() (display "\n"))
+   ((port) (display "\n" port))))
 (define (length x)
   (let loop ((n 0) (x x))
     (if (null? x)
@@ -298,6 +344,14 @@
        (apply proc (map (lambda (x) (vector-ref x i)) vecs))))))
 
 ;; strings
+(define (string-map proc . strs)
+  (let* ((len (apply min (map string-length strs)))
+	 (str (make-string len)))
+    (do ((i 0 (+ i 1)))
+	((= i len) str)
+      (string-set!
+       str i
+       (apply proc (map (lambda (x) (string-ref x i)) strs))))))
 (define (string-length n) (sys:FOREIGN_CALL "SCM_STRING_LENGTH" n))
 (define make-string
   (case-lambda
@@ -868,12 +922,6 @@
 (define (round d)
   (sys:FOREIGN_CALL "SCM_ROUND" (inexact d)))
 
-(define (flush-output-port x ) 1)
-(define (current-output-port ) 1)
-(define (open-input-file f) 0)
-
-;;;;;;;;;
-
 ;;;;;;;;;;;;;;;;;;; number->string
 (define number->string
   (case-lambda
@@ -919,7 +967,116 @@
 (include "str2num.scm")
 
 ;;;;;;;;;;;;; IO
-(define (call-with-input-file a) (error "call-with-input-file"))
-(define (call-with-output-file a) (error "call-with-output-file"))
+(define-record-type port (make-port input fold-case fd pos len buf fillflush) port?
+		    (input input-port?)
+		    (fold-case port-fold-case)
+		    (fd port-fd port-fd-set!)
+		    (pos port-pos port-pos-set!)
+		    (len port-len port-len-set!)
+		    (buf port-buf)
+		    (fillflush port-fillflush))
+
+(define (output-port? p)
+  (not (input-port? p)))
+
+(define (port-fd-fill port)
+  (unless (port-fd port) (error "ERROR port fill"))
+  (when (< (port-pos port) (port-len port)) (error "Invalid port fill:" (port-pos port) " " (port-len port)))
+  (port-pos-set! port 0)
+  (port-len-set! port
+		 (sys:FOREIGN_CALL "SCM_READ_FD" (port-fd port)
+				   (port-buf port))))
+(define (port-fd-flush port)
+  (unless (port-fd port) (error "ERROR port flush"))
+  (sys:FOREIGN_CALL "SCM_WRITE_FD" (port-fd port) (port-pos port) (port-buf port))
+  (port-pos-set! port 0))
+
+(define (flush-output-port port)
+  ((port-fillflush port) port))
+
+(define port-buffer-size 512)
+
+(define *current-input-port* (make-port #t #f 0 0 0 (make-string port-buffer-size) port-fd-fill))
+(define (current-input-port) *current-input-port*)
+(define *current-output-port* (make-port #f #f 1 0 port-buffer-size (make-string port-buffer-size) port-fd-flush))
+(define (current-output-port) *current-output-port*)
+(define *current-error-port* (make-port #t #f 2 0 0 (make-string port-buffer-size) port-fd-fill))
+(define (current-error-port) *current-error-port*)
+
+(define (open-input-file file)
+  (let ((fd (sys:FOREIGN_CALL "SCM_OPEN_FD" file #t)))
+    (when (< fd 0) (error "open-input-file error:" file))
+    (make-port #t #f fd 0 0 (make-string port-buffer-size) port-fd-fill)))
+(define (open-output-file file)
+  (let ((fd (sys:FOREIGN_CALL "SCM_OPEN_FD" file #f)))
+    (when (< fd 0) (error "open-output-file error:" file))
+    (make-port #f #f fd 0 port-buffer-size (make-string port-buffer-size) port-fd-flush)))
+
+(define (close-input-port p)
+  (close-port p))
+(define (close-output-port p)
+  (close-port p))
+(define (close-port p)
+  (when (port-fd p)
+    (unless (= 0 (sys:FOREIGN_CALL "SCM_CLOSE_FD" (port-fd p)))
+      (error "Close port: error closing fd " (port-fd p))))
+  (port-fd-set! p #f))
+
+(define (call-with-input-file file l)
+  (let* ((p (open-input-file file))
+	 (res (l p)))
+    (close-input-port p)
+    res))
+
+(define (call-with-output-file file l)
+  (let* ((p (open-output-file file))
+	 (res (l p)))
+    (close-output-port p)
+    res))
+
+(define-record-type eof-object (make-eof-object) eof-object?)
+
+(define peek-char
+  (case-lambda
+   (() (peek-char (current-input-port)))
+   ((port)
+    (if (< (port-pos port) (port-len port))
+	(string-ref (port-buf port) (port-pos port))
+	(begin
+	  ((port-fillflush port) port)
+	  (if (< (port-pos port) (port-len port))
+	      (peek-char port)
+	      (make-eof-object)))))))
+
+(define read-char
+  (case-lambda
+   (() (read-char (current-input-port)))
+   ((port)
+    (if (< (port-pos port) (port-len port))
+	(let ((res (string-ref (port-buf port) (port-pos port))))
+	  (port-pos-set! port (+ 1 (port-pos port)))
+	  res)
+	(begin
+	  ((port-fillflush port) port)
+	  (if (< (port-pos port) (port-len port))
+	      (read-char port)
+	      (make-eof-object)))))))
+
+(include "read.scm")
+
+(define write-char
+  (case-lambda
+   ((ch) (write-char ch (current-output-port)))
+   ((ch port)
+    (when (>= (port-pos port) (port-len port))
+      ((port-fillflush port) port))
+    (string-set! (port-buf port) (port-pos port) ch)
+    (port-pos-set! port (+ 1 (port-pos port)))
+    (when (eq? #\newline ch)
+      ((port-fillflush port) port)))))
+
+;;;;;;; equals?, hash tables.
+
 (include "hashtable.scm")
 (include "equal.scm")
+
