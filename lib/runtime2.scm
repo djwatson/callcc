@@ -357,7 +357,7 @@
   (case-lambda
    ((n) (sys:FOREIGN_CALL "SCM_MAKE_STRING" n #f))
    ((n fill) (sys:FOREIGN_CALL "SCM_MAKE_STRING" n fill))))
-(define (str-copy tostr tostart fromstr fromstart fromend)
+(define (string-copy! tostr tostart fromstr fromstart fromend)
   (let loop ((frompos fromstart) (topos tostart))
     (if (< frompos fromend)
 	(begin
@@ -367,8 +367,8 @@
   (let* ((lena (string-length a))
 	 (lenb (string-length b))
 	 (newstr (make-string (+ lena lenb))))
-    (str-copy newstr 0 a 0 lena)
-    (str-copy newstr lena b 0 lenb)
+    (string-copy! newstr 0 a 0 lena)
+    (string-copy! newstr lena b 0 lenb)
     newstr))
 
 (define string-append
@@ -384,7 +384,7 @@
 	(if (not (null? strs))
 	    (let* ((cur_str (car strs))
  		   (cur_len (string-length cur_str)))
-	      (str-copy newstr place (car strs) 0 cur_len)
+	      (string-copy! newstr place (car strs) 0 cur_len)
 	      (loop (cdr strs) (+ place cur_len)))))
       newstr))))
 
@@ -818,7 +818,7 @@
    ((string start end) (substring string start end))))
 (define (substring s start end)
   (let ((new (make-string (- end start))))
-    (str-copy new 0 s start end)
+    (string-copy! new 0 s start end)
     new))
 ;;;;;;;
 (define (symbol->string a) (sys:FOREIGN_CALL "SCM_SYMBOL_STRING" a))
@@ -973,7 +973,7 @@
 		    (fd port-fd port-fd-set!)
 		    (pos port-pos port-pos-set!)
 		    (len port-len port-len-set!)
-		    (buf port-buf)
+		    (buf port-buf port-buf-set!)
 		    (fillflush port-fillflush))
 
 (define (output-port? p)
@@ -990,6 +990,13 @@
   (unless (port-fd port) (error "ERROR port flush"))
   (sys:FOREIGN_CALL "SCM_WRITE_FD" (port-fd port) (port-pos port) (port-buf port))
   (port-pos-set! port 0))
+
+(define (port-string-flush port)
+  (when (= (port-pos port) (string-length (port-buf port)))
+    (let* ((buf (port-buf port))
+	   (new-buf (make-string (* 2 (string-length buf)))))
+      (string-copy! new-buf 0 buf 0 (port-pos port))
+      (port-buf-set! port new-buf))))
 
 (define (flush-output-port port)
   ((port-fillflush port) port))
@@ -1011,6 +1018,10 @@
   (let ((fd (sys:FOREIGN_CALL "SCM_OPEN_FD" file #f)))
     (when (< fd 0) (error "open-output-file error:" file))
     (make-port #f #f fd 0 port-buffer-size (make-string port-buffer-size) port-fd-flush)))
+(define (open-output-string)
+  (make-port #f #f #f 0 port-buffer-size (make-string port-buffer-size) port-string-flush))
+(define (get-output-string port)
+  (substring (port-buf port) 0 (port-pos port)))
 
 (define (close-input-port p)
   (close-port p))
@@ -1077,6 +1088,34 @@
 
 (define (file-exists? name)
   (sys:FOREIGN_CALL "SCM_FILE_EXISTS" name))
+
+(define (delete-file name)
+  (sys:FOREIGN_CALL "SCM_FILE_EXISTS" name))
+
+(define read-line
+  (case-lambda
+    (() (read-line (current-input-port)))
+    ((port)
+     (let ((p (open-output-string)))
+       (let loop ((c (read-char port)))
+	 (if (or (eof-object? c) (eq? #\newline c))
+	     (let ((res (get-output-string p)))
+	       (if (and (eof-object? c) (eqv? (string-length res) 0))
+		   c
+		   res))
+	     (begin
+	       (write-char c p)
+	       (loop (read-char port)))))))))
+
+(define write-string
+  (case-lambda
+    ((str) (write-string str (current-output-port)))
+    ((str port start) (write-string (substring str start (string-length str)) port))
+    ((str port start end) (write-string (substring str start end) port))
+    ((str port)
+     (do ((i 0 (+ i 1)))
+	 ((= i  (string-length str)))
+       (write-char (string-ref str i) port)))))
 
 ;;;;;;; equals?, hash tables.
 

@@ -1298,3 +1298,12 @@ INLINE gc_obj SCM_FILE_EXISTS(gc_obj scmname) {
   }
   return FALSE_REP;
 }
+
+INLINE gc_obj SCM_DELETE_FILE(gc_obj scmname) {
+  auto str = to_string(scmname);
+  char name[256];
+  memcpy(name, str->str, to_fixnum(str->len));
+  assert(to_fixnum(str->len) < 255);
+  name[to_fixnum(str->len)] = '\0';
+  return tag_fixnum(unlink(name));
+}

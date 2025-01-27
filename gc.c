@@ -243,7 +243,7 @@ static void merge_and_free_slab(slab_info* slab) {
   // TODO: actual merge.
   auto page_class = sz_to_page_class(slab->end - slab->start);
   //printf("Page class %i sz class %i\n", page_class, slab->class);
-  if (page_class > page_classes) {
+  if (page_class >= page_classes) {
     // Direct free
     //printf("Freeing huge %i\n", slab->class*8);
     free(slab->start);
