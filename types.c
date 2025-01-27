@@ -1238,6 +1238,15 @@ INLINE gc_obj SCM_STRING_HASH(gc_obj h) {
   auto hash = XXH3_64bits(str->str, to_fixnum(str->len));
   return tag_fixnum((int)hash);
 }
+INLINE gc_obj SCM_STRING_CPY(gc_obj tostr, gc_obj tostart, gc_obj fromstr, gc_obj fromstart, gc_obj fromend) {
+  auto from_pos = to_fixnum(fromstart);
+  auto len = to_fixnum(fromend) - from_pos;
+  auto start = to_fixnum(tostart);
+  auto to = to_string(tostr);
+  auto from = to_string(fromstr);
+  memcpy(&to->str[start], &from->str[from_pos], len);
+  return UNDEFINED;
+}
 INLINE gc_obj SCM_AND(gc_obj num, gc_obj mask) {
   return (gc_obj){.value = num.value & mask.value};
 }

@@ -367,8 +367,10 @@
   (let* ((lena (string-length a))
 	 (lenb (string-length b))
 	 (newstr (make-string (+ lena lenb))))
-    (string-copy! newstr 0 a 0 lena)
-    (string-copy! newstr lena b 0 lenb)
+    (sys:FOREIGN_CALL "SCM_STRING_CPY" newstr 0 a 0 lena)
+    (sys:FOREIGN_CALL "SCM_STRING_CPY" newstr lena b 0 lenb)
+    ;; (string-copy! newstr 0 a 0 lena)
+    ;; (string-copy! newstr lena b 0 lenb)
     newstr))
 
 (define string-append
