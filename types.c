@@ -1228,14 +1228,37 @@ INLINE gc_obj SCM_READ_SHADOW_STACK(uint64_t pos) {
   return shadow_stack[pos];
 }
 
-#include <nmmintrin.h>
-INLINE gc_obj SCM_EQ_HASH(gc_obj h) {
-  return tag_fixnum(_mm_crc32_u32(0, h.value >> 3));
+static uint64_t hashmix( uint64_t key ){
+  key += (key << 10);
+  key ^= (key >> 6);
+  return key;
 }
-#include <xxhash.h>
+INLINE gc_obj SCM_EQ_HASH(gc_obj h) {
+  return (gc_obj){.value=(long)hashmix(h.value)<<3};
+}
+static uint64_t stringhash(char* str, uint64_t len) {
+  uint64_t hash = 401887359;
+  uint64_t* strp = (void*)str;
+  while (len > 8) {
+    hash += *strp;
+    hash = hashmix(hash);
+    len -= 8;
+    strp++;
+    str+= 8;
+  }
+  while(len > 0) {
+    hash += *str;
+    hash = hashmix(hash);
+    len -= 1;
+    str+= 1;
+  }
+  return hash;
+}
+
 INLINE gc_obj SCM_STRING_HASH(gc_obj h) {
   auto str = to_string(h);
-  auto hash = XXH3_64bits(str->str, to_fixnum(str->len));
+  auto hash = stringhash(str->str, to_fixnum(str->len));
+  //auto hash = XXH3_64bits(str->str, to_fixnum(str->len));
   return tag_fixnum((int)hash);
 }
 INLINE gc_obj SCM_STRING_CPY(gc_obj tostr, gc_obj tostart, gc_obj fromstr, gc_obj fromstart, gc_obj fromend) {

@@ -2,17 +2,17 @@
   * GC needs defrag/generational: graphs, earley, gcbench
   * also needs inliner to remove alloc: graphs
   
-  * need input/output: wc tail sum1 slatex read1 ray parsing dynamic cat scheme
-  
   * complex: mbrotZ
   
   * stack size check: earley, divrec
 
   * exact-integer-sqrt: pi
   * bignums: pi chudnovsky
-  
-* faster symbol table using hashtable
 
+* debug info in llvm: would help perf record --call-graph=dwarf
+* auto-listify globals: consargs stub in compiler called a lot: 
+  * vector. Hand-coded in chez
+  
 * cpstak:
   * argcnt needs a register, ugh.  Too slow otherwise.
 
@@ -24,9 +24,9 @@
 * figure out strategy for intrinsics????
 * cleanup runtime
 * inliner?? graphs is slow without
+  * can be simple called-once??? check graphs
 
 * self-compile
-* outpout/input buffering
 * gc fd's.
 * gset check
 * bignums, compnums, ratnums
