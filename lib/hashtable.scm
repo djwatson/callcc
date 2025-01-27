@@ -1,22 +1,29 @@
 ;; Simple EQ hash tables, open addressing, linear probing.
 
-(define-record-type hash-table (%make-hash-table size maxsize entries) hash-table?
+(define-record-type hash-table (%make-hash-table hash cmp size maxsize entries) hash-table?
+		    (hash hash-table-hash)
+		    (cmp hash-table-cmp)
 		    (size hash-table-size hash-table-size-set!)
 		    (maxsize hash-table-maxsize hash-table-maxsize-set!)
 		    (entries hash-table-entries hash-table-entries-set!))
 
-(define (make-hash-table hash) (%make-hash-table 0 1638 (make-vector 2048 #f)))
+(define make-hash-table
+  (case-lambda
+   (() (%make-hash-table eqhash eq? 0 1638 (make-vector 2048 #f)))
+   ((hash cmp) (%make-hash-table hash cmp 0 1638 (make-vector 2048 #f)))))
 (define (hash-modulo h len) (sys:FOREIGN_CALL "SCM_AND" h (- len 1)))
 (define (hash-table-ref/default ht key default)
   (let* ((size (hash-table-size ht))
 	 (table (hash-table-entries ht))
 	 (len (vector-length table))
-	 (idx (hash-modulo (eqhash key) len)))
+	 (hash (hash-table-hash ht))
+	 (cmp (hash-table-cmp ht))
+	 (idx (hash-modulo (hash key) len)))
     (let loop ((idx idx))
       (let ((cur (vector-ref table idx)))
 	(cond
 	 ((not cur) default)
-	 ((eq? (car cur) key) (cdr cur))
+	 ((cmp (car cur) key) (cdr cur))
 	 (else (loop (hash-modulo (+ idx 1) len))))))))
 (define (hash-table-grow ht)
   (let ((old-entries (hash-table-entries ht)))
@@ -28,6 +35,7 @@
 	(when cur
 	  (hash-table-set! ht (car cur) (cdr cur)))))))
 (define (eqhash x) (sys:FOREIGN_CALL "SCM_EQ_HASH" x))
+(define (string-hash x) (sys:FOREIGN_CALL "SCM_STRING_HASH" x))
 (define (hash-table-set! ht key value)
   (let* ((size (hash-table-size ht))
 	 (entries (hash-table-entries ht))
@@ -37,14 +45,16 @@
   (let* ((size (hash-table-size ht))
 	 (table (hash-table-entries ht))
 	 (len (vector-length table))
-	 (idx (hash-modulo (eqhash key) len)))
+	 (hash (hash-table-hash ht))
+	 (cmp (hash-table-cmp ht))
+	 (idx (hash-modulo (hash key) len)))
     (let loop ((idx idx))
       (let ((cur (vector-ref table idx)))
 	(cond
 	 ((not cur)
 	  (vector-set! table idx (cons key value))
 	  (hash-table-size-set! ht (+ 1 (hash-table-size ht))))
-	 ((eq? (car cur) key) (vector-set! table idx (cons key value)))
+	 ((cmp (car cur) key) (vector-set! table idx (cons key value)))
 	 (else (loop (hash-modulo (+ idx 1) len))))))))
 
 

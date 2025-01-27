@@ -1232,6 +1232,12 @@ INLINE gc_obj SCM_READ_SHADOW_STACK(uint64_t pos) {
 INLINE gc_obj SCM_EQ_HASH(gc_obj h) {
   return tag_fixnum(_mm_crc32_u32(0, h.value >> 3));
 }
+#include <xxhash.h>
+INLINE gc_obj SCM_STRING_HASH(gc_obj h) {
+  auto str = to_string(h);
+  auto hash = XXH3_64bits(str->str, to_fixnum(str->len));
+  return tag_fixnum((int)hash);
+}
 INLINE gc_obj SCM_AND(gc_obj num, gc_obj mask) {
   return (gc_obj){.value = num.value & mask.value};
 }

@@ -30,7 +30,7 @@
 (define (interleave? x y k)
   (let ((ht #f))
     (define (call-union-find x y)
-      (unless ht (set! ht (make-hash-table eq?)))
+      (unless ht (set! ht (make-hash-table)))
       (union-find ht x y))
     (define (e? x y k)
       (if (<= k 0)

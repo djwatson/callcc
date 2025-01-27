@@ -820,20 +820,6 @@
   (let ((new (make-string (- end start))))
     (string-copy! new 0 s start end)
     new))
-;;;;;;;
-(define (symbol->string a) (sys:FOREIGN_CALL "SCM_SYMBOL_STRING" a))
-(define scm-symbol-table '())
-(define (string->symbol str)
-  (when (null? scm-symbol-table)
-    (let ((table (sys:FOREIGN_CALL "SCM_GET_SYM_TABLE")))
-      (set! scm-symbol-table (map (lambda (x) (cons (symbol->string x) x)) (vector->list table)))))
-  (cond
-   ((assoc str scm-symbol-table) => cdr)
-   (else (let* ((strcopy (string-copy str))
-		(new-sym (sys:FOREIGN_CALL "SCM_MAKE_SYMBOL" strcopy)))
-	   (set! scm-symbol-table (cons (cons strcopy new-sym) scm-symbol-table))
-	   new-sym))))
-
 ;;;;;; Records
 (define (record-set! record index value)
   ;(unless (record? record) (error "record-set!: not a record" record))
@@ -1121,4 +1107,19 @@
 
 (include "hashtable.scm")
 (include "equal.scm")
+
+;;;;;;; Symbols
+(define (symbol->string a) (sys:FOREIGN_CALL "SCM_SYMBOL_STRING" a))
+(define scm-symbol-table '())
+(define (string->symbol str)
+  (when (null? scm-symbol-table)
+    (set! scm-symbol-table (make-hash-table string-hash equal?))
+    (let ((table (sys:FOREIGN_CALL "SCM_GET_SYM_TABLE")))
+      (for-each (lambda (x) (hash-table-set! scm-symbol-table (symbol->string x) x)) (vector->list table))))
+  (cond
+   ((hash-table-ref/default scm-symbol-table str #f))
+   (else (let* ((strcopy (string-copy str))
+		(new-sym (sys:FOREIGN_CALL "SCM_MAKE_SYMBOL" strcopy)))
+	   (hash-table-set! scm-symbol-table strcopy new-sym)
+	   new-sym))))
 
