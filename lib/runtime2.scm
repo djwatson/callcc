@@ -1127,6 +1127,15 @@
 	 ((= i  (string-length str)))
        (write-char (string-ref str i) port)))))
 
+(define (with-input-from-file file thunk)
+  (let ((p (open-input-file file))
+	(old-port *current-input-port*))
+    (set! *current-input-port* p)
+    (let ((res (thunk)))
+      (close-input-port p)
+      (set! *current-input-port* old-port)
+      res)))
+
 ;;;;;;; equals?, hash tables.
 
 (include "hashtable.scm")
