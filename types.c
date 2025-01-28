@@ -823,16 +823,44 @@ INLINE gc_obj SCM_MAKE_VECTOR(gc_obj obj) {
 }
 
 INLINE gc_obj SCM_VECTOR_LENGTH(gc_obj vec) {
+  if (unlikely(!is_vector(vec))) {
+    abort();
+  }
   return to_vector(vec)->len;
 }
 
 INLINE gc_obj SCM_VECTOR_REF(gc_obj vec, gc_obj idx) {
-  return to_vector(vec)->v[to_fixnum(idx)];
+  if (unlikely(!is_fixnum(idx))) {
+    abort();
+  }
+  if (unlikely(!is_vector(vec))) {
+    abort();
+  }
+  auto v = to_vector(vec);
+  auto i = to_fixnum(idx);
+  if (unlikely(i >= to_fixnum(v->len))) {
+    abort();
+  }
+  
+  return v->v[i];
 }
 
 INLINE gc_obj SCM_VECTOR_SET(gc_obj vec, gc_obj idx, gc_obj val) {
   // TODO gclog
-  to_vector(vec)->v[to_fixnum(idx)] = val;
+  if (unlikely(!is_fixnum(idx))) {
+    abort();
+  }
+  if (unlikely(!is_vector(vec))) {
+    abort();
+  }
+  auto v = to_vector(vec);
+  auto i = to_fixnum(idx);
+  if (unlikely(i >= to_fixnum(v->len))) {
+    abort();
+  }
+  
+  v->v[i] = val;
+
   return UNDEFINED;
 }
 

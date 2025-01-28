@@ -842,7 +842,8 @@
    ((string start end) (substring string start end))))
 (define (substring s start end)
   (let ((new (make-string (- end start))))
-    (string-copy! new 0 s start end)
+    (sys:FOREIGN_CALL "SCM_STRING_CPY" new 0 s start end)
+    ;(string-copy! new 0 s start end)
     new))
 ;;;;;; Records
 (define (record-set! record index value)
