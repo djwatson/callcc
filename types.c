@@ -371,7 +371,7 @@ INLINE gc_obj SCM_LOAD_GLOBAL(gc_obj a) {
 }
 
 INLINE void SCM_SET_GLOBAL(gc_obj a, gc_obj b) {
-  // TODO gclog
+  // TODO gclog check if static, if not, quick set
   auto sym = to_symbol(a);
   sym->val = b;
 }
@@ -772,7 +772,7 @@ INLINE gc_obj SCM_CDR(gc_obj obj) {
 }
 
 INLINE gc_obj SCM_SETCAR(gc_obj obj, gc_obj val) {
-  // TODO gclog
+  // TODO gclog fast
   if (!is_cons(obj)) {
     abort();
   }
@@ -781,7 +781,7 @@ INLINE gc_obj SCM_SETCAR(gc_obj obj, gc_obj val) {
 }
 
 INLINE gc_obj SCM_SETCDR(gc_obj obj, gc_obj val) {
-  // TODO gclog
+  // TODO gclog fast
   if (!is_cons(obj)) {
     abort();
   }
@@ -846,7 +846,6 @@ INLINE gc_obj SCM_VECTOR_REF(gc_obj vec, gc_obj idx) {
 }
 
 INLINE gc_obj SCM_VECTOR_SET(gc_obj vec, gc_obj idx, gc_obj val) {
-  // TODO gclog
   if (unlikely(!is_fixnum(idx))) {
     abort();
   }
@@ -858,14 +857,19 @@ INLINE gc_obj SCM_VECTOR_SET(gc_obj vec, gc_obj idx, gc_obj val) {
   if (unlikely(i >= to_fixnum(v->len))) {
     abort();
   }
-  
   v->v[i] = val;
+  // TODO gclog need to check if large
+  /* if (!gc_is_small(sizeof(vector_s) + (to_fixnum(v->len)*sizeof(gc_obj)))) { */
+  /* } else { */
+  /* } */
+  
 
   return UNDEFINED;
 }
 
 INLINE gc_obj SCM_CLOSURE(gc_obj p, uint64_t len) {
   //  printf("make closure %li\n", len);
+  assert(gc_is_small(sizeof(closure_s) + ((len+1)*sizeof(gc_obj))));
   closure_s* clo = rcimmix_alloc(sizeof(closure_s) + (len+1) * sizeof(gc_obj));
   clo->type = CLOSURE_TAG;
   clo->v[0] = p;
@@ -874,7 +878,7 @@ INLINE gc_obj SCM_CLOSURE(gc_obj p, uint64_t len) {
 
 INLINE void SCM_CLOSURE_SET(gc_obj clo, gc_obj obj, uint64_t i) {
   //    printf("Closure set %li\n", i);
-  // TODO gclog
+  // TODO gclog fast
   to_closure(clo)->v[i + 1] = obj;
 }
 
@@ -1156,7 +1160,8 @@ INLINE gc_obj SCM_INEXACT(gc_obj fix) {
 }
 ////// records
 INLINE gc_obj SCM_MAKE_RECORD(gc_obj sz) {
-  record_s* r = rcimmix_alloc(sizeof(record_s) + to_fixnum(sz)*sizeof(gc_obj));
+  assert(gc_is_small(sizeof(record_s) + (to_fixnum(sz)*sizeof(gc_obj))));
+  record_s* r = rcimmix_alloc(sizeof(record_s) + (to_fixnum(sz)*sizeof(gc_obj)));
   r->type = RECORD_TAG;
   
   return tag_ptr(r);
@@ -1167,7 +1172,7 @@ INLINE gc_obj SCM_RECORD_REF(gc_obj r, gc_obj idx) {
 }
 
 INLINE gc_obj SCM_RECORD_SET(gc_obj r, gc_obj idx, gc_obj val) {
-  // TODO gclog
+  // TODO gclog fast
   to_record(r)->v[to_fixnum(idx)] = val;
   return UNDEFINED;
 }

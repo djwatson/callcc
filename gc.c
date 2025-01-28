@@ -430,3 +430,8 @@ void *rcimmix_alloc(uint64_t sz) {
   fl->start_ptr = start;
   return (void *)s;
 }
+
+bool gc_is_small(uint64_t sz) {
+  uint64_t sz_class = sz / 8;
+  return likely(sz_class < size_classes);
+}

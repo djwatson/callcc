@@ -521,6 +521,7 @@ attributes #0 = { returns_twice}
 	 (prog (expand-program input "PROG-" libman))
 	 (lowered (r7-pass `(begin  	,@runtime
 					,@prog
+					0 ;; return value.
 					) #f))
 	 (main-fun (make-fun "main")))
     (when verbose
