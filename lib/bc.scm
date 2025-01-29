@@ -287,7 +287,7 @@
 			  id label (length args)))
        
        (for (arg i) (args (iota (length args)))
-	    (push-instr! fun (format "call void @SCM_CLOSURE_SET(i64 %v~a, i64 ~a, i64 ~a)"
+	    (push-instr! fun (format "call void @SCM_CLOSURE_SET_FAST(i64 %v~a, i64 ~a, i64 ~a)"
 				     id arg i)))
        (format "%v~a" id)))
     ((const-closure (label ,label))
@@ -445,6 +445,7 @@ declare i64 @SCM_CLOSURE (i64, i64)
 declare i64 @SCM_CLOSURE_GET (i64, i64)
 declare i64 @SCM_ARGCNT_FAIL ()
 declare void @SCM_CLOSURE_SET (i64, i64, i64)
+declare void @SCM_CLOSURE_SET_FAST (i64, i64, i64)
 declare i64 @SCM_LOAD_GLOBAL(i64)
 declare void @SCM_SET_GLOBAL(i64, i64)
 declare ptr @SCM_LOAD_CLOSURE_PTR(i64)

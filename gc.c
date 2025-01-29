@@ -256,19 +256,25 @@ static void merge_and_free_slab(slab_info* slab) {
   kv_push(pages_free[page_class], slab);
 }
 
-static int collect_big = 0;
+static uint64_t collect_big = 0;
+static uint64_t next_collect_big  = 50000000*4;
 __attribute__((noinline, preserve_none)) static void rcimmix_collect() {
   struct timespec start;
   struct timespec end;
   clock_gettime(CLOCK_MONOTONIC, &start);
-  totsize = 0;
   bool collect_full = false;
 
-  if (collect_big++ == 4) {
-    collect_big = 0;
+  collect_big += next_collect;
+  if (collect_big >= next_collect_big) {
     collect_full = true;
+    collect_big = 0;
   }
-  //collect_full = true;
+  /* if (collect_big++ == 2) { */
+  /*   collect_big = 0; */
+  /*   collect_full = true; */
+  /* } */
+
+  /* collect_full = true; */
 
   // Init mark stack
   kv_init(markstack);
@@ -279,10 +285,13 @@ __attribute__((noinline, preserve_none)) static void rcimmix_collect() {
     slab_info *slab = container_of(itr, slab_info, link);
 
     if (collect_full) {
+      totsize = 0;
       memset(slab->markbits, 0, sizeof(slab->markbits));
       slab->marked = 0;
-      uint64_t* logbits = (uint64_t*)(slab->start - mark_byte_cnt);
-      memset(logbits, 0, mark_byte_cnt);
+      if (slab->class < size_classes) {
+	uint64_t* logbits = (uint64_t*)(slab->start - mark_byte_cnt);
+	memset(logbits, 0, mark_byte_cnt);
+      }
     }  else {
 
       // Remembered set analysis for sticky mark-bit sweeping
@@ -313,15 +322,13 @@ __attribute__((noinline, preserve_none)) static void rcimmix_collect() {
 	// Reset remembered set.
 	memset(logbits, 0, mark_byte_cnt);
       } else {
-
+	printf("MARKLARGE\n");
 	// Large objects use a single bit, bit 0 in markbits
 	if (bt(slab->markbits, 1)) {
 	  kv_push(markstack,
 		  ((range){(uint64_t*)slab->start,
 			   (uint64_t*)(slab->start + slab->class * 8)}));
-	  printf("MARKLARGE\n");
 	  // Reset markbit.
-	  slab->markbits[0] = 0;
 	  btr(slab->markbits, 1);
 	}
       }
@@ -389,8 +396,15 @@ __attribute__((noinline, preserve_none)) static void rcimmix_collect() {
   }
   uint64_t live_bytes = total_bytes - freed_bytes;
 
-  if (next_collect < totsize) {
-    next_collect = totsize;
+  // TODO: ideally we would have a running statistic
+  // how many bytes we *expect* to be freed by a full collect vs.
+  // a minor collection.
+  //
+  // earley is highly fragmented, but full GC's don't help.
+  // paraffins needs lots of full GC's.
+  if (collect_full && (next_collect_big < totsize*2)) {
+    next_collect_big = totsize*2;
+    next_collect = next_collect_big/4;
   }
 
   kv_destroy(markstack);
@@ -403,7 +417,7 @@ __attribute__((noinline, preserve_none)) static void rcimmix_collect() {
       ((double)end.tv_nsec - (double)start.tv_nsec) / 1000000.0; // ns to ms
   printf(
 	 "COLLECT %.3f ms, full %i, %li total %li, free%% %f, next_collect %li, totsize %li rembytes %li, frag %% %f\n",
-	 time_taken, collect_full, totsize, total_bytes, 100.0 * (double)freed_bytes / (double)total_bytes, next_collect,
+	 time_taken, collect_full, totsize, total_bytes, 100.0 * (double)freed_bytes / (double)total_bytes, next_collect_big,
 	 totsize, rem_bytes,
 	 100.0 * (double) (rem_bytes - totsize) / (double)rem_bytes);
 }
@@ -517,6 +531,7 @@ NOINLINE void gc_log(uint64_t a) {
     uint64_t addr = a & (default_slab_size-1);
     bts(logbits,(addr / 8));
   } else {
-    bts(slab->markbits, 1);
+    // TODO: fix
+    btr(slab->markbits, 1);
   }
 }

@@ -374,7 +374,7 @@ INLINE void SCM_SET_GLOBAL(gc_obj a, gc_obj b) {
   auto sym = to_symbol(a);
   sym->val = b;
   // gclog check if static, if not, quick set
-  printf("log global\n");
+  //printf("log global\n");
   gc_log((uint64_t)&sym->val);
 }
 
@@ -779,7 +779,7 @@ INLINE gc_obj SCM_SETCAR(gc_obj obj, gc_obj val) {
   }
   auto c = to_cons(obj);
   c->a = val;
-  //printf("log setcar\n");
+  //  printf("log setcar\n");
   gc_log_fast((uint64_t)&c->a);
   return UNDEFINED;
 }
@@ -790,7 +790,7 @@ INLINE gc_obj SCM_SETCDR(gc_obj obj, gc_obj val) {
   }
   auto c = to_cons(obj);
   c->b = val;
-  printf("log setcdr\n");
+  //  printf("log setcdr\n");
   gc_log_fast((uint64_t)&c->b);
   return UNDEFINED;
 }
@@ -865,8 +865,8 @@ INLINE gc_obj SCM_VECTOR_SET(gc_obj vec, gc_obj idx, gc_obj val) {
   }
   v->v[i] = val;
 
-  // TODO gclog need to check if large
-  //printf("log vec\n");
+  /* // TODO gclog need to check if large */
+  /* //printf("log vec\n"); */
   if (!gc_is_small(sizeof(vector_s) + (to_fixnum(v->len)*sizeof(gc_obj)))) {
     gc_log((uint64_t)&v->v[i]);
   } else {
@@ -899,6 +899,13 @@ INLINE void SCM_CLOSURE_SET(gc_obj clo, gc_obj obj, uint64_t i) {
   c->v[i + 1] = obj;
   /* printf("log closure\n"); */
   gc_log_fast((uint64_t)&c->v[i+1]);
+}
+
+
+INLINE void SCM_CLOSURE_SET_FAST(gc_obj clo, gc_obj obj, uint64_t i) {
+  //    printf("Closure set %li\n", i);
+  auto c = to_closure(clo);
+  c->v[i + 1] = obj;
 }
 
 INLINE gc_obj SCM_CLOSURE_GET(gc_obj clo, gc_obj i) {
@@ -1194,7 +1201,7 @@ INLINE gc_obj SCM_RECORD_SET(gc_obj r, gc_obj idx, gc_obj val) {
   auto rec = to_record(r);
   auto i = to_fixnum(idx);
   rec->v[i] = val;
-  printf("log record\n");
+  //printf("log record\n");
   gc_log_fast((uint64_t)&rec->v[i]);
   return UNDEFINED;
 }
