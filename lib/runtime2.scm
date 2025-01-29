@@ -427,23 +427,23 @@
 (define (inexact x) (exact->inexact x))
 
 ;; List
-;; (define (append2 a b)
-;;   (let loop ((a a) (b b))
-;;     (if (null? a)
-;; 	b
-;; 	(cons (car a) (loop (cdr a) b)))))
 (define (append2 a b)
-  (if (null? a)
-      b
-      (let ((cell (cons (car a) '())))
-	(let loop ((a (cdr a)) (b b) (head cell) (tail cell))
-	  (if (null? a)
-	      (begin
-		(set-cdr! tail b)
-		head)
-	      (let ((cell (cons (car a) '())))
-		(set-cdr! tail cell)
-		(loop (cdr a) b head cell)))))))
+  (let loop ((a a) (b b))
+    (if (null? a)
+	b
+	(cons (car a) (loop (cdr a) b)))))
+;; (define (append2 a b)
+;;   (if (null? a)
+;;       b
+;;       (let ((cell (cons (car a) '())))
+;; 	(let loop ((a (cdr a)) (b b) (head cell) (tail cell))
+;; 	  (if (null? a)
+;; 	      (begin
+;; 		(set-cdr! tail b)
+;; 		head)
+;; 	      (let ((cell (cons (car a) '())))
+;; 		(set-cdr! tail cell)
+;; 		(loop (cdr a) b head cell)))))))
 
 (define append
   (case-lambda

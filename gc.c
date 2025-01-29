@@ -20,10 +20,10 @@
 #define INLINE __attribute__((always_inline))
 
 static constexpr uint64_t size_classes = 4096 / 8;
-static constexpr uint64_t default_slab_size = 16384;
+static constexpr uint64_t PAGE_SIZE = 1UL << 12;
+static constexpr uint64_t default_slab_size = PAGE_SIZE*4;
 static uint64_t next_collect = 50000000;
 static uint64_t collect_cnt = 0;
-static uint64_t PAGE_SIZE = 1UL << 12;
 static alloc_table atable;
 
 static uint64_t *stacktop;
@@ -31,6 +31,7 @@ static uint64_t *stacktop;
 uint64_t *gc_get_stack_top() { return stacktop; }
 
 static constexpr uint64_t mark_word_cnt = (default_slab_size / 8) / 64;
+static constexpr uint64_t mark_byte_cnt = (default_slab_size / 8);
 
 typedef struct slab_info {
   uint32_t class;
@@ -255,26 +256,73 @@ static void merge_and_free_slab(slab_info* slab) {
   kv_push(pages_free[page_class], slab);
 }
 
+static int collect_big = 0;
 __attribute__((noinline, preserve_none)) static void rcimmix_collect() {
   struct timespec start;
   struct timespec end;
   clock_gettime(CLOCK_MONOTONIC, &start);
   totsize = 0;
+  bool collect_full = false;
+
+  if (collect_big++ == 3) {
+    collect_big = 0;
+    collect_full = true;
+  }
+
+  // Init mark stack
+  kv_init(markstack);
 
   // Clear marks
   list_head *itr;
   list_for_each (itr, &live_slabs) {
     slab_info *slab = container_of(itr, slab_info, link);
-      
-    memset(slab->markbits, 0, sizeof(slab->markbits));
-    slab->marked = 0;
+
+    if (collect_full) {
+      memset(slab->markbits, 0, sizeof(slab->markbits));
+      slab->marked = 0;
+      /* uint64_t* logbits = (uint64_t*)(slab->start - mark_byte_cnt); */
+      /* memset(logbits, 0, mark_byte_cnt); */
+    }  else {
+
+      // Remembered set analysis for sticky mark-bit sweeping
+      // (generational mark-sweep).
+      if (slab->class < size_classes) {
+	// Small classes use a logbits area at the start of the
+	// slab.
+	uint64_t* logbits = (uint64_t*)(slab->start - mark_byte_cnt);
+	auto objstart = slab->start;
+	uint64_t logcnt = 0;
+	while(objstart < slab->end) {
+	  auto addr = (uint64_t)objstart & (default_slab_size - 1);
+	  //printf("bit %li\n", (addr/8));
+	  if(bt(logbits, (addr/8))) {
+	    kv_push(markstack,
+		    ((range){(uint64_t*)objstart,
+			     (uint64_t*)(objstart +8)}));
+	    logcnt++;
+	  }
+	  objstart += 8;
+	}
+	/* printf("logcnt: %li\n", logcnt); */
+	// Reset remembered set.
+	memset(logbits, 0, mark_byte_cnt);
+      } else {
+	// Large objects use a single bit, bit 0 in markbits
+	if (bt(slab->markbits, 0)) {
+	  kv_push(markstack,
+		  ((range){(uint64_t*)slab->start,
+			   (uint64_t*)(slab->start + slab->class * 8)}));
+	  printf("MARKLARGE\n");
+	  // Reset markbit.
+	  btr(slab->markbits, 0);
+	}
+      }
+
+    }
   }
   for (uint64_t i = 0; i < size_classes; i++) {
     kv_clear(partials[i]);
   }
-
-  // Init mark stack
-  kv_init(markstack);
 
   // Mark C roots
   // TODO: unnecessary with conservative collection.
@@ -344,11 +392,11 @@ __attribute__((noinline, preserve_none)) static void rcimmix_collect() {
       ((double)end.tv_sec - (double)start.tv_sec) * 1000.0; // sec to ms
   time_taken +=
       ((double)end.tv_nsec - (double)start.tv_nsec) / 1000000.0; // ns to ms
-  /* printf( */
-  /* 	 "COLLECT %.3f ms, %li total %li, free%% %f, next_collect %li, totsize %li rembytes %li, frag %% %f\n", */
-  /* 	 time_taken, totsize, total_bytes, 100.0 * (double)freed_bytes / (double)total_bytes, next_collect, */
-  /* 	 totsize, rem_bytes, */
-  /* 	 100.0 * (double) (rem_bytes - totsize) / (double)rem_bytes); */
+  printf(
+	 "COLLECT %.3f ms, full %i, %li total %li, free%% %f, next_collect %li, totsize %li rembytes %li, frag %% %f\n",
+	 time_taken, collect_full, totsize, total_bytes, 100.0 * (double)freed_bytes / (double)total_bytes, next_collect,
+	 totsize, rem_bytes,
+	 100.0 * (double) (rem_bytes - totsize) / (double)rem_bytes);
 }
 
 static slab_info *alloc_slab(uint64_t sz_class) {
@@ -362,8 +410,6 @@ static slab_info *alloc_slab(uint64_t sz_class) {
     if (free) {
       //printf("Found free slab class %li %i %i\n", sz_class, free->class, page_class);
       free->class = sz_class;
-      alloc_table_set_range(&atable, free, free->start,
-                            free->end - free->start);
       list_add(&free->link, &live_slabs);
       return free;
     }
@@ -375,11 +421,12 @@ static slab_info *alloc_slab(uint64_t sz_class) {
   free->class = sz_class;
   init_list_head(&free->link);
 
-  posix_memalign((void **)&free->start, PAGE_SIZE, sz);
+  posix_memalign((void **)&free->start, default_slab_size, sz);
   free->end = free->start + sz;
   list_add(&free->link, &live_slabs);
 
   alloc_table_set_range(&atable, free, free->start, free->end - free->start);
+  free->start += mark_byte_cnt;
   return free;
 }
 
@@ -434,4 +481,30 @@ void *rcimmix_alloc(uint64_t sz) {
 bool gc_is_small(uint64_t sz) {
   uint64_t sz_class = sz / 8;
   return likely(sz_class < size_classes);
+}
+
+// Assumes a is a small allocation.
+void gc_log_fast(uint64_t a) {
+  slab_info* slab;
+  assert(alloc_table_lookup(&atable, (void*)a, (void**)&slab));
+  uint64_t* logbits = (uint64_t*)(a & ~(default_slab_size-1));
+
+  uint64_t addr = a & (default_slab_size-1);
+  bts(logbits,(addr / 8) ); 
+}
+
+NOINLINE void gc_log(uint64_t a) {
+  slab_info* slab;
+  if (!alloc_table_lookup(&atable, (void*)a, (void**)&slab)) {
+    // It's in the static data section (probably).
+    return;
+  }
+  
+  if (likely(slab->class < size_classes)) {
+    uint64_t* logbits = (uint64_t*)(a & ~(default_slab_size-1));
+    uint64_t addr = a & (default_slab_size-1);
+    bts(logbits,(addr / 8) / 64);
+  } else {
+    bts(slab->markbits, 0);
+  }
 }
