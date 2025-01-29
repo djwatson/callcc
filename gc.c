@@ -257,22 +257,22 @@ static void merge_and_free_slab(slab_info* slab) {
 }
 
 static uint64_t collect_big = 0;
-static uint64_t next_collect_big  = 50000000*4;
+static bool next_force_full = false;
 __attribute__((noinline, preserve_none)) static void rcimmix_collect() {
   struct timespec start;
   struct timespec end;
   clock_gettime(CLOCK_MONOTONIC, &start);
-  bool collect_full = false;
+  bool collect_full = next_force_full;
 
-  collect_big += next_collect;
-  if (collect_big >= next_collect_big) {
-    collect_full = true;
-    collect_big = 0;
-  }
-  /* if (collect_big++ == 2) { */
+  /* collect_big += next_collect; */
+  /* if (collect_big >= next_collect_big) { */
+  /*   /\* collect_full = true; *\/ */
   /*   collect_big = 0; */
-  /*   collect_full = true; */
   /* } */
+  if (collect_big++ == 16) {
+    collect_big = 0;
+    collect_full = true;
+  }
 
   /* collect_full = true; */
 
@@ -402,10 +402,13 @@ __attribute__((noinline, preserve_none)) static void rcimmix_collect() {
   //
   // earley is highly fragmented, but full GC's don't help.
   // paraffins needs lots of full GC's.
-  if (collect_full && (next_collect_big < totsize*2)) {
-    next_collect_big = totsize*2;
-    next_collect = next_collect_big/4;
+  if (collect_full && (next_collect < totsize)) {
+    next_collect = totsize;
   }
+  next_force_full = false;
+  if (!collect_full && freed_bytes < next_collect / 2) {
+    next_force_full = true;
+  } 
 
   kv_destroy(markstack);
 
@@ -416,8 +419,8 @@ __attribute__((noinline, preserve_none)) static void rcimmix_collect() {
   time_taken +=
       ((double)end.tv_nsec - (double)start.tv_nsec) / 1000000.0; // ns to ms
   /* printf( */
-  /* 	 "COLLECT %.3f ms, full %i, %li total %li, free%% %f, next_collect %li, totsize %li rembytes %li, frag %% %f\n", */
-  /* 	 time_taken, collect_full, totsize, total_bytes, 100.0 * (double)freed_bytes / (double)total_bytes, next_collect_big, */
+  /* 	 "COLLECT %.3f ms, full %i, %li total %li, freed %li, free%% %f, next_collect %li, totsize %li rembytes %li, frag %% %f\n", */
+  /* 	 time_taken, collect_full, totsize, total_bytes, freed_bytes, 100.0 * (double)freed_bytes / (double)total_bytes, next_collect, */
   /* 	 totsize, rem_bytes, */
   /* 	 100.0 * (double) (rem_bytes - totsize) / (double)rem_bytes); */
 }
