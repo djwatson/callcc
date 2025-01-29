@@ -31,7 +31,7 @@ static uint64_t *stacktop;
 uint64_t *gc_get_stack_top() { return stacktop; }
 
 static constexpr uint64_t mark_word_cnt = (default_slab_size / 8) / 64;
-static constexpr uint64_t mark_byte_cnt = (default_slab_size / 8);
+static constexpr uint64_t mark_byte_cnt = (default_slab_size / 8) / 8;
 
 typedef struct slab_info {
   uint32_t class;
@@ -264,10 +264,11 @@ __attribute__((noinline, preserve_none)) static void rcimmix_collect() {
   totsize = 0;
   bool collect_full = false;
 
-  if (collect_big++ == 3) {
+  if (collect_big++ == 4) {
     collect_big = 0;
     collect_full = true;
   }
+  //collect_full = true;
 
   // Init mark stack
   kv_init(markstack);
@@ -280,8 +281,8 @@ __attribute__((noinline, preserve_none)) static void rcimmix_collect() {
     if (collect_full) {
       memset(slab->markbits, 0, sizeof(slab->markbits));
       slab->marked = 0;
-      /* uint64_t* logbits = (uint64_t*)(slab->start - mark_byte_cnt); */
-      /* memset(logbits, 0, mark_byte_cnt); */
+      uint64_t* logbits = (uint64_t*)(slab->start - mark_byte_cnt);
+      memset(logbits, 0, mark_byte_cnt);
     }  else {
 
       // Remembered set analysis for sticky mark-bit sweeping
@@ -290,33 +291,41 @@ __attribute__((noinline, preserve_none)) static void rcimmix_collect() {
 	// Small classes use a logbits area at the start of the
 	// slab.
 	uint64_t* logbits = (uint64_t*)(slab->start - mark_byte_cnt);
-	auto objstart = slab->start;
-	uint64_t logcnt = 0;
-	while(objstart < slab->end) {
-	  auto addr = (uint64_t)objstart & (default_slab_size - 1);
-	  //printf("bit %li\n", (addr/8));
-	  if(bt(logbits, (addr/8))) {
-	    kv_push(markstack,
-		    ((range){(uint64_t*)objstart,
-			     (uint64_t*)(objstart +8)}));
-	    logcnt++;
+	uint64_t bit = 0;
+	while(true) {
+	  uint64_t res;
+	  auto hasnext = find_next_bit(logbits, mark_byte_cnt*8, bit, false, &res);
+	  if (!hasnext) {
+	    break;
 	  }
-	  objstart += 8;
+	  uint64_t logptr = (uint64_t)slab->start + (res * 8);
+	  uint64_t index = (res*8) / (slab->class*8);
+	  // Only walk remembered set if the object it is in is already marked -
+	  // otherwise it will already traced if live.
+	  if (bt(slab->markbits, index)) {
+	    kv_push(markstack,
+		    ((range){(uint64_t*)logptr, (uint64_t*)(logptr + 8)}));
+	  }
+	  
+	  bit = res + 1;
 	}
 	/* printf("logcnt: %li\n", logcnt); */
 	// Reset remembered set.
 	memset(logbits, 0, mark_byte_cnt);
       } else {
+
 	// Large objects use a single bit, bit 0 in markbits
-	if (bt(slab->markbits, 0)) {
+	if (bt(slab->markbits, 1)) {
 	  kv_push(markstack,
 		  ((range){(uint64_t*)slab->start,
 			   (uint64_t*)(slab->start + slab->class * 8)}));
 	  printf("MARKLARGE\n");
 	  // Reset markbit.
-	  btr(slab->markbits, 0);
+	  slab->markbits[0] = 0;
+	  btr(slab->markbits, 1);
 	}
       }
+
 
     }
   }
@@ -426,7 +435,10 @@ static slab_info *alloc_slab(uint64_t sz_class) {
   list_add(&free->link, &live_slabs);
 
   alloc_table_set_range(&atable, free, free->start, free->end - free->start);
-  free->start += mark_byte_cnt;
+  if (sz_class < size_classes) {
+    // Leave room for logbits
+    free->start += mark_byte_cnt;
+  }
   return free;
 }
 
@@ -503,8 +515,8 @@ NOINLINE void gc_log(uint64_t a) {
   if (likely(slab->class < size_classes)) {
     uint64_t* logbits = (uint64_t*)(a & ~(default_slab_size-1));
     uint64_t addr = a & (default_slab_size-1);
-    bts(logbits,(addr / 8) / 64);
+    bts(logbits,(addr / 8));
   } else {
-    bts(slab->markbits, 0);
+    bts(slab->markbits, 1);
   }
 }
