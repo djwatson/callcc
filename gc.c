@@ -307,8 +307,8 @@ __attribute__((noinline, preserve_none)) static void rcimmix_collect() {
 	  if (!hasnext) {
 	    break;
 	  }
-	  uint64_t logptr = (uint64_t)slab->start + (res * 8);
-	  uint64_t index = (res*8) / (slab->class*8);
+	  uint64_t logptr = (uint64_t)logbits + (res * 8);
+	  uint64_t index = (logptr - (uint64_t)slab->start) / (slab->class*8);
 	  // Only walk remembered set if the object it is in is already marked -
 	  // otherwise it will already traced if live.
 	  if (bt(slab->markbits, index)) {
@@ -415,11 +415,11 @@ __attribute__((noinline, preserve_none)) static void rcimmix_collect() {
       ((double)end.tv_sec - (double)start.tv_sec) * 1000.0; // sec to ms
   time_taken +=
       ((double)end.tv_nsec - (double)start.tv_nsec) / 1000000.0; // ns to ms
-  printf(
-	 "COLLECT %.3f ms, full %i, %li total %li, free%% %f, next_collect %li, totsize %li rembytes %li, frag %% %f\n",
-	 time_taken, collect_full, totsize, total_bytes, 100.0 * (double)freed_bytes / (double)total_bytes, next_collect_big,
-	 totsize, rem_bytes,
-	 100.0 * (double) (rem_bytes - totsize) / (double)rem_bytes);
+  /* printf( */
+  /* 	 "COLLECT %.3f ms, full %i, %li total %li, free%% %f, next_collect %li, totsize %li rembytes %li, frag %% %f\n", */
+  /* 	 time_taken, collect_full, totsize, total_bytes, 100.0 * (double)freed_bytes / (double)total_bytes, next_collect_big, */
+  /* 	 totsize, rem_bytes, */
+  /* 	 100.0 * (double) (rem_bytes - totsize) / (double)rem_bytes); */
 }
 
 static slab_info *alloc_slab(uint64_t sz_class) {
@@ -451,6 +451,7 @@ static slab_info *alloc_slab(uint64_t sz_class) {
   alloc_table_set_range(&atable, free, free->start, free->end - free->start);
   if (sz_class < size_classes) {
     // Leave room for logbits
+    memset(free->start, 0, mark_byte_cnt);
     free->start += mark_byte_cnt;
   }
   return free;
