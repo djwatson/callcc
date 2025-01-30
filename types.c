@@ -1407,3 +1407,11 @@ INLINE gc_obj SCM_DELETE_FILE(gc_obj scmname) {
   name[to_fixnum(str->len)] = '\0';
   return tag_fixnum(unlink(name));
 }
+/////// FLONUMS
+INLINE gc_obj SCM_FLONUM_BOX(double d) {
+  return double_to_gc_slow(d);
+}
+INLINE double SCM_FLONUM_UNBOX(gc_obj d) { return to_double(d); }
+INLINE double SCM_INEXACT_UNBOXED(gc_obj fix) {
+  return (double)to_fixnum(fix);
+}

@@ -4,6 +4,7 @@
      (scheme write)
      (scheme complex)
      (scheme cxr)
+     (scheme char)
      (except (srfi 1) map!)
      (format)
      (srfi 69)

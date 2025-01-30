@@ -185,6 +185,12 @@
        (push-instr! fun (format "call void @SCM_SET_GLOBAL(i64 ~a, i64 ~a)"
 				sym val)))
      (finish undefined-tag))
+    ((flonum-op ,op ,a ,b)
+     (let ((av (emit a env fun #f))
+	   (bv (emit b env fun #f))
+	   (id (next-id)))
+       (push-instr! fun (format "%f~a = ~a double ~a, ~a" id op av bv))
+       (format "%f~a" id)))
     ((primcall APPLY ,args ___)
      (let* ((args (omap arg args (emit arg env fun #f)))
 	    (clo-id (next-id))
