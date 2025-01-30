@@ -693,7 +693,7 @@ TODO: boxes could be passed down through funcs
        `(label-call ,(hash-table-ref global-defs global) #f ,args ___)
        (begin
 	 (display (format "Global not found:~a\n" global) (current-error-port))
-	 sexp))))
+	 `(call (lookup ,global) ,args ___)))))
 
 (define (debug-print x)
   (pretty-print x)
