@@ -707,6 +707,7 @@ TODO: boxes could be passed down through funcs
       (cons (deep-copy (car x)) (deep-copy (cdr x)))
       x))
 
+(include "sua.scm")
 (define (r7-pass x pic)
   (-> x
       deep-copy
@@ -731,6 +732,8 @@ TODO: boxes could be passed down through funcs
 
       find-global-labels
       programify
+      
+      storage-use-analysis
       ))
 
 
