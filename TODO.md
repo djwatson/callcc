@@ -1,6 +1,5 @@
-* benchmarks:
-  * GC needs defrag/generational: graphs, earley, gcbench
-  * also needs inliner to remove alloc: graphs
+# benchmarks:
+  * Needs inliner to remove alloc: graphs
   
   * complex: mbrotZ
   
@@ -8,6 +7,15 @@
 
   * exact-integer-sqrt: pi
   * bignums: pi chudnovsky
+
+# GC stuff:
+  * GC faster marklarge
+  * Maybe add type tag to vec/cons, and use a bit to indicate 'young' for logging.
+    * Mostly matters for vector?
+    * use field-logging?  Or even simple RC?
+	
+* storage use analysis: unboxing flonums, longjmp/setjmp call/cc, and typecheck removal.
+
 
 * debug info in llvm: would help perf record --call-graph=dwarf
 * auto-listify globals: consargs stub in compiler called a lot: 
@@ -32,6 +40,5 @@
 * bignums, compnums, ratnums
 
 * recheck GC get stack top
-* gc generational-lazy marking
 
 * call/cc: figure out valgrind or address santizer workings?

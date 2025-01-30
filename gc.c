@@ -242,6 +242,9 @@ extern  int64_t shadow_stack[100];
 
 static void merge_and_free_slab(slab_info* slab) {
   // TODO: actual merge.
+  if (slab->class <size_classes) {
+    slab->start -= mark_byte_cnt;
+  }
   auto page_class = sz_to_page_class(slab->end - slab->start);
   //printf("Page class %i sz class %i\n", page_class, slab->class);
   if (page_class >= page_classes) {
@@ -300,6 +303,7 @@ __attribute__((noinline, preserve_none)) static void rcimmix_collect() {
 	// Small classes use a logbits area at the start of the
 	// slab.
 	uint64_t* logbits = (uint64_t*)(slab->start - mark_byte_cnt);
+	assert(((uint64_t)logbits & (default_slab_size -1) ) == 0);
 	uint64_t bit = 0;
 	while(true) {
 	  uint64_t res;
@@ -322,7 +326,7 @@ __attribute__((noinline, preserve_none)) static void rcimmix_collect() {
 	// Reset remembered set.
 	memset(logbits, 0, mark_byte_cnt);
       } else {
-	printf("MARKLARGE\n");
+	//printf("MARKLARGE\n");
 	// Large objects use a single bit, bit 0 in markbits
 	if (bt(slab->markbits, 1)) {
 	  kv_push(markstack,
@@ -434,7 +438,6 @@ static slab_info *alloc_slab(uint64_t sz_class) {
   if (page_class < page_classes && kv_size(pages_free[page_class])) {
     slab_info* free = kv_pop(pages_free[page_class]);
     if (free) {
-      //printf("Found free slab class %li %i %i\n", sz_class, free->class, page_class);
       free->class = sz_class;
       list_add(&free->link, &live_slabs);
       return free;
@@ -448,15 +451,11 @@ static slab_info *alloc_slab(uint64_t sz_class) {
   init_list_head(&free->link);
 
   posix_memalign((void **)&free->start, default_slab_size, sz);
+  memset(free->start, 0, sz);
   free->end = free->start + sz;
   list_add(&free->link, &live_slabs);
 
   alloc_table_set_range(&atable, free, free->start, free->end - free->start);
-  if (sz_class < size_classes) {
-    // Leave room for logbits
-    memset(free->start, 0, mark_byte_cnt);
-    free->start += mark_byte_cnt;
-  }
   return free;
 }
 
@@ -482,6 +481,10 @@ rcimmix_alloc_slow(uint64_t sz) {
     
   } else {
     auto slab = alloc_slab(sz_class);
+    // Leave room for logbits
+    memset(slab->start, 0, mark_byte_cnt);
+    slab->start += mark_byte_cnt;
+
     freelist[sz_class].start_ptr = (uint64_t)slab->start;
     freelist[sz_class].end_ptr = (uint64_t)slab->end;
     freelist[sz_class].slab = slab;
