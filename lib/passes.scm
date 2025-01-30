@@ -323,6 +323,9 @@ TODO: boxes could be passed down through funcs
 	   (if (eq? var (cadr f))
 	       (no-refs? var (cddr f))
 	       (no-refs? var (cdr f))))
+	  ((loop)
+	   (and (no-refs? var (second f))
+		(only-tailcalls? var (fourth f))))
 	  (else (no-refs? var f)))))
   (define-pass lower
     ((call (fix (,name) (lambda (case ,vars ,(lower body))) ,name2) ,(lower args) ___)
