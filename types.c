@@ -1184,6 +1184,9 @@ INLINE gc_obj SCM_EXACT(gc_obj flo) {
 }
 
 INLINE gc_obj SCM_INEXACT(gc_obj fix) {
+  if (is_flonum(fix)) {
+    return fix;
+  }
   gc_obj res;
   double d = (double)to_fixnum(fix);
   if (double_to_gc(d, &res)) {
@@ -1423,5 +1426,8 @@ INLINE gc_obj SCM_FLONUM_BOX(double d) {
 }
 INLINE double SCM_FLONUM_UNBOX(gc_obj d) { return to_double(d); }
 INLINE double SCM_INEXACT_UNBOXED(gc_obj fix) {
+  if (is_flonum(fix)) {
+    return to_double(fix);
+  }
   return (double)to_fixnum(fix);
 }

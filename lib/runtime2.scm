@@ -420,9 +420,7 @@
 (define (inexact? x) (flonum? x))
 
 (define (inexact->exact a)
-  (if (flonum? a) 
-      (sys:FOREIGN_CALL "SCM_EXACT" a)
-      a))
+  (sys:FOREIGN_CALL "SCM_EXACT" a))
 (define (exact x) (inexact->exact x))
 (define (exact->inexact a)
   (if (fixnum? a)
