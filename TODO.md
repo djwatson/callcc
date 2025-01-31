@@ -1,3 +1,5 @@
+* preserve_none seems to be smashing rbp. Doh.
+
 # benchmarks:
   * Needs inliner to remove alloc: graphs
   
@@ -15,6 +17,7 @@
     * use field-logging?  Or even simple RC?
 	
 * storage use analysis: unboxing flonums, longjmp/setjmp call/cc, and typecheck removal.
+   * call/cc can just be a simple escape analysis? global though
 
 
 * debug info in llvm: would help perf record --call-graph=dwarf
@@ -35,6 +38,9 @@
   * can be simple called-once??? check graphs
 
 * self-compile
+  * eval / environment
+  * display, including write-flonum to string
+      * which could mean bignums, etc......
 * gc fd's.
 * gset check
 * bignums, compnums, ratnums

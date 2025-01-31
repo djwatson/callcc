@@ -245,10 +245,13 @@
 
 (define (not a) (if a #f #t))
 (define (call-with-current-continuation x)
-  (sys:FOREIGN_CALL "SCM_CALLCC" x))
+  (let* ((winds *here*)
+	 (res (sys:FOREIGN_CALL "SCM_CALLCC" x)))
+    (reroot! winds)
+    res))
 
 (define (car a)
-  ;(unless (pair? a) (error "Trying to car not a pair" a))
+					;(unless (pair? a) (error "Trying to car not a pair" a))
   (sys:FOREIGN_CALL "SCM_CAR" a))
 (define (cdr a)
   ;(unless (pair? a) (error "Trying to cdr not a pair" a))
@@ -448,18 +451,18 @@
 
 (define append
   (case-lambda
-    ((a b)
-     (append2 a b))
-    ((a b c) (append a (append b c)))
-    ((a b c d) (append a (append b (append c d))))
+   ((a b)
+    (append2 a b))
+   ((a b c) (append a (append b c)))
+   ((a b c d) (append a (append b (append c d))))
    (lsts (if (null? lsts) '()
-      (let loop ((lsts lsts))
-	(if (null? (cdr lsts))
-	    (car lsts)
-	    (let copy ((node (car lsts)))
-	      (if (pair? node)
-		  (cons (car node) (copy (cdr node)))
-		  (loop (cdr lsts))))))))))
+	     (let loop ((lsts lsts))
+	       (if (null? (cdr lsts))
+		   (car lsts)
+		   (let copy ((node (car lsts)))
+		     (if (pair? node)
+			 (cons (car node) (copy (cdr node)))
+			 (loop (cdr lsts))))))))))
 
 (define (reverse lst)
   (let loop ((lst lst) (res '()))
@@ -922,14 +925,50 @@
         (force promise))))
 
 (define (call-with-values producer consumer)
-  (apply consumer (producer)))
+  (unless (and (procedure? producer)
+	       (procedure? consumer))
+    (error "Bad call-with-values" producer consumer))
+  (let ((res (producer)))
+    (if (and (pair? res) (eq? *values-tag* (car res)))
+        (apply consumer (cdr res))
+        (consumer res))))
+
+(define *values-tag* (list 'values))
+
+(define (%values ls)
+  (if (and (pair? ls) (null? (cdr ls)))
+      (car ls)
+      (cons *values-tag* ls)))
 
 (define values
   (case-lambda
+   (() (list *values-tag*))
    ((a) a)
-   ((a b) (cons a (cons b '())))
-   ((a b c) (cons a (cons b (cons c '()))))
-   (rest rest)))
+   ((a b) `(,*values-tag* ,a ,b))
+   (ls (%values ls))))
+
+(define *here* (list #f))
+
+(define (dynamic-wind before during after)
+  (unless (and (procedure? before)
+	       (procedure? during)
+	       (procedure? after))
+    (error "bad dynamic wind proc:" before during after))
+  (let ((here *here*))
+    (reroot! (cons (cons before after) here))
+    (call-with-values during
+      (lambda results (reroot! here) (apply values results)))))
+
+(define (reroot! there)
+  (unless (eq? *here* there)
+      (reroot! (cdr there))
+      (let ((before (caar there))
+	    (after (cdar there)))
+	(set-car! *here* (cons after before))
+	(set-cdr! *here* there)
+	(set-car! there #f)
+	(set-cdr! there '())
+	(set! *here* there) (before))))
 
 (define (round d)
   (sys:FOREIGN_CALL "SCM_ROUND" (inexact d)))
@@ -1158,3 +1197,15 @@
 	   (hash-table-set! scm-symbol-table strcopy new-sym)
 	   new-sym))))
 
+;;;;;;;; parameters
+(define (make-parameter init . val)
+  (let ((cell init))
+    (lambda arg
+      (if (pair? arg)
+	  (set! cell (car arg))
+	  cell))))
+
+(define (command-line) '("test" "test.scm"))
+(define (environment . lst) '())
+(define (eval expr env)
+  (display "EVAL:") (display expr) (newline))

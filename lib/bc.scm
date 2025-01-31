@@ -345,6 +345,7 @@
      (finish (emit-const const)))
     (,else (error "UNKOWN EMIT:" sexp))))
 
+
 (define (flonum? c)
   (and (number? c) (inexact? c)))
 
@@ -511,14 +512,17 @@ declare void @SCM_WRITE_SHADOW_STACK(i64, i64)
 declare void @gc_init ()
 @argcnt = dso_local global i64 0
 @wanted_argcnt = dso_local global i64 0
-attributes #0 = { returns_twice}
+attributes #0 = { returns_twice \"frame-pointer\"=\"all\"}
 "))
 
 (define (compile file verbose)
   (set! functions '())
   (let* ((libman (make-libman))
+	 (unused (set! library-search-paths (cons "./srfi2" library-search-paths)))
 	 (runtime-input (with-input-from-file "runtime2.scm" read-file))
+
 	 (pre-input (with-input-from-file file read-file))
+
 	 ;; Auto-add 'import' to scripts.
 	 (input
 	  (match pre-input
@@ -534,7 +538,7 @@ attributes #0 = { returns_twice}
 	 (main-fun (make-fun "main")))
     (when verbose
       (display (format "Compiling ~a\n" file) (current-error-port))
-					;(pretty-print lowered (current-error-port))
+      (pretty-print lowered (current-error-port))
       )
 					;;(exit)
 					(emit lowered '() main-fun #t)

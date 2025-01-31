@@ -593,13 +593,23 @@ NOINLINE __attribute__((preserve_most)) gc_obj SCM_LT_SLOW(gc_obj a, gc_obj b) {
   double fa, fb;
   if (is_fixnum(a)) {
     fa = to_fixnum(a);
-  } else {
+  } else if (is_flonum(a)) {
     fa = to_double(a);
+  } else {
+    printf("LT: not a number:");
+    SCM_DISPLAY(a, tag_fixnum(0));
+    printf("\n");
+    abort();
   }
   if (is_fixnum(b)) {
     fb = to_fixnum(b);
-  } else {
+  } else if (is_flonum(b)){
     fb = to_double(b);
+  } else {
+    printf("LT: not a number:");
+    SCM_DISPLAY(b, tag_fixnum(0));
+    printf("\n");
+    abort();
   }
   if (fa < fb) {
     return TRUE_REP;
