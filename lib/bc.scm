@@ -512,7 +512,7 @@ declare void @SCM_WRITE_SHADOW_STACK(i64, i64)
 declare void @gc_init ()
 @argcnt = dso_local global i64 0
 @wanted_argcnt = dso_local global i64 0
-attributes #0 = { returns_twice \"frame-pointer\"=\"all\"}
+attributes #0 = { returns_twice}
 "))
 
 (define (compile file verbose)

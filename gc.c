@@ -99,12 +99,15 @@ bool find_next_bit(uint64_t const* bits, uint64_t maxbit, uint64_t bit, bool inv
   auto res = __builtin_ffsll(search);
   if(res && res <= (64 - b)) {
     bit += res - 1;
-    *result = bit;
     if (invert) {
       assert(!bt(bits, bit));
     } else {
       assert(bt(bits, bit));
     }
+    if (bit >= maxbit) {
+      return false;
+    }
+    *result = bit;
     return true;
   }
   bit += 64 - b;
@@ -155,6 +158,8 @@ bool get_partial_range(uint64_t sz_class, freelist_s *fl) {
   //printf("End index was %li, new start %li, new end %li\n", end_index, new_start, new_end);
   fl->start_ptr = (uint64_t)slab->start + new_start * slab->class * 8;
   fl->end_ptr = (uint64_t)slab->start + new_end * slab->class * 8;
+  assert(fl->start_ptr >= fl->slab->start);
+  assert(fl->end_ptr <= fl->slab->end);
   return true;
 }
 
@@ -261,6 +266,7 @@ static void merge_and_free_slab(slab_info* slab) {
 
 static uint64_t collect_big = 0;
 static bool next_force_full = false;
+extern void* cur_link;
 __attribute__((noinline, preserve_none)) static void rcimmix_collect() {
   struct timespec start;
   struct timespec end;
@@ -363,6 +369,8 @@ __attribute__((noinline, preserve_none)) static void rcimmix_collect() {
     kv_push(markstack, ((range){&symbol[1], &symbol[3]}));
   }
   kv_push(markstack, ((range){(uint64_t*)&shadow_stack[0], (uint64_t*)&shadow_stack[100]}));
+
+  kv_push(markstack, ((range){&cur_link, &cur_link+8}));
 
   // Run mark loop.
   mark();

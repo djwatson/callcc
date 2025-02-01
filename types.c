@@ -935,7 +935,7 @@ typedef struct ccsave {
   int64_t stack[];
 } ccsave;
 
-static ccsave *cur_link = NULL;
+ccsave *cur_link = NULL;
 static uint8_t tmpstack[100];
 static gc_obj ccresthunk(gc_obj unused, gc_obj n) {
   ccsave *c = (ccsave *)to_closure(unused);
