@@ -224,6 +224,10 @@ static void mark() {
       bool found = alloc_table_lookup(&atable, val, (void **)&slab);
       if (found && (slab != nullptr) && (val >= slab->start) && (val < slab->end)) {
         // Find the start of the object
+	if(list_empty(&slab->link)) {
+	  r.start++;
+	  continue;
+	}
         uint64_t index =
             ((uint64_t)val - (uint64_t)slab->start) / (slab->class * 8);
         uint64_t base_ptr = (uint64_t)slab->start + (slab->class * 8 * index);
