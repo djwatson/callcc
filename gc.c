@@ -158,8 +158,8 @@ bool get_partial_range(uint64_t sz_class, freelist_s *fl) {
   //printf("End index was %li, new start %li, new end %li\n", end_index, new_start, new_end);
   fl->start_ptr = (uint64_t)slab->start + new_start * slab->class * 8;
   fl->end_ptr = (uint64_t)slab->start + new_end * slab->class * 8;
-  assert(fl->start_ptr >= fl->slab->start);
-  assert(fl->end_ptr <= fl->slab->end);
+  assert((uintptr_t)fl->start_ptr >= (uintptr_t)fl->slab->start);
+  assert((uintptr_t)fl->end_ptr <= (uintptr_t)fl->slab->end);
   return true;
 }
 
@@ -374,7 +374,7 @@ __attribute__((noinline, preserve_none)) static void rcimmix_collect() {
   }
   kv_push(markstack, ((range){(uint64_t*)&shadow_stack[0], (uint64_t*)&shadow_stack[100]}));
 
-  kv_push(markstack, ((range){&cur_link, &cur_link+8}));
+  kv_push(markstack, ((range){(uint64_t*)&cur_link, (uint64_t*)(&cur_link+8)}));
 
   // Run mark loop.
   mark();
