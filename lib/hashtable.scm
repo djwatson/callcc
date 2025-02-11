@@ -9,8 +9,8 @@
 
 (define make-hash-table
   (case-lambda
-   (() (%make-hash-table eqhash eq? 0 1638 (make-vector 2048 #f)))
-   ((hash cmp) (%make-hash-table hash cmp 0 1638 (make-vector 2048 #f)))))
+   (() (%make-hash-table eqhash eq? 0 1792 (make-vector 2048 #f)))
+   ((hash cmp) (%make-hash-table hash cmp 0 1792 (make-vector 2048 #f)))))
 (define (hash-modulo h len) (sys:FOREIGN_CALL "SCM_AND" h (- len 1)))
 (define (hash-table-ref/default ht key default)
   (let* ((size (hash-table-size ht))
@@ -33,10 +33,12 @@
 	((= idx (vector-length old-entries)))
       (let ((cur (vector-ref old-entries idx)))
 	(when cur
-	  (hash-table-set! ht (car cur) (cdr cur)))))))
+	  (hash-table-set-pair! ht cur))))))
 (define (eqhash x) (sys:FOREIGN_CALL "SCM_EQ_HASH" x))
 (define (string-hash x) (sys:FOREIGN_CALL "SCM_STRING_HASH" x))
 (define (hash-table-set! ht key value)
+  (hash-table-set-pair! ht (cons key value)))
+(define (hash-table-set-pair! ht kv)
   (let* ((size (hash-table-size ht))
 	 (entries (hash-table-entries ht))
 	 (len (vector-length entries)))
@@ -47,14 +49,14 @@
 	 (len (vector-length table))
 	 (hash (hash-table-hash ht))
 	 (cmp (hash-table-cmp ht))
-	 (idx (hash-modulo (hash key) len)))
+	 (idx (hash-modulo (hash (car kv)) len)))
     (let loop ((idx idx))
       (let ((cur (vector-ref table idx)))
 	(cond
 	 ((not cur)
-	  (vector-set! table idx (cons key value))
+	  (vector-set! table idx kv)
 	  (hash-table-size-set! ht (+ 1 (hash-table-size ht))))
-	 ((cmp (car cur) key) (vector-set! table idx (cons key value)))
+	 ((cmp (car cur) (car kv)) (vector-set! table idx kv))
 	 (else (loop (hash-modulo (+ idx 1) len))))))))
 
 
