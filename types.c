@@ -365,10 +365,14 @@ INLINE gc_obj SCM_LOAD_GLOBAL(gc_obj a) {
   //assert(is_symbol(a));
   auto sym = to_symbol(a);
   auto val = sym->val;
+#ifndef UNSAFE
   if (likely(val.value != UNDEFINED.value)) {
     return val;
   }
   [[clang::musttail]] return SCM_LOAD_GLOBAL_FAIL(a);
+#else
+  return val;
+#endif
 }
 
 INLINE void SCM_SET_GLOBAL(gc_obj a, gc_obj b) {
@@ -391,11 +395,15 @@ NOINLINE void* SCM_LOAD_CLOSURE_PTR_FAIL(gc_obj a) {
   abort();
 }
 INLINE void* SCM_LOAD_CLOSURE_PTR(gc_obj a) {
+#ifndef UNSAFE
   if (likely(is_closure(a))) {
+#endif
     auto clo = to_closure(a);
-    return (void*)clo->v[0].value;
+    return (void *)clo->v[0].value;
+#ifndef UNSAFE
   }
   [[clang::musttail]] return SCM_LOAD_CLOSURE_PTR_FAIL(a);
+#endif
 }
 
 NOINLINE __attribute__((preserve_most)) gc_obj SCM_ADD_SLOW(gc_obj a, gc_obj b) {
@@ -771,23 +779,29 @@ INLINE gc_obj SCM_NUM_EQ(gc_obj a, gc_obj b) {
 }
 
 INLINE gc_obj SCM_CAR(gc_obj obj) {
+  #ifndef UNSAFE
   if (!is_cons(obj)) {
     abort();
   }
+  #endif
   return to_cons(obj)->a;
 }
 
 INLINE gc_obj SCM_CDR(gc_obj obj) {
+  #ifndef UNSAFE
   if (!is_cons(obj)) {
     abort();
   }
+  #endif
   return to_cons(obj)->b;
 }
 
 INLINE gc_obj SCM_SETCAR(gc_obj obj, gc_obj val) {
+  #ifndef UNSAFE
   if (!is_cons(obj)) {
     abort();
   }
+  #endif
   auto c = to_cons(obj);
   c->a = val;
   //  printf("log setcar\n");
@@ -796,9 +810,11 @@ INLINE gc_obj SCM_SETCAR(gc_obj obj, gc_obj val) {
 }
 
 INLINE gc_obj SCM_SETCDR(gc_obj obj, gc_obj val) {
+  #ifndef UNSAFE
   if (!is_cons(obj)) {
     abort();
   }
+  #endif
   auto c = to_cons(obj);
   c->b = val;
   //  printf("log setcdr\n");
@@ -842,40 +858,50 @@ INLINE gc_obj SCM_MAKE_VECTOR(gc_obj obj) {
 }
 
 INLINE gc_obj SCM_VECTOR_LENGTH(gc_obj vec) {
+  #ifndef UNSAFE
   if (unlikely(!is_vector(vec))) {
     abort();
   }
+  #endif
   return to_vector(vec)->len;
 }
 
 INLINE gc_obj SCM_VECTOR_REF(gc_obj vec, gc_obj idx) {
+  #ifndef UNSAFE
   if (unlikely(!is_fixnum(idx))) {
     abort();
   }
   if (unlikely(!is_vector(vec))) {
     abort();
   }
+  #endif
   auto v = to_vector(vec);
   auto i = to_fixnum(idx);
+  #ifndef UNSAFE
   if (unlikely(i >= to_fixnum(v->len))) {
     abort();
   }
+  #endif
   
   return v->v[i];
 }
 
 INLINE gc_obj SCM_VECTOR_SET(gc_obj vec, gc_obj idx, gc_obj val) {
+  #ifndef UNSAFE
   if (unlikely(!is_fixnum(idx))) {
     abort();
   }
   if (unlikely(!is_vector(vec))) {
     abort();
   }
+  #endif
   auto v = to_vector(vec);
   auto i = to_fixnum(idx);
+  #ifndef UNSAFE
   if (unlikely(i >= to_fixnum(v->len))) {
     abort();
   }
+  #endif
   v->v[i] = val;
 
   gc_log_with_slab((uint64_t)&v->v[i], v->slab);
