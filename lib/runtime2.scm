@@ -1018,7 +1018,7 @@
 ;;;;;;;;;;;;; IO
 (define-record-type port (make-port input fold-case fd pos len buf fillflush) port?
 		    (input input-port?)
-		    (fold-case port-fold-case)
+		    (fold-case port-fold-case port-fold-case-set!)
 		    (fd port-fd port-fd-set!)
 		    (pos port-pos port-pos-set!)
 		    (len port-len port-len-set!)

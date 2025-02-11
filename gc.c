@@ -1,5 +1,6 @@
 #define _POSIX_C_SOURCE 200112L
 #define _GNU_SOURCE
+#define GENGC 1
 
 #include <assert.h>
 #include <pthread.h>
@@ -282,10 +283,15 @@ __attribute__((noinline, preserve_none)) static void rcimmix_collect() {
   /*   /\* collect_full = true; *\/ */
   /*   collect_big = 0; */
   /* } */
-  if (collect_big++ == 16) {
+#ifdef GENGC
+  if (collect_big++ == 8) {
     collect_big = 0;
     collect_full = true;
   }
+#else
+  collect_full = true;
+#endif
+
 
   /* collect_full = true; */
 
@@ -369,7 +375,7 @@ __attribute__((noinline, preserve_none)) static void rcimmix_collect() {
   uint64_t *v = (uint64_t *)(symbol_table & ~7);
   auto len = (*v) >> 3;
   for (uint64_t i = 0; i < len; i++) {
-    uint64_t *symbol = (uint64_t *)(v[1 + i] & ~7);
+    uint64_t *symbol = (uint64_t *)(v[2 + i] & ~7);
     kv_push(markstack, ((range){&symbol[1], &symbol[3]}));
   }
   kv_push(markstack, ((range){(uint64_t*)&shadow_stack[0], (uint64_t*)&shadow_stack[100]}));
@@ -471,12 +477,12 @@ static slab_info *alloc_slab(uint64_t sz_class) {
   return free;
 }
 
-NOINLINE __attribute__((preserve_most)) static void *
+NOINLINE __attribute__((preserve_most)) static alloc_result
 rcimmix_alloc_slow(uint64_t sz) {
   if (collect_cnt >= next_collect) {
     collect_cnt = 0;
     rcimmix_collect();
-    return rcimmix_alloc(sz);
+    return rcimmix_alloc_with_slab(sz);
   }
   assert((sz & 0x7) == 0);
 
@@ -485,7 +491,7 @@ rcimmix_alloc_slow(uint64_t sz) {
   if (sz_class >= size_classes) {
     auto slab = alloc_slab(sz_class);
     collect_cnt += sz;
-    return slab->start;
+    return (alloc_result){slab->start, slab};
   }
   // It's in a small slab.
   //  assert(freelist[sz_class].start_ptr >= freelist[sz_class].end_ptr);
@@ -502,10 +508,10 @@ rcimmix_alloc_slow(uint64_t sz) {
     freelist[sz_class].slab = slab;
     collect_cnt += freelist[sz_class].end_ptr - freelist[sz_class].start_ptr;
   }
-  return rcimmix_alloc(sz);
+  return rcimmix_alloc_with_slab(sz);
 }
 
-void *rcimmix_alloc(uint64_t sz) {
+alloc_result rcimmix_alloc_with_slab(uint64_t sz) {
   assert((sz & 0x7) == 0);
   uint64_t sz_class = sz / 8;
   if (unlikely(sz_class >= size_classes)) {
@@ -520,7 +526,11 @@ void *rcimmix_alloc(uint64_t sz) {
   }
 
   fl->start_ptr = start;
-  return (void *)s;
+  return (alloc_result){(void *)s, fl->slab};
+}
+
+void *rcimmix_alloc(uint64_t sz) {
+  return rcimmix_alloc_with_slab(sz).p;
 }
 
 bool gc_is_small(uint64_t sz) {
@@ -530,15 +540,18 @@ bool gc_is_small(uint64_t sz) {
 
 // Assumes a is a small allocation.
 void gc_log_fast(uint64_t a) {
+#ifdef GENGC
   slab_info* slab;
   assert(alloc_table_lookup(&atable, (void*)a, (void**)&slab));
   uint64_t* logbits = (uint64_t*)(a & ~(default_slab_size-1));
 
   uint64_t addr = a & (default_slab_size-1);
-  bts(logbits,(addr / 8) ); 
+  bts(logbits,(addr / 8) );
+#endif
 }
 
 NOINLINE void gc_log(uint64_t a) {
+#ifdef GENGC
   slab_info* slab;
   if (!alloc_table_lookup(&atable, (void*)a, (void**)&slab)) {
     // It's in the static data section (probably).
@@ -550,7 +563,25 @@ NOINLINE void gc_log(uint64_t a) {
     uint64_t addr = a & (default_slab_size-1);
     bts(logbits,(addr / 8));
   } else {
-    // TODO: fix
-    btr(slab->markbits, 1);
+    if (bt(slab->markbits, 0)) {
+      bts(slab->markbits, 1);
+    }
   }
+#endif
+}
+
+void gc_log_with_slab(uint64_t a, void* sp) {
+#ifdef GENGC
+  slab_info* slab = sp;
+  assert(slab);
+  if (slab->class < size_classes) {
+    uint64_t* logbits = (uint64_t*)(a & ~(default_slab_size-1));
+    uint64_t addr = a & (default_slab_size-1);
+    bts(logbits,(addr / 8));
+  } else {
+    if (bt(slab->markbits, 0)) {
+      bts(slab->markbits, 1);
+    }
+  }
+#endif
 }
