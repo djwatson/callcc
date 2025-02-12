@@ -140,6 +140,7 @@ bool is_undefined(gc_obj obj) { return get_imm_tag(obj) == UNDEFINED_TAG; }
 bool is_vector(gc_obj obj) { return get_tag(obj) == VECTOR_TAG; }
 bool is_symbol(gc_obj obj) { return get_tag(obj) == SYMBOL_TAG; }
 bool is_fixnum(gc_obj obj) { return get_tag(obj) == FIXNUM_TAG; }
+bool is_bignum(gc_obj obj) { return is_ptr(obj) && get_ptr_tag(obj) == BIGNUM_TAG; }
 bool is_heap_object(gc_obj obj) { return !is_fixnum(obj) && !is_literal(obj); }
 gc_obj tag_fixnum(int64_t num) {
   assert(((num << 3) >> 3) == num);
@@ -185,6 +186,13 @@ static bool is_flonum(gc_obj obj) {
 
 gc_obj SCM_IS_FLONUM(gc_obj obj) {
   if (is_flonum(obj)) {
+    return TRUE_REP;
+  }
+  return FALSE_REP;
+}
+
+gc_obj SCM_IS_BIGNUM(gc_obj obj) {
+  if (is_bignum(obj)) {
     return TRUE_REP;
   }
   return FALSE_REP;

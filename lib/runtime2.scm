@@ -414,9 +414,10 @@
 (define write display)
 
 (define (fixnum? x) (fixnum? x))
+(define (bignum? x) (sys:FOREIGN_CALL "SCM_IS_BIGNUM" x))
 (define (integer? x) (fixnum? x))
 (define (exact-integer? x) (fixnum? x))
-(define (exact? x) (fixnum? x))
+(define (exact? x) (or (fixnum? x) (bignum? x)))
 (define (inexact? x) (flonum? x))
 
 (define (inexact->exact a)
