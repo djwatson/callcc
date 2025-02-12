@@ -406,377 +406,154 @@ INLINE void* SCM_LOAD_CLOSURE_PTR(gc_obj a) {
 #endif
 }
 
-NOINLINE __attribute__((preserve_most)) gc_obj SCM_ADD_SLOW(gc_obj a, gc_obj b) {
-  double fa, fb;
-  if (is_fixnum(a)) {
-    fa = to_fixnum(a);
-  } else if (is_flonum(a)){
-    fa = to_double(a);
-  } else {
-    printf("Add: not a number:");
-    SCM_DISPLAY(a, tag_fixnum(0));
-    printf("\n");
-    abort();
-  }
-  if (is_fixnum(b)) {
-    fb = to_fixnum(b);
-  } else if (is_flonum(b)) {
-    fb = to_double(b);
-  } else {
-    printf("Add: not a number:");
-    SCM_DISPLAY(b, tag_fixnum(0));
-    printf("\n");
-    abort();
-  }
-  return double_to_gc_slow(fa + fb);
-}
+#define MATH_OVERFLOW_OP(OPNAME,OPLCNAME,OP,SHIFT)				\
+  NOINLINE __attribute__((preserve_most)) gc_obj SCM_##OPNAME##_SLOW(gc_obj a, gc_obj b) { \
+    double fa, fb;							\
+    if (is_fixnum(a)) {							\
+      fa = to_fixnum(a);						\
+    } else if (is_flonum(a)){						\
+      fa = to_double(a);						\
+    } else {								\
+      printf(#OPNAME ": not a number:");				\
+      SCM_DISPLAY(a, tag_fixnum(0));					\
+      printf("\n");							\
+      abort();								\
+    }									\
+    if (is_fixnum(b)) {							\
+      fb = to_fixnum(b);						\
+    } else if (is_flonum(b)) {						\
+      fb = to_double(b);						\
+    } else {								\
+      printf(#OPNAME ": not a number:");				\
+      SCM_DISPLAY(b, tag_fixnum(0));					\
+      printf("\n");							\
+      abort();								\
+    }									\
+    return double_to_gc_slow(OP(fa, fb));				\
+  }									\
+									\
+  INLINE gc_obj SCM_##OPNAME(gc_obj a, gc_obj b) {			\
+    if (likely((is_fixnum(a) & is_fixnum(b)) == 1)) {			\
+      gc_obj res;							\
+      if(likely(!__builtin_##OPLCNAME##_overflow(a.value, SHIFT(b.value), &res.value))) { \
+	return res;							\
+      } else {								\
+	return SCM_##OPNAME##_SLOW(a, b);				\
+      }									\
+    } else if (likely((is_flonum_fast(a) & is_flonum_fast(b)) == 1)) {	\
+      gc_obj res;							\
+      if(likely(double_to_gc(OP(to_double_fast(a), to_double_fast(b)), &res))) { \
+	return res;							\
+      } else {								\
+	return SCM_##OPNAME##_SLOW(a, b);				\
+      }									\
+    } else {								\
+      return SCM_##OPNAME##_SLOW(a, b);					\
+    }									\
+  } 
 
-INLINE gc_obj SCM_ADD(gc_obj a, gc_obj b) {
-  if (likely((is_fixnum(a) & is_fixnum(b)) == 1)) {
-    gc_obj res;
-    if(likely(!__builtin_add_overflow(a.value, b.value, &res.value))) {
-      return res;
-    } else {
-      return SCM_ADD_SLOW(a, b);
-    }
-  } else if (likely((is_flonum_fast(a) & is_flonum_fast(b)) == 1)) {
-    gc_obj res;
-    if(likely(double_to_gc(to_double_fast(a) + to_double_fast(b), &res))) {
-      return res;
-    } else {
-      return SCM_ADD_SLOW(a, b);
-    }
-  } else {
-    return SCM_ADD_SLOW(a, b);
-  }
-}
+#define MATH_ADD(a, b) ((a) + (b))
+#define MATH_SUB(a, b) ((a) - (b))
+#define MATH_MUL(a, b) ((a) * (b))
+#define NOSHIFT(a) (a)
+#define SHIFT(a) (a >> 3)
+MATH_OVERFLOW_OP(ADD,add,MATH_ADD,NOSHIFT)
+MATH_OVERFLOW_OP(SUB,sub,MATH_SUB,NOSHIFT)
+MATH_OVERFLOW_OP(MUL,mul,MATH_MUL,SHIFT)
 
-NOINLINE gc_obj SCM_MUL_SLOW(gc_obj a, gc_obj b) {
-  double fa, fb;
-  if (is_fixnum(a)) {
-    fa = to_fixnum(a);
-  } else if (is_flonum(a)) {
-    fa = to_double(a);
-  } else {
-    printf("MUL: not a number:");
-    SCM_DISPLAY(a, tag_fixnum(0));
-    printf("\n");
-    abort();
-  }
-  if (is_fixnum(b)) {
-    fb = to_fixnum(b);
-  } else if (is_flonum(b)) {
-    fb = to_double(b);
-  } else {
-    printf("MUL: not a number:");
-    SCM_DISPLAY(b, tag_fixnum(0));
-    printf("\n");
-    abort();
-  }
-  return double_to_gc_slow(fa * fb);
-}
-
-INLINE gc_obj SCM_MUL(gc_obj a, gc_obj b) {
-  if (likely((is_fixnum(a) & is_fixnum(b)) == 1)) {
-    gc_obj res;
-    if(likely(!__builtin_mul_overflow(a.value, b.value >> 3, &res.value))) {
-      return res;
-    } else {
-      [[clang::musttail]] return SCM_MUL_SLOW(a, b);
-    }
-  } else if (likely((is_flonum_fast(a) & is_flonum_fast(b)) == 1)) {
-    gc_obj res;
-    if(likely(double_to_gc(to_double_fast(a) * to_double_fast(b), &res))) {
-      return res;
-    } else {
-      [[clang::musttail]] return SCM_MUL_SLOW(a, b);
-    }
-  } else {
-    [[clang::musttail]] return SCM_MUL_SLOW(a, b);
-  }
-}
-
-NOINLINE __attribute__((preserve_most)) gc_obj SCM_SUB_SLOW(gc_obj a, gc_obj b) {
-  double fa, fb;
-  if (is_fixnum(a)) {
-    fa = to_fixnum(a);
-  } else {
-    fa = to_double(a);
-  }
-  if (is_fixnum(b)) {
-    fb = to_fixnum(b);
-  } else {
-    fb = to_double(b);
+#define MATH_SIMPLE_OP(OPNAME,OP,FPOP)					\
+									\
+  NOINLINE gc_obj SCM_##OPNAME##_SLOW(gc_obj a, gc_obj b) {		\
+    double fa, fb;							\
+    if (is_fixnum(a)) {							\
+      fa = to_fixnum(a);						\
+    } else {								\
+      fa = to_double(a);						\
+    }									\
+    if (is_fixnum(b)) {							\
+      fb = to_fixnum(b);						\
+    } else {								\
+      fb = to_double(b);						\
+    }									\
+									\
+    return double_to_gc_slow(FPOP(fa, fb));				\
+  }									\
+									\
+  INLINE gc_obj SCM_##OPNAME(gc_obj a, gc_obj b) {			\
+    if (likely((is_fixnum(a) & is_fixnum(b)) == 1)) {			\
+      return tag_fixnum(OP(to_fixnum(a), to_fixnum(b)));		\
+    } else if (likely((is_flonum_fast(a) & is_flonum_fast(b)) == 1)) {	\
+      gc_obj res;							\
+      if(likely(double_to_gc(FPOP(to_double_fast(a), to_double_fast(b)), &res))) { \
+	return res;							\
+      } else {								\
+	[[clang::musttail]] return SCM_##OPNAME##_SLOW(a, b);		\
+      }									\
+    } else {								\
+      [[clang::musttail]] return SCM_##OPNAME##_SLOW(a, b);		\
+    }									\
   }
 
-  return double_to_gc_slow(fa - fb);
-}
+#define MATH_DIV(a, b) ((a) / (b))
+#define MATH_MOD(a, b) ((a) % (b))
+#define MATH_FPMOD(a, b) (fmod((a),(b)))
+MATH_SIMPLE_OP(DIV,MATH_DIV,MATH_DIV)
+MATH_SIMPLE_OP(MOD,MATH_MOD, MATH_FPMOD)
 
-INLINE  gc_obj SCM_SUB(gc_obj a, gc_obj b) {
-  if (likely((is_fixnum(a) & is_fixnum(b)) == 1)) {
-    gc_obj res;
-    if(likely(!__builtin_sub_overflow(a.value, b.value, &res.value))) {
-      return res;
-    } else {
-      return SCM_SUB_SLOW(a, b);
-    }
-  } else if (likely((is_flonum_fast(a) & is_flonum_fast(b)) == 1)) {
-    gc_obj res;
-    if(likely(double_to_gc(to_double_fast(a) - to_double_fast(b), &res))) {
-      return res;
-    } else {
-       return SCM_SUB_SLOW(a, b);
-    }
-  } else {
-     return SCM_SUB_SLOW(a, b);
+#define MATH_COMPARE_OP(OPNAME,OP)					\
+  NOINLINE __attribute__((preserve_most)) gc_obj SCM_##OPNAME##_SLOW(gc_obj a, gc_obj b) { \
+    double fa, fb;							\
+    if (is_fixnum(a)) {							\
+      fa = to_fixnum(a);						\
+    } else if (is_flonum(a)) {						\
+      fa = to_double(a);						\
+    } else {								\
+      printf(#OPNAME ": not a number:");				\
+      SCM_DISPLAY(a, tag_fixnum(0));					\
+      printf("\n");							\
+      abort();								\
+    }									\
+    if (is_fixnum(b)) {							\
+      fb = to_fixnum(b);						\
+    } else if (is_flonum(b)){						\
+      fb = to_double(b);						\
+    } else {								\
+      printf(#OPNAME ": not a number:");				\
+      SCM_DISPLAY(b, tag_fixnum(0));					\
+      printf("\n");							\
+      abort();								\
+    }									\
+    if (OP(fa,fb)) {							\
+      return TRUE_REP;							\
+    }									\
+    return FALSE_REP;							\
+  }									\
+									\
+  INLINE gc_obj SCM_##OPNAME(gc_obj a, gc_obj b) {			\
+    if (likely((is_fixnum(a) & is_fixnum(b)) == 1)) {			\
+      if(OP(a.value, b.value)) {					\
+	return TRUE_REP;						\
+      }									\
+      return FALSE_REP;							\
+    }									\
+    if (likely((is_flonum_fast(a) & is_flonum_fast(b)) == 1)) {		\
+      if(OP(to_double_fast(a), to_double_fast(b))) {			\
+	return TRUE_REP;						\
+      }									\
+      return FALSE_REP;							\
+    }									\
+    return SCM_##OPNAME##_SLOW(a, b);					\
   }
-}
-// TODO check is_flonum
-
-NOINLINE gc_obj SCM_DIV_SLOW(gc_obj a, gc_obj b) {
-  double fa, fb;
-  if (is_fixnum(a)) {
-    fa = to_fixnum(a);
-  } else {
-    fa = to_double(a);
-  }
-  if (is_fixnum(b)) {
-    fb = to_fixnum(b);
-  } else {
-    fb = to_double(b);
-  }
-
-  return double_to_gc_slow(fa / fb);
-}
-
-INLINE gc_obj SCM_DIV(gc_obj a, gc_obj b) {
-  if (likely((is_fixnum(a) & is_fixnum(b)) == 1)) {
-    return tag_fixnum(to_fixnum(a) / to_fixnum(b));
-  } else if (likely((is_flonum_fast(a) & is_flonum_fast(b)) == 1)) {
-    gc_obj res;
-    if(likely(double_to_gc(to_double_fast(a) / to_double_fast(b), &res))) {
-      return res;
-    } else {
-      [[clang::musttail]] return SCM_DIV_SLOW(a, b);
-    }
-  } else {
-    [[clang::musttail]] return SCM_DIV_SLOW(a, b);
-  }
-}
-
-NOINLINE gc_obj SCM_MOD_SLOW(gc_obj a, gc_obj b) {
-  double fa, fb;
-  if (is_fixnum(a)) {
-    fa = to_fixnum(a);
-  } else {
-    fa = to_double(a);
-  }
-  if (is_fixnum(b)) {
-    fb = to_fixnum(b);
-  } else {
-    fb = to_double(b);
-  }
-  gc_obj res;
-  if(double_to_gc(fmod(fa, fb), &res)) {
-    return res;
-  }
-  abort();
-}
-
-INLINE gc_obj SCM_MOD(gc_obj a, gc_obj b) {
-  if (likely((is_fixnum(a) & is_fixnum(b)) == 1)) {
-    return tag_fixnum(to_fixnum(a) % to_fixnum(b));
-  } else if (likely((is_flonum_fast(a) & is_flonum_fast(b)) == 1)) {
-    gc_obj res;
-    if(likely(double_to_gc(fmod(to_double_fast(a), to_double_fast(b)), &res))) {
-      return res;
-    } else {
-      [[clang::musttail]] return SCM_MOD_SLOW(a, b);
-    }
-  } else {
-    [[clang::musttail]] return SCM_MOD_SLOW(a, b);
-  }
-}
-
-NOINLINE __attribute__((preserve_most)) gc_obj SCM_LT_SLOW(gc_obj a, gc_obj b) {
-  double fa, fb;
-  if (is_fixnum(a)) {
-    fa = to_fixnum(a);
-  } else if (is_flonum(a)) {
-    fa = to_double(a);
-  } else {
-    printf("LT: not a number:");
-    SCM_DISPLAY(a, tag_fixnum(0));
-    printf("\n");
-    abort();
-  }
-  if (is_fixnum(b)) {
-    fb = to_fixnum(b);
-  } else if (is_flonum(b)){
-    fb = to_double(b);
-  } else {
-    printf("LT: not a number:");
-    SCM_DISPLAY(b, tag_fixnum(0));
-    printf("\n");
-    abort();
-  }
-  if (fa < fb) {
-    return TRUE_REP;
-  }
-  return FALSE_REP;
-}
-
-INLINE gc_obj SCM_LT(gc_obj a, gc_obj b) {
-  if (likely((is_fixnum(a) & is_fixnum(b)) == 1)) {
-    if(a.value < b.value) {
-      return TRUE_REP;
-    }
-    return FALSE_REP;
-  }
-  if (likely((is_flonum_fast(a) & is_flonum_fast(b)) == 1)) {
-    if(to_double_fast(a) < to_double_fast(b)) {
-      return TRUE_REP;
-    }
-    return FALSE_REP;
-  }
-  return SCM_LT_SLOW(a, b);
-}
-
-NOINLINE __attribute__((preserve_most)) gc_obj SCM_LTE_SLOW(gc_obj a, gc_obj b) {
-  double fa, fb;
-  if (is_fixnum(a)) {
-    fa = to_fixnum(a);
-  } else {
-    fa = to_double(a);
-  }
-  if (is_fixnum(b)) {
-    fb = to_fixnum(b);
-  } else {
-    fb = to_double(b);
-  }
-  if (fa <= fb) {
-    return TRUE_REP;
-  }
-  return FALSE_REP;
-}
-
-INLINE gc_obj SCM_LTE(gc_obj a, gc_obj b) {
-  if (likely((is_fixnum(a) & is_fixnum(b)) == 1)) {
-    if(a.value <= b.value) {
-      return TRUE_REP;
-    }
-    return FALSE_REP;
-  }
-  if (likely((is_flonum_fast(a) & is_flonum_fast(b)) == 1)) {
-    if(to_double_fast(a) <= to_double_fast(b)) {
-      return TRUE_REP;
-    }
-    return FALSE_REP;
-  }
-  return SCM_LTE_SLOW(a, b);
-}
-
-NOINLINE gc_obj SCM_GT_SLOW(gc_obj a, gc_obj b) {
-  double fa, fb;
-  if (is_fixnum(a)) {
-    fa = to_fixnum(a);
-  } else {
-    fa = to_double(a);
-  }
-  if (is_fixnum(b)) {
-    fb = to_fixnum(b);
-  } else {
-    fb = to_double(b);
-  }
-  if (fa > fb) {
-    return TRUE_REP;
-  }
-  return FALSE_REP;
-}
-
-INLINE gc_obj SCM_GT(gc_obj a, gc_obj b) {
-  if (likely((is_fixnum(a) & is_fixnum(b)) == 1)) {
-    if(a.value > b.value) {
-      return TRUE_REP;
-    }
-    return FALSE_REP;
-  }
-  if (likely((is_flonum_fast(a) & is_flonum_fast(b)) == 1)) {
-    if(to_double_fast(a) > to_double_fast(b)) {
-      return TRUE_REP;
-    }
-    return FALSE_REP;
-  }
-  [[clang::musttail]] return SCM_GT_SLOW(a, b);
-}
-
-NOINLINE gc_obj SCM_GTE_SLOW(gc_obj a, gc_obj b) {
-  double fa, fb;
-  if (is_fixnum(a)) {
-    fa = to_fixnum(a);
-  } else {
-    fa = to_double(a);
-  }
-  if (is_fixnum(b)) {
-    fb = to_fixnum(b);
-  } else {
-    fb = to_double(b);
-  }
-  if (fa >= fb) {
-    return TRUE_REP;
-  }
-  return FALSE_REP;
-}
-
-INLINE gc_obj SCM_GTE(gc_obj a, gc_obj b) {
-  if (likely((is_fixnum(a) & is_fixnum(b)) == 1)) {
-    if(a.value >= b.value) {
-      return TRUE_REP;
-    }
-    return FALSE_REP;
-  }
-  if (likely((is_flonum_fast(a) & is_flonum_fast(b)) == 1)) {
-    if(to_double_fast(a) >= to_double_fast(b)) {
-      return TRUE_REP;
-    }
-    return FALSE_REP;
-  }
-  [[clang::musttail]] return SCM_GTE_SLOW(a, b);
-}
-
-NOINLINE __attribute__((preserve_most)) gc_obj SCM_NUM_EQ_SLOW(gc_obj a, gc_obj b) {
-  double fa, fb;
-  if (is_fixnum(a)) {
-    fa = to_fixnum(a);
-  } else {
-    fa = to_double(a);
-  }
-  if (is_fixnum(b)) {
-    fb = to_fixnum(b);
-  } else {
-    fb = to_double(b);
-  }
-  if (fa == fb) {
-    return TRUE_REP;
-  }
-  return FALSE_REP;
-}
-
-INLINE gc_obj SCM_NUM_EQ(gc_obj a, gc_obj b) {
-  if (likely((is_fixnum(a) & is_fixnum(b)) == 1)) {
-    if(a.value == b.value) {
-      return TRUE_REP;
-    }
-    return FALSE_REP;
-  }
-  if (likely((is_flonum_fast(a) & is_flonum_fast(b)) == 1)) {
-    if(to_double_fast(a) == to_double_fast(b)) {
-      return TRUE_REP;
-    }
-    return FALSE_REP;
-  }
-  return SCM_NUM_EQ_SLOW(a, b);
-}
+#define MATH_LT(a, b) ((a) < (b))
+#define MATH_LTE(a, b) ((a) <= (b))
+#define MATH_GT(a, b) ((a) > (b))
+#define MATH_GTE(a, b) ((a) >= (b))
+#define MATH_EQ(a, b) ((a) == (b))
+MATH_COMPARE_OP(LT,MATH_LT)
+MATH_COMPARE_OP(LTE,MATH_LTE)
+MATH_COMPARE_OP(GT,MATH_GT)
+MATH_COMPARE_OP(GTE,MATH_GTE)
+MATH_COMPARE_OP(NUM_EQ,MATH_EQ)
 
 INLINE gc_obj SCM_CAR(gc_obj obj) {
   #ifndef UNSAFE
