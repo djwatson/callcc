@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <gmp.h>
 #include <math.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -24,7 +25,10 @@
   X(CLOSURE, 0x12)                                                             \
   X(SYMBOL, 0x1a)                                                              \
   X(CONT, 0x22)                                                                \
-  X(FLONUM, 0x2a)
+  X(FLONUM, 0x2a)                                                              \
+  X(BIGNUM, 0x32)                                                              \
+  X(RATNUM, 0x3a)                                                              \
+  X(COMPNUM, 0x42)
 
 #define IMMEDIATE_TAGS                                                         \
   X(BOOL, 0x6)                                                                 \
@@ -62,6 +66,11 @@ typedef struct flonum_s {
   uint64_t type;
   double x;
 } flonum_s;
+
+typedef struct bignum_s {
+  uint64_t type;
+  mpz_t x;
+} bignum_s;
 
 typedef struct string_s {
   uint64_t type;
@@ -102,6 +111,7 @@ void *to_raw_ptr(gc_obj obj) { return (void *)(obj.value & ~TAG_MASK); }
 string_s *to_string(gc_obj obj) { return (string_s *)(obj.value - PTR_TAG); }
 symbol *to_symbol(gc_obj obj) { return (symbol *)(obj.value - PTR_TAG); }
 int64_t to_fixnum(gc_obj obj) { return obj.value >> 3; }
+bignum_s *to_bignum(gc_obj obj) { return (bignum_s *)(obj.value - PTR_TAG); }
 cons_s *to_cons(gc_obj obj) { return (cons_s *)(obj.value - CONS_TAG); }
 vector_s *to_vector(gc_obj obj) { return (vector_s *)(obj.value - VECTOR_TAG); }
 record_s *to_record(gc_obj obj) { return (record_s *)(obj.value - PTR_TAG); }
@@ -282,6 +292,13 @@ gc_obj SCM_DISPLAY(gc_obj obj, gc_obj scmfd) {
       display_double(obj, fd);
       break;
     }
+    case BIGNUM_TAG: {
+      auto bn = to_bignum(obj);
+      char *gstr = mpz_get_str(nullptr, 10, bn->x);
+      dprintf(fd, "%s", gstr);
+      free(gstr);
+      break;
+    }
     default:
       printf("Unknown ptr tag: %i\n", ptr_tag);
       abort();
@@ -409,31 +426,96 @@ INLINE void *SCM_LOAD_CLOSURE_PTR(gc_obj a) {
 #endif
 }
 
+static uint64_t get_math_type(gc_obj o) {
+  if (is_ptr(o)) {
+    return get_ptr_tag(o);
+  }
+  return get_tag(o);
+}
+
+#define SWAP(a, b)                                                             \
+  do {                                                                         \
+    typeof(a) temp = a;                                                        \
+    (a) = b;                                                                   \
+    (b) = temp;                                                                \
+  } while (0)
+
+static gc_obj tag_bignum(mpz_t a) {
+  // Simplify to fixnum if possible.
+  if (mpz_fits_sint_p(a)) {
+    return tag_fixnum(mpz_get_si(a));
+  }
+  bignum_s *res = rcimmix_alloc(sizeof(bignum_s));
+  res->type = BIGNUM_TAG;
+  mpz_set(res->x, a);
+  return tag_ptr(res);
+}
+
 #define MATH_OVERFLOW_OP(OPNAME, OPLCNAME, OP, SHIFT)                          \
   NOINLINE __attribute__((preserve_most)) gc_obj SCM_##OPNAME##_SLOW(          \
       gc_obj a, gc_obj b) {                                                    \
-    double fa, fb;                                                             \
-    if (is_fixnum(a)) {                                                        \
-      fa = to_fixnum(a);                                                       \
-    } else if (is_flonum(a)) {                                                 \
-      fa = to_double(a);                                                       \
-    } else {                                                                   \
+    auto ta = get_math_type(a);                                                \
+    auto tb = get_math_type(b);                                                \
+    if (tb > ta) {                                                             \
+      SWAP(ta, tb);                                                            \
+      SWAP(a, b);                                                              \
+    }                                                                          \
+    switch (ta) {                                                              \
+    case FIXNUM_TAG: {                                                         \
+      gc_obj res;                                                              \
+      if (!__builtin_##OPLCNAME##_overflow(a.value, SHIFT(b.value),            \
+                                           &res.value)) {                      \
+        return res;                                                            \
+      }                                                                        \
+      /* make it a bignum, result overflowed */                                \
+      mpz_t ba;                                                                \
+      mpz_t bb;                                                                \
+      mpz_t bres;                                                              \
+      mpz_init(bres);                                                          \
+      mpz_init_set_si(ba, to_fixnum(a));                                       \
+      mpz_init_set_si(bb, to_fixnum(b));                                       \
+      mpz_##OPLCNAME(bres, ba, bb);                                            \
+      return tag_bignum(bres);                                                 \
+    }                                                                          \
+    case FLONUM_TAG:                                                           \
+    case FLONUM1_TAG:                                                          \
+    case FLONUM2_TAG:                                                          \
+    case FLONUM3_TAG:                                                          \
+      double fb;                                                               \
+      double fa = to_double(a);                                                \
+      if (tb == FIXNUM_TAG) {                                                  \
+        fb = to_fixnum(b);                                                     \
+      } else {                                                                 \
+        fb = to_double(b);                                                     \
+      }                                                                        \
+      return double_to_gc_slow(OP(fb, fa));                                    \
+    case BIGNUM_TAG:                                                           \
+      mpz_t bres;                                                              \
+      mpz_init(bres);                                                          \
+      switch (tb) {                                                            \
+      case FIXNUM_TAG:                                                         \
+        mpz_t bb;                                                              \
+        mpz_init_set_si(bb, to_fixnum(b));                                     \
+        mpz_##OPLCNAME(bres, to_bignum(a)->x, bb);                             \
+        return tag_bignum(bres);                                               \
+      case FLONUM_TAG:                                                         \
+      case FLONUM1_TAG:                                                        \
+      case FLONUM2_TAG:                                                        \
+      case FLONUM3_TAG:                                                        \
+        double fa = mpz_get_d(to_bignum(a)->x);                                \
+        return double_to_gc_slow(OP(fa, to_double(b)));                        \
+      case BIGNUM_TAG:                                                         \
+        mpz_##OPLCNAME(bres, to_bignum(a)->x, to_bignum(b)->x);                \
+        return tag_bignum(bres);                                               \
+      default:                                                                 \
+        abort();                                                               \
+      }                                                                        \
+    default:                                                                   \
       printf(#OPNAME ": not a number:");                                       \
       SCM_DISPLAY(a, tag_fixnum(0));                                           \
       printf("\n");                                                            \
       abort();                                                                 \
     }                                                                          \
-    if (is_fixnum(b)) {                                                        \
-      fb = to_fixnum(b);                                                       \
-    } else if (is_flonum(b)) {                                                 \
-      fb = to_double(b);                                                       \
-    } else {                                                                   \
-      printf(#OPNAME ": not a number:");                                       \
-      SCM_DISPLAY(b, tag_fixnum(0));                                           \
-      printf("\n");                                                            \
-      abort();                                                                 \
-    }                                                                          \
-    return double_to_gc_slow(OP(fa, fb));                                      \
   }                                                                            \
                                                                                \
   INLINE gc_obj SCM_##OPNAME(gc_obj a, gc_obj b) {                             \
@@ -473,13 +555,17 @@ MATH_OVERFLOW_OP(MUL, mul, MATH_MUL, SHIFT)
     double fa, fb;                                                             \
     if (is_fixnum(a)) {                                                        \
       fa = to_fixnum(a);                                                       \
-    } else {                                                                   \
+    } else if (is_flonum(a)) {                                                 \
       fa = to_double(a);                                                       \
+    } else {                                                                   \
+      abort();                                                                 \
     }                                                                          \
     if (is_fixnum(b)) {                                                        \
       fb = to_fixnum(b);                                                       \
-    } else {                                                                   \
+    } else if (is_flonum(b)) {                                                 \
       fb = to_double(b);                                                       \
+    } else {                                                                   \
+      abort();                                                                 \
     }                                                                          \
                                                                                \
     return double_to_gc_slow(FPOP(fa, fb));                                    \
@@ -510,31 +596,63 @@ MATH_SIMPLE_OP(MOD, MATH_MOD, MATH_FPMOD)
 #define MATH_COMPARE_OP(OPNAME, OP)                                            \
   NOINLINE __attribute__((preserve_most)) gc_obj SCM_##OPNAME##_SLOW(          \
       gc_obj a, gc_obj b) {                                                    \
-    double fa, fb;                                                             \
-    if (is_fixnum(a)) {                                                        \
-      fa = to_fixnum(a);                                                       \
-    } else if (is_flonum(a)) {                                                 \
-      fa = to_double(a);                                                       \
-    } else {                                                                   \
-      printf(#OPNAME ": not a number:");                                       \
-      SCM_DISPLAY(a, tag_fixnum(0));                                           \
-      printf("\n");                                                            \
+    auto ta = get_math_type(a);                                                \
+    auto tb = get_math_type(b);                                                \
+    auto fail = FALSE_REP;                                                     \
+    auto ok = TRUE_REP;                                                        \
+    if (tb > ta) {                                                             \
+      SWAP(ta, tb);                                                            \
+      SWAP(a, b);                                                              \
+      SWAP(ok, fail);                                                          \
+    }                                                                          \
+    switch (ta) {                                                              \
+    case FIXNUM_TAG:                                                           \
+      if (OP(a.value, b.value)) {                                              \
+        return ok;                                                             \
+      }                                                                        \
+      break;                                                                   \
+    case FLONUM_TAG:                                                           \
+    case FLONUM1_TAG:                                                          \
+    case FLONUM2_TAG:                                                          \
+    case FLONUM3_TAG:                                                          \
+      if (tb == FIXNUM_TAG) {                                                  \
+        if (OP(to_double(a), to_fixnum(b))) {                                  \
+          return ok;                                                           \
+        }                                                                      \
+      } else {                                                                 \
+        if (OP(to_double(a), to_double(b))) {                                  \
+          return ok;                                                           \
+        }                                                                      \
+      }                                                                        \
+      break;                                                                   \
+    case BIGNUM_TAG:                                                           \
+      switch (tb) {                                                            \
+      case FIXNUM_TAG:                                                         \
+        if (OP(mpz_cmp_si(to_bignum(a)->x, to_fixnum(b)), 0)) {                \
+          return ok;                                                           \
+        }                                                                      \
+        break;                                                                 \
+      case FLONUM_TAG:                                                         \
+      case FLONUM1_TAG:                                                        \
+      case FLONUM2_TAG:                                                        \
+      case FLONUM3_TAG:                                                        \
+        if (OP(mpz_cmp_d(to_bignum(a)->x, to_double(b)), 0)) {                 \
+          return ok;                                                           \
+        }                                                                      \
+        break;                                                                 \
+      case BIGNUM_TAG:                                                         \
+        if (OP(mpz_cmp(to_bignum(a)->x, to_bignum(b)->x), 0)) {                \
+          return ok;                                                           \
+        }                                                                      \
+        break;                                                                 \
+      default:                                                                 \
+        abort();                                                               \
+      }                                                                        \
+      break;                                                                   \
+    default:                                                                   \
       abort();                                                                 \
     }                                                                          \
-    if (is_fixnum(b)) {                                                        \
-      fb = to_fixnum(b);                                                       \
-    } else if (is_flonum(b)) {                                                 \
-      fb = to_double(b);                                                       \
-    } else {                                                                   \
-      printf(#OPNAME ": not a number:");                                       \
-      SCM_DISPLAY(b, tag_fixnum(0));                                           \
-      printf("\n");                                                            \
-      abort();                                                                 \
-    }                                                                          \
-    if (OP(fa, fb)) {                                                          \
-      return TRUE_REP;                                                         \
-    }                                                                          \
-    return FALSE_REP;                                                          \
+    return fail;                                                               \
   }                                                                            \
                                                                                \
   INLINE gc_obj SCM_##OPNAME(gc_obj a, gc_obj b) {                             \
