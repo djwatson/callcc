@@ -1,7 +1,11 @@
-* preserve_none seems to be smashing rbp. Doh.
+# known bugs:
+ * Call/cc broken with --coverage in clang.
 
 # benchmarks:
   * Needs inliner to remove alloc: graphs
+  * faster with float type: fft fibfp mbrot pnpoly simplex sumfp
+  * faster with list/int typecheck removal: quicksort primes puzzle array1
+  * faster with single-shot continuations: ctak fibc
   
   * complex: mbrotZ
   
@@ -11,10 +15,11 @@
   * bignums: pi chudnovsky
 
 # GC stuff:
-  * GC faster marklarge
-  * Maybe add type tag to vec/cons, and use a bit to indicate 'young' for logging.
-    * Mostly matters for vector?
-    * use field-logging?  Or even simple RC?
+* cleanup vector sizing: just use another header for large similar to small logbits?
+  * large could always use markbits, but it doesn't show up in any tests currently.
+* And do same thing for static symbols?
+* Cleanup the GC roots, some should be in types, add_root unused currently.
+* Remove the radix tree: just use pre-allocated virtual space.
 	
 * storage use analysis: unboxing flonums, longjmp/setjmp call/cc, and typecheck removal.
    * call/cc can just be a simple escape analysis? global though
@@ -47,4 +52,5 @@
 
 * recheck GC get stack top
 
-* call/cc: figure out valgrind or address santizer workings?
+# call/cc
+  * call/cc: figure out valgrind or address santizer workings?

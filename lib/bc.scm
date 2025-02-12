@@ -350,7 +350,7 @@
   (and (number? c) (inexact? c)))
 
 (define (fixnum? c)
-  (and (number? c) (exact? c)
+  (and (number? c) (exact? c) (integer? c)  (real? c)
        (< (abs c) #x1fffffffffffffff)))
 
 (define (fix-string-format str) ;; some extra work since we have no char-type.
