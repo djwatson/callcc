@@ -1,29 +1,29 @@
-#include <stdint.h>
-#include <string.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <stdbool.h>
 #include <assert.h>
 #include <math.h>
+#include <stdbool.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 #include "gc.h"
 
-#define LOW_TAGS							\
+#define LOW_TAGS                                                               \
   X(FIXNUM, 0)                                                                 \
-  X(FLONUM1, 1)                                                                    \
-  X(PTR, 2)                                                                 \
+  X(FLONUM1, 1)                                                                \
+  X(PTR, 2)                                                                    \
   X(CONS, 3)                                                                   \
   X(FLONUM2, 4)                                                                \
   X(FLONUM3, 5)                                                                \
-  X(LITERAL, 6)                                                                 \
+  X(LITERAL, 6)                                                                \
   X(VECTOR, 7)
 
 #define PTR_TAGS                                                               \
-  X(STRING, 0x2)                                                              \
+  X(STRING, 0x2)                                                               \
   X(RECORD, 0xa)                                                               \
-  X(CLOSURE, 0x12)							\
-  X(SYMBOL, 0x1a)							\
-  X(CONT, 0x22)							\
+  X(CLOSURE, 0x12)                                                             \
+  X(SYMBOL, 0x1a)                                                              \
+  X(CONT, 0x22)                                                                \
   X(FLONUM, 0x2a)
 
 #define IMMEDIATE_TAGS                                                         \
@@ -77,7 +77,7 @@ typedef struct symbol {
 
 typedef struct vector_s {
   gc_obj len;
-  void* slab;
+  void *slab;
   gc_obj v[];
 } vector_s;
 
@@ -116,7 +116,9 @@ uint32_t get_ptr_tag(gc_obj obj) {
 bool is_char(gc_obj obj) { return get_imm_tag(obj) == CHAR_TAG; }
 bool is_cons(gc_obj obj) { return get_tag(obj) == CONS_TAG; }
 bool is_ptr(gc_obj obj) { return get_tag(obj) == PTR_TAG; }
-bool is_closure(gc_obj obj) { return is_ptr(obj) && get_ptr_tag(obj) == CLOSURE_TAG; }
+bool is_closure(gc_obj obj) {
+  return is_ptr(obj) && get_ptr_tag(obj) == CLOSURE_TAG;
+}
 bool is_literal(gc_obj obj) { return get_tag(obj) == LITERAL_TAG; }
 bool is_string(gc_obj obj) {
   return is_ptr(obj) && get_ptr_tag(obj) == STRING_TAG;
@@ -151,21 +153,21 @@ gc_obj tag_closure(closure_s *s) {
 gc_obj tag_char(char ch) {
   return (gc_obj){.value = (((int64_t)ch << 8) + CHAR_TAG)};
 }
-gc_obj tag_symbol(symbol* s) {
+gc_obj tag_symbol(symbol *s) {
   return (gc_obj){.value = ((int64_t)s + PTR_TAG)};
 }
-gc_obj tag_ptr(void* s) {
-  return (gc_obj){.value = ((int64_t)s + PTR_TAG)};
-}
+gc_obj tag_ptr(void *s) { return (gc_obj){.value = ((int64_t)s + PTR_TAG)}; }
 
-#define TAG_SET2 ((1 <<5)|(1 <<4)|(1 <<1))
-static bool has_tag_5_or_4_or_1 ( int64_t n ) {
+#define TAG_SET2 ((1 << 5) | (1 << 4) | (1 << 1))
+static bool has_tag_5_or_4_or_1(int64_t n) {
   // Note that unlike the paper, we need to explictly ensure n is
   // masked to 5 bits: shifting by more than 32 bits here is undefined
   // behavior, and clang will happily optimize everything out.
-  return ((( uint32_t )1 << (n&0x1f) ) & (~( uint32_t )0/0xff * TAG_SET2 )) != 0;
+  return (((uint32_t)1 << (n & 0x1f)) & (~(uint32_t)0 / 0xff * TAG_SET2)) != 0;
 }
-static bool is_flonum_fast(gc_obj obj) { return has_tag_5_or_4_or_1(obj.value); }
+static bool is_flonum_fast(gc_obj obj) {
+  return has_tag_5_or_4_or_1(obj.value);
+}
 
 static bool is_flonum(gc_obj obj) {
   return is_flonum_fast(obj) || (is_ptr(obj) && get_ptr_tag(obj) == FLONUM_TAG);
@@ -178,7 +180,7 @@ gc_obj SCM_IS_FLONUM(gc_obj obj) {
   return FALSE_REP;
 }
 
-bool double_to_gc(double d, gc_obj* res) {
+bool double_to_gc(double d, gc_obj *res) {
   uint64_t di;
   memcpy(&di, &d, sizeof(d));
   di = __builtin_rotateleft64(di, 4);
@@ -198,7 +200,7 @@ gc_obj double_to_gc_slow(double d) {
   if (has_tag_5_or_4_or_1(di)) {
     return (gc_obj){.value = di};
   }
-  flonum_s* f = rcimmix_alloc(sizeof(flonum_s));
+  flonum_s *f = rcimmix_alloc(sizeof(flonum_s));
   f->type = FLONUM_TAG;
   f->x = d;
   return tag_ptr(f);
@@ -206,7 +208,7 @@ gc_obj double_to_gc_slow(double d) {
 
 double to_double(gc_obj obj) {
   if (is_ptr(obj)) {
-    flonum_s* f = to_raw_ptr(obj);
+    flonum_s *f = to_raw_ptr(obj);
     return f->x;
   }
   assert(has_tag_5_or_4_or_1(obj.value));
@@ -226,22 +228,22 @@ double to_double_fast(gc_obj obj) {
 }
 
 static void display_double(gc_obj obj, int fd) {
-    char buffer[40];
-    double d = to_double(obj);
-    snprintf(buffer, 40 - 3, "%g", d);
-    if (strpbrk(buffer, ".eE") == nullptr) {
-      size_t len = strlen(buffer);
-      buffer[len] = '.';
-      buffer[len + 1] = '0';
-      buffer[len + 2] = '\0';
-    }
-    dprintf(fd, "%s", buffer);
+  char buffer[40];
+  double d = to_double(obj);
+  snprintf(buffer, 40 - 3, "%g", d);
+  if (strpbrk(buffer, ".eE") == nullptr) {
+    size_t len = strlen(buffer);
+    buffer[len] = '.';
+    buffer[len + 1] = '0';
+    buffer[len + 2] = '\0';
+  }
+  dprintf(fd, "%s", buffer);
 }
 
 gc_obj SCM_DISPLAY(gc_obj obj, gc_obj scmfd) {
   int fd = (int)to_fixnum(scmfd);
   auto tag = get_tag(obj);
-  switch(tag) {
+  switch (tag) {
   case FIXNUM_TAG:
     dprintf(fd, "%li", to_fixnum(obj));
     break;
@@ -252,7 +254,7 @@ gc_obj SCM_DISPLAY(gc_obj obj, gc_obj scmfd) {
     break;
   case PTR_TAG: {
     auto ptr_tag = get_ptr_tag(obj);
-    switch(ptr_tag) {
+    switch (ptr_tag) {
     case STRING_TAG: {
       auto str = to_string(obj);
       dprintf(fd, "%.*s", (int)to_fixnum(str->len), str->str);
@@ -304,16 +306,16 @@ gc_obj SCM_DISPLAY(gc_obj obj, gc_obj scmfd) {
   }
   case LITERAL_TAG: {
     auto lit_tag = get_imm_tag(obj);
-    switch(lit_tag) {
+    switch (lit_tag) {
     case CHAR_TAG: {
       dprintf(fd, "%c", to_char(obj));
       break;
     }
     case BOOL_TAG: {
       if (obj.value == TRUE_REP.value) {
-	dprintf(fd, "#t");
+        dprintf(fd, "#t");
       } else if (obj.value == FALSE_REP.value) {
-	dprintf(fd, "#f");
+        dprintf(fd, "#f");
       }
       break;
     }
@@ -323,7 +325,7 @@ gc_obj SCM_DISPLAY(gc_obj obj, gc_obj scmfd) {
     }
     case UNDEFINED_TAG: {
       dprintf(fd, "#<undef>");
-	break;
+      break;
     }
     default:
       printf("Unknown lit tag: %i\n", lit_tag);
@@ -334,9 +336,9 @@ gc_obj SCM_DISPLAY(gc_obj obj, gc_obj scmfd) {
   case VECTOR_TAG: {
     auto v = to_vector(obj);
     dprintf(fd, "#(");
-    for(uint64_t i = 0; i < to_fixnum(v->len); i++) {
+    for (uint64_t i = 0; i < to_fixnum(v->len); i++) {
       if (i != 0) {
-	dprintf(fd, " ");
+        dprintf(fd, " ");
       }
       SCM_DISPLAY(v->v[i], scmfd);
     }
@@ -358,11 +360,12 @@ gc_obj SCM_DISPLAY(gc_obj obj, gc_obj scmfd) {
 
 NOINLINE gc_obj SCM_LOAD_GLOBAL_FAIL(gc_obj a) {
   auto str = to_string(to_symbol(a)->name);
-  printf("Attempting to load undefined sym: %.*s\n", (int)to_fixnum(str->len), str->str);
+  printf("Attempting to load undefined sym: %.*s\n", (int)to_fixnum(str->len),
+         str->str);
   abort();
 }
 INLINE gc_obj SCM_LOAD_GLOBAL(gc_obj a) {
-  //assert(is_symbol(a));
+  // assert(is_symbol(a));
   auto sym = to_symbol(a);
   auto val = sym->val;
 #ifndef UNSAFE
@@ -379,7 +382,7 @@ INLINE void SCM_SET_GLOBAL(gc_obj a, gc_obj b) {
   auto sym = to_symbol(a);
   sym->val = b;
   // gclog check if static, if not, quick set
-  //printf("log global\n");
+  // printf("log global\n");
   gc_log((uint64_t)&sym->val);
 }
 
@@ -388,13 +391,13 @@ NOINLINE void SCM_ARGCNT_FAIL() {
   abort();
 }
 
-NOINLINE void* SCM_LOAD_CLOSURE_PTR_FAIL(gc_obj a) {
+NOINLINE void *SCM_LOAD_CLOSURE_PTR_FAIL(gc_obj a) {
   printf("Attempting to call non-closure:");
   SCM_DISPLAY(a, tag_fixnum(0));
   printf("\n");
   abort();
 }
-INLINE void* SCM_LOAD_CLOSURE_PTR(gc_obj a) {
+INLINE void *SCM_LOAD_CLOSURE_PTR(gc_obj a) {
 #ifndef UNSAFE
   if (likely(is_closure(a))) {
 #endif
@@ -406,179 +409,184 @@ INLINE void* SCM_LOAD_CLOSURE_PTR(gc_obj a) {
 #endif
 }
 
-#define MATH_OVERFLOW_OP(OPNAME,OPLCNAME,OP,SHIFT)				\
-  NOINLINE __attribute__((preserve_most)) gc_obj SCM_##OPNAME##_SLOW(gc_obj a, gc_obj b) { \
-    double fa, fb;							\
-    if (is_fixnum(a)) {							\
-      fa = to_fixnum(a);						\
-    } else if (is_flonum(a)){						\
-      fa = to_double(a);						\
-    } else {								\
-      printf(#OPNAME ": not a number:");				\
-      SCM_DISPLAY(a, tag_fixnum(0));					\
-      printf("\n");							\
-      abort();								\
-    }									\
-    if (is_fixnum(b)) {							\
-      fb = to_fixnum(b);						\
-    } else if (is_flonum(b)) {						\
-      fb = to_double(b);						\
-    } else {								\
-      printf(#OPNAME ": not a number:");				\
-      SCM_DISPLAY(b, tag_fixnum(0));					\
-      printf("\n");							\
-      abort();								\
-    }									\
-    return double_to_gc_slow(OP(fa, fb));				\
-  }									\
-									\
-  INLINE gc_obj SCM_##OPNAME(gc_obj a, gc_obj b) {			\
-    if (likely((is_fixnum(a) & is_fixnum(b)) == 1)) {			\
-      gc_obj res;							\
-      if(likely(!__builtin_##OPLCNAME##_overflow(a.value, SHIFT(b.value), &res.value))) { \
-	return res;							\
-      } else {								\
-	return SCM_##OPNAME##_SLOW(a, b);				\
-      }									\
-    } else if (likely((is_flonum_fast(a) & is_flonum_fast(b)) == 1)) {	\
-      gc_obj res;							\
-      if(likely(double_to_gc(OP(to_double_fast(a), to_double_fast(b)), &res))) { \
-	return res;							\
-      } else {								\
-	return SCM_##OPNAME##_SLOW(a, b);				\
-      }									\
-    } else {								\
-      return SCM_##OPNAME##_SLOW(a, b);					\
-    }									\
-  } 
+#define MATH_OVERFLOW_OP(OPNAME, OPLCNAME, OP, SHIFT)                          \
+  NOINLINE __attribute__((preserve_most)) gc_obj SCM_##OPNAME##_SLOW(          \
+      gc_obj a, gc_obj b) {                                                    \
+    double fa, fb;                                                             \
+    if (is_fixnum(a)) {                                                        \
+      fa = to_fixnum(a);                                                       \
+    } else if (is_flonum(a)) {                                                 \
+      fa = to_double(a);                                                       \
+    } else {                                                                   \
+      printf(#OPNAME ": not a number:");                                       \
+      SCM_DISPLAY(a, tag_fixnum(0));                                           \
+      printf("\n");                                                            \
+      abort();                                                                 \
+    }                                                                          \
+    if (is_fixnum(b)) {                                                        \
+      fb = to_fixnum(b);                                                       \
+    } else if (is_flonum(b)) {                                                 \
+      fb = to_double(b);                                                       \
+    } else {                                                                   \
+      printf(#OPNAME ": not a number:");                                       \
+      SCM_DISPLAY(b, tag_fixnum(0));                                           \
+      printf("\n");                                                            \
+      abort();                                                                 \
+    }                                                                          \
+    return double_to_gc_slow(OP(fa, fb));                                      \
+  }                                                                            \
+                                                                               \
+  INLINE gc_obj SCM_##OPNAME(gc_obj a, gc_obj b) {                             \
+    if (likely((is_fixnum(a) & is_fixnum(b)) == 1)) {                          \
+      gc_obj res;                                                              \
+      if (likely(!__builtin_##OPLCNAME##_overflow(a.value, SHIFT(b.value),     \
+                                                  &res.value))) {              \
+        return res;                                                            \
+      } else {                                                                 \
+        return SCM_##OPNAME##_SLOW(a, b);                                      \
+      }                                                                        \
+    } else if (likely((is_flonum_fast(a) & is_flonum_fast(b)) == 1)) {         \
+      gc_obj res;                                                              \
+      if (likely(                                                              \
+              double_to_gc(OP(to_double_fast(a), to_double_fast(b)), &res))) { \
+        return res;                                                            \
+      } else {                                                                 \
+        return SCM_##OPNAME##_SLOW(a, b);                                      \
+      }                                                                        \
+    } else {                                                                   \
+      return SCM_##OPNAME##_SLOW(a, b);                                        \
+    }                                                                          \
+  }
 
 #define MATH_ADD(a, b) ((a) + (b))
 #define MATH_SUB(a, b) ((a) - (b))
 #define MATH_MUL(a, b) ((a) * (b))
 #define NOSHIFT(a) (a)
 #define SHIFT(a) (a >> 3)
-MATH_OVERFLOW_OP(ADD,add,MATH_ADD,NOSHIFT)
-MATH_OVERFLOW_OP(SUB,sub,MATH_SUB,NOSHIFT)
-MATH_OVERFLOW_OP(MUL,mul,MATH_MUL,SHIFT)
+MATH_OVERFLOW_OP(ADD, add, MATH_ADD, NOSHIFT)
+MATH_OVERFLOW_OP(SUB, sub, MATH_SUB, NOSHIFT)
+MATH_OVERFLOW_OP(MUL, mul, MATH_MUL, SHIFT)
 
-#define MATH_SIMPLE_OP(OPNAME,OP,FPOP)					\
-									\
-  NOINLINE gc_obj SCM_##OPNAME##_SLOW(gc_obj a, gc_obj b) {		\
-    double fa, fb;							\
-    if (is_fixnum(a)) {							\
-      fa = to_fixnum(a);						\
-    } else {								\
-      fa = to_double(a);						\
-    }									\
-    if (is_fixnum(b)) {							\
-      fb = to_fixnum(b);						\
-    } else {								\
-      fb = to_double(b);						\
-    }									\
-									\
-    return double_to_gc_slow(FPOP(fa, fb));				\
-  }									\
-									\
-  INLINE gc_obj SCM_##OPNAME(gc_obj a, gc_obj b) {			\
-    if (likely((is_fixnum(a) & is_fixnum(b)) == 1)) {			\
-      return tag_fixnum(OP(to_fixnum(a), to_fixnum(b)));		\
-    } else if (likely((is_flonum_fast(a) & is_flonum_fast(b)) == 1)) {	\
-      gc_obj res;							\
-      if(likely(double_to_gc(FPOP(to_double_fast(a), to_double_fast(b)), &res))) { \
-	return res;							\
-      } else {								\
-	[[clang::musttail]] return SCM_##OPNAME##_SLOW(a, b);		\
-      }									\
-    } else {								\
-      [[clang::musttail]] return SCM_##OPNAME##_SLOW(a, b);		\
-    }									\
+#define MATH_SIMPLE_OP(OPNAME, OP, FPOP)                                       \
+                                                                               \
+  NOINLINE gc_obj SCM_##OPNAME##_SLOW(gc_obj a, gc_obj b) {                    \
+    double fa, fb;                                                             \
+    if (is_fixnum(a)) {                                                        \
+      fa = to_fixnum(a);                                                       \
+    } else {                                                                   \
+      fa = to_double(a);                                                       \
+    }                                                                          \
+    if (is_fixnum(b)) {                                                        \
+      fb = to_fixnum(b);                                                       \
+    } else {                                                                   \
+      fb = to_double(b);                                                       \
+    }                                                                          \
+                                                                               \
+    return double_to_gc_slow(FPOP(fa, fb));                                    \
+  }                                                                            \
+                                                                               \
+  INLINE gc_obj SCM_##OPNAME(gc_obj a, gc_obj b) {                             \
+    if (likely((is_fixnum(a) & is_fixnum(b)) == 1)) {                          \
+      return tag_fixnum(OP(to_fixnum(a), to_fixnum(b)));                       \
+    } else if (likely((is_flonum_fast(a) & is_flonum_fast(b)) == 1)) {         \
+      gc_obj res;                                                              \
+      if (likely(double_to_gc(FPOP(to_double_fast(a), to_double_fast(b)),      \
+                              &res))) {                                        \
+        return res;                                                            \
+      } else {                                                                 \
+        [[clang::musttail]] return SCM_##OPNAME##_SLOW(a, b);                  \
+      }                                                                        \
+    } else {                                                                   \
+      [[clang::musttail]] return SCM_##OPNAME##_SLOW(a, b);                    \
+    }                                                                          \
   }
 
 #define MATH_DIV(a, b) ((a) / (b))
 #define MATH_MOD(a, b) ((a) % (b))
-#define MATH_FPMOD(a, b) (fmod((a),(b)))
-MATH_SIMPLE_OP(DIV,MATH_DIV,MATH_DIV)
-MATH_SIMPLE_OP(MOD,MATH_MOD, MATH_FPMOD)
+#define MATH_FPMOD(a, b) (fmod((a), (b)))
+MATH_SIMPLE_OP(DIV, MATH_DIV, MATH_DIV)
+MATH_SIMPLE_OP(MOD, MATH_MOD, MATH_FPMOD)
 
-#define MATH_COMPARE_OP(OPNAME,OP)					\
-  NOINLINE __attribute__((preserve_most)) gc_obj SCM_##OPNAME##_SLOW(gc_obj a, gc_obj b) { \
-    double fa, fb;							\
-    if (is_fixnum(a)) {							\
-      fa = to_fixnum(a);						\
-    } else if (is_flonum(a)) {						\
-      fa = to_double(a);						\
-    } else {								\
-      printf(#OPNAME ": not a number:");				\
-      SCM_DISPLAY(a, tag_fixnum(0));					\
-      printf("\n");							\
-      abort();								\
-    }									\
-    if (is_fixnum(b)) {							\
-      fb = to_fixnum(b);						\
-    } else if (is_flonum(b)){						\
-      fb = to_double(b);						\
-    } else {								\
-      printf(#OPNAME ": not a number:");				\
-      SCM_DISPLAY(b, tag_fixnum(0));					\
-      printf("\n");							\
-      abort();								\
-    }									\
-    if (OP(fa,fb)) {							\
-      return TRUE_REP;							\
-    }									\
-    return FALSE_REP;							\
-  }									\
-									\
-  INLINE gc_obj SCM_##OPNAME(gc_obj a, gc_obj b) {			\
-    if (likely((is_fixnum(a) & is_fixnum(b)) == 1)) {			\
-      if(OP(a.value, b.value)) {					\
-	return TRUE_REP;						\
-      }									\
-      return FALSE_REP;							\
-    }									\
-    if (likely((is_flonum_fast(a) & is_flonum_fast(b)) == 1)) {		\
-      if(OP(to_double_fast(a), to_double_fast(b))) {			\
-	return TRUE_REP;						\
-      }									\
-      return FALSE_REP;							\
-    }									\
-    return SCM_##OPNAME##_SLOW(a, b);					\
+#define MATH_COMPARE_OP(OPNAME, OP)                                            \
+  NOINLINE __attribute__((preserve_most)) gc_obj SCM_##OPNAME##_SLOW(          \
+      gc_obj a, gc_obj b) {                                                    \
+    double fa, fb;                                                             \
+    if (is_fixnum(a)) {                                                        \
+      fa = to_fixnum(a);                                                       \
+    } else if (is_flonum(a)) {                                                 \
+      fa = to_double(a);                                                       \
+    } else {                                                                   \
+      printf(#OPNAME ": not a number:");                                       \
+      SCM_DISPLAY(a, tag_fixnum(0));                                           \
+      printf("\n");                                                            \
+      abort();                                                                 \
+    }                                                                          \
+    if (is_fixnum(b)) {                                                        \
+      fb = to_fixnum(b);                                                       \
+    } else if (is_flonum(b)) {                                                 \
+      fb = to_double(b);                                                       \
+    } else {                                                                   \
+      printf(#OPNAME ": not a number:");                                       \
+      SCM_DISPLAY(b, tag_fixnum(0));                                           \
+      printf("\n");                                                            \
+      abort();                                                                 \
+    }                                                                          \
+    if (OP(fa, fb)) {                                                          \
+      return TRUE_REP;                                                         \
+    }                                                                          \
+    return FALSE_REP;                                                          \
+  }                                                                            \
+                                                                               \
+  INLINE gc_obj SCM_##OPNAME(gc_obj a, gc_obj b) {                             \
+    if (likely((is_fixnum(a) & is_fixnum(b)) == 1)) {                          \
+      if (OP(a.value, b.value)) {                                              \
+        return TRUE_REP;                                                       \
+      }                                                                        \
+      return FALSE_REP;                                                        \
+    }                                                                          \
+    if (likely((is_flonum_fast(a) & is_flonum_fast(b)) == 1)) {                \
+      if (OP(to_double_fast(a), to_double_fast(b))) {                          \
+        return TRUE_REP;                                                       \
+      }                                                                        \
+      return FALSE_REP;                                                        \
+    }                                                                          \
+    return SCM_##OPNAME##_SLOW(a, b);                                          \
   }
 #define MATH_LT(a, b) ((a) < (b))
 #define MATH_LTE(a, b) ((a) <= (b))
 #define MATH_GT(a, b) ((a) > (b))
 #define MATH_GTE(a, b) ((a) >= (b))
 #define MATH_EQ(a, b) ((a) == (b))
-MATH_COMPARE_OP(LT,MATH_LT)
-MATH_COMPARE_OP(LTE,MATH_LTE)
-MATH_COMPARE_OP(GT,MATH_GT)
-MATH_COMPARE_OP(GTE,MATH_GTE)
-MATH_COMPARE_OP(NUM_EQ,MATH_EQ)
+MATH_COMPARE_OP(LT, MATH_LT)
+MATH_COMPARE_OP(LTE, MATH_LTE)
+MATH_COMPARE_OP(GT, MATH_GT)
+MATH_COMPARE_OP(GTE, MATH_GTE)
+MATH_COMPARE_OP(NUM_EQ, MATH_EQ)
 
 INLINE gc_obj SCM_CAR(gc_obj obj) {
-  #ifndef UNSAFE
+#ifndef UNSAFE
   if (!is_cons(obj)) {
     abort();
   }
-  #endif
+#endif
   return to_cons(obj)->a;
 }
 
 INLINE gc_obj SCM_CDR(gc_obj obj) {
-  #ifndef UNSAFE
+#ifndef UNSAFE
   if (!is_cons(obj)) {
     abort();
   }
-  #endif
+#endif
   return to_cons(obj)->b;
 }
 
 INLINE gc_obj SCM_SETCAR(gc_obj obj, gc_obj val) {
-  #ifndef UNSAFE
+#ifndef UNSAFE
   if (!is_cons(obj)) {
     abort();
   }
-  #endif
+#endif
   auto c = to_cons(obj);
   c->a = val;
   //  printf("log setcar\n");
@@ -587,11 +595,11 @@ INLINE gc_obj SCM_SETCAR(gc_obj obj, gc_obj val) {
 }
 
 INLINE gc_obj SCM_SETCDR(gc_obj obj, gc_obj val) {
-  #ifndef UNSAFE
+#ifndef UNSAFE
   if (!is_cons(obj)) {
     abort();
   }
-  #endif
+#endif
   auto c = to_cons(obj);
   c->b = val;
   //  printf("log setcdr\n");
@@ -599,7 +607,7 @@ INLINE gc_obj SCM_SETCDR(gc_obj obj, gc_obj val) {
   return UNDEFINED;
 }
 INLINE gc_obj SCM_CONS(gc_obj a, gc_obj b) {
-  cons_s* c = rcimmix_alloc(sizeof(cons_s));
+  cons_s *c = rcimmix_alloc(sizeof(cons_s));
   c->a = a;
   c->b = b;
   return tag_cons(c);
@@ -627,58 +635,59 @@ INLINE gc_obj SCM_GUARD(gc_obj a, int64_t type) {
 }
 
 INLINE gc_obj SCM_MAKE_VECTOR(gc_obj obj) {
-  auto res = rcimmix_alloc_with_slab(sizeof(vector_s) + to_fixnum(obj)*sizeof(gc_obj));
-  vector_s* v = res.p;
+  auto res = rcimmix_alloc_with_slab(sizeof(vector_s) +
+                                     to_fixnum(obj) * sizeof(gc_obj));
+  vector_s *v = res.p;
   v->slab = res.slab;
   v->len = obj;
   return tag_vector(v);
 }
 
 INLINE gc_obj SCM_VECTOR_LENGTH(gc_obj vec) {
-  #ifndef UNSAFE
+#ifndef UNSAFE
   if (unlikely(!is_vector(vec))) {
     abort();
   }
-  #endif
+#endif
   return to_vector(vec)->len;
 }
 
 INLINE gc_obj SCM_VECTOR_REF(gc_obj vec, gc_obj idx) {
-  #ifndef UNSAFE
+#ifndef UNSAFE
   if (unlikely(!is_fixnum(idx))) {
     abort();
   }
   if (unlikely(!is_vector(vec))) {
     abort();
   }
-  #endif
+#endif
   auto v = to_vector(vec);
   auto i = to_fixnum(idx);
-  #ifndef UNSAFE
+#ifndef UNSAFE
   if (unlikely(i >= to_fixnum(v->len))) {
     abort();
   }
-  #endif
-  
+#endif
+
   return v->v[i];
 }
 
 INLINE gc_obj SCM_VECTOR_SET(gc_obj vec, gc_obj idx, gc_obj val) {
-  #ifndef UNSAFE
+#ifndef UNSAFE
   if (unlikely(!is_fixnum(idx))) {
     abort();
   }
   if (unlikely(!is_vector(vec))) {
     abort();
   }
-  #endif
+#endif
   auto v = to_vector(vec);
   auto i = to_fixnum(idx);
-  #ifndef UNSAFE
+#ifndef UNSAFE
   if (unlikely(i >= to_fixnum(v->len))) {
     abort();
   }
-  #endif
+#endif
   v->v[i] = val;
 
   gc_log_with_slab((uint64_t)&v->v[i], v->slab);
@@ -695,8 +704,9 @@ INLINE gc_obj SCM_VECTOR_SET_FAST(gc_obj vec, gc_obj idx, gc_obj val) {
 
 INLINE gc_obj SCM_CLOSURE(gc_obj p, uint64_t len) {
   //  printf("make closure %li\n", len);
-  assert(gc_is_small(sizeof(closure_s) + ((len+1)*sizeof(gc_obj))));
-  closure_s* clo = rcimmix_alloc(sizeof(closure_s) + (len+1) * sizeof(gc_obj));
+  assert(gc_is_small(sizeof(closure_s) + ((len + 1) * sizeof(gc_obj))));
+  closure_s *clo =
+      rcimmix_alloc(sizeof(closure_s) + (len + 1) * sizeof(gc_obj));
   clo->type = CLOSURE_TAG;
   clo->v[0] = p;
   return tag_closure(clo);
@@ -707,9 +717,8 @@ INLINE void SCM_CLOSURE_SET(gc_obj clo, gc_obj obj, uint64_t i) {
   auto c = to_closure(clo);
   c->v[i + 1] = obj;
   /* printf("log closure\n"); */
-  gc_log_fast((uint64_t)&c->v[i+1]);
+  gc_log_fast((uint64_t)&c->v[i + 1]);
 }
-
 
 INLINE void SCM_CLOSURE_SET_FAST(gc_obj clo, gc_obj obj, uint64_t i) {
   //    printf("Closure set %li\n", i);
@@ -781,7 +790,7 @@ static gc_obj ccresthunk(gc_obj unused, gc_obj n) {
                  "r"(saved_sz), "r"(n)
                : "memory", "x19", "x20", "x0", "x1", "x2");
 #else
-  #error "Arch not supported for CALLCC"
+#error "Arch not supported for CALLCC"
 #endif
   __builtin_unreachable();
   return n;
@@ -801,7 +810,7 @@ static __attribute__((preserve_none)) void need_more_frames() {
   asm volatile("mov %0, x0\n\t" : "=r"(res) : : "x0");
 #endif
   // assert(cur_link);
-  ccresthunk(tag_closure((closure_s*)cur_link), res);
+  ccresthunk(tag_closure((closure_s *)cur_link), res);
 }
 
 extern int64_t argcnt;
@@ -813,7 +822,7 @@ SCM_CALLCC(gc_obj cont) {
   auto clo = to_closure(cont);
 
   void *stack_bottom = __builtin_frame_address(0);
-  void* stacktop = (void*)gc_get_stack_top();
+  void *stacktop = (void *)gc_get_stack_top();
   size_t stack_sz = stacktop - stack_bottom;
   ccsave *stack = rcimmix_alloc(sizeof(ccsave) + stack_sz);
   stack->sz = stack_sz;
@@ -822,7 +831,7 @@ SCM_CALLCC(gc_obj cont) {
   stack->prev_link = cur_link;
   memcpy(stack->stack, stack_bottom, stack_sz);
 
-  auto cc = tag_closure((closure_s*)stack);
+  auto cc = tag_closure((closure_s *)stack);
   argcnt = 2; // Two args: Closure ptr & cc.
 
   gc_obj unused_res;
@@ -836,7 +845,8 @@ SCM_CALLCC(gc_obj cont) {
                "mov %4, %%rsi\n\t" // Set up call thunk - callcc cont arg
                "jmp *%5\n\t"       // Jump to thunk.
                : "=r"(unused_res)  // output
-               : "r"(stacktop), "r"(need_more_frames), "r"(cont), "r"(cc), "r"(clo->v[0])                 // input
+               : "r"(stacktop), "r"(need_more_frames), "r"(cont), "r"(cc),
+                 "r"(clo->v[0])         // input
                : "rdi", "rsi", "memory" // clobbers
   );
 
@@ -849,7 +859,7 @@ SCM_CALLCC(gc_obj cont) {
                "br %5\n\t"        // Jump to thunk.
                : "=r"(unused_res) // output
                : "r"(stacktop), "r"(need_more_frames), "r"(cont), "r"(cc),
-                 "r"(clo->v[0])               // input
+                 "r"(clo->v[0])       // input
                : "x0", "x1", "memory" // clobbers
   );
 #endif
@@ -872,17 +882,18 @@ static const uint64_t reg_arg_cnt = 6;
 
 // TODO: gc shadow_stack
 gc_obj shadow_stack[100];
-gc_obj consargs_stub(gc_obj a0, gc_obj a1, gc_obj a2, gc_obj a3, gc_obj a4, gc_obj a5) {
+gc_obj consargs_stub(gc_obj a0, gc_obj a1, gc_obj a2, gc_obj a3, gc_obj a4,
+                     gc_obj a5) {
   auto cnt = argcnt - wanted_argcnt;
   auto cur = argcnt;
   gc_obj head = NIL;
-  gc_obj* tail = &head;
-  switch(wanted_argcnt) {
+  gc_obj *tail = &head;
+  switch (wanted_argcnt) {
   case 0:
     if (cnt-- == 0) {
       return head;
     }
-    *tail = SCM_CONS(a0, NIL); 
+    *tail = SCM_CONS(a0, NIL);
     tail = &to_cons(*tail)->b;
   case 1:
     if (cnt-- == 0) {
@@ -917,13 +928,13 @@ gc_obj consargs_stub(gc_obj a0, gc_obj a1, gc_obj a2, gc_obj a3, gc_obj a4, gc_o
   default:
   }
   auto res = NIL;
-  while(cur > reg_arg_cnt) {
+  while (cur > reg_arg_cnt) {
     if (cur <= wanted_argcnt) {
       *tail = res;
-      shadow_stack[cur-reg_arg_cnt] = head;
+      shadow_stack[cur - reg_arg_cnt] = head;
       return head;
     }
-    res = SCM_CONS(shadow_stack[cur-reg_arg_cnt-1], res);
+    res = SCM_CONS(shadow_stack[cur - reg_arg_cnt - 1], res);
     cur--;
   }
   *tail = res;
@@ -941,8 +952,8 @@ INLINE gc_obj SCM_EQ(gc_obj a, gc_obj b) {
 
 INLINE gc_obj SCM_MAKE_STRING(gc_obj len, gc_obj fill) {
   // Align.
-  auto strlen = (to_fixnum(len)+7)&~7;
-  string_s* str = rcimmix_alloc(sizeof(string_s) + strlen);
+  auto strlen = (to_fixnum(len) + 7) & ~7;
+  string_s *str = rcimmix_alloc(sizeof(string_s) + strlen);
   str->type = STRING_TAG;
   str->len = len;
   if (fill.value != FALSE_REP.value) {
@@ -951,15 +962,11 @@ INLINE gc_obj SCM_MAKE_STRING(gc_obj len, gc_obj fill) {
   return tag_string(str);
 }
 
-INLINE gc_obj SCM_CHAR_INTEGER(gc_obj ch) {
-  return tag_fixnum(to_char(ch));
-}
+INLINE gc_obj SCM_CHAR_INTEGER(gc_obj ch) { return tag_fixnum(to_char(ch)); }
 
 INLINE gc_obj SCM_INTEGER_CHAR(gc_obj i) { return tag_char(to_fixnum(i)); }
 
-INLINE gc_obj SCM_SYMBOL_STRING(gc_obj sym) {
-  return to_symbol(sym)->name;
-}
+INLINE gc_obj SCM_SYMBOL_STRING(gc_obj sym) { return to_symbol(sym)->name; }
 
 INLINE gc_obj SCM_STRING_REF(gc_obj str, gc_obj pos) {
   return tag_char(to_string(str)->str[to_fixnum(pos)]);
@@ -971,16 +978,14 @@ INLINE gc_obj SCM_STRING_SET(gc_obj str, gc_obj pos, gc_obj ch) {
 }
 
 INLINE gc_obj SCM_MAKE_SYMBOL(gc_obj str) {
-  symbol* sym = rcimmix_alloc(sizeof(symbol));
+  symbol *sym = rcimmix_alloc(sizeof(symbol));
   sym->type = SYMBOL_TAG;
   sym->name = str;
   sym->val = UNDEFINED;
   return tag_symbol(sym);
 }
 
-INLINE gc_obj SCM_EXACT(gc_obj flo) {
-  return tag_fixnum(to_double(flo));
-}
+INLINE gc_obj SCM_EXACT(gc_obj flo) { return tag_fixnum(to_double(flo)); }
 
 INLINE gc_obj SCM_INEXACT(gc_obj fix) {
   if (is_flonum(fix)) {
@@ -991,17 +996,18 @@ INLINE gc_obj SCM_INEXACT(gc_obj fix) {
   if (double_to_gc(d, &res)) {
     return res;
   }
-  flonum_s* f = rcimmix_alloc(sizeof(flonum_s));
+  flonum_s *f = rcimmix_alloc(sizeof(flonum_s));
   f->type = FLONUM_TAG;
   f->x = d;
   return tag_ptr(f);
 }
 ////// records
 INLINE gc_obj SCM_MAKE_RECORD(gc_obj sz) {
-  assert(gc_is_small(sizeof(record_s) + (to_fixnum(sz)*sizeof(gc_obj))));
-  record_s* r = rcimmix_alloc(sizeof(record_s) + (to_fixnum(sz)*sizeof(gc_obj)));
+  assert(gc_is_small(sizeof(record_s) + (to_fixnum(sz) * sizeof(gc_obj))));
+  record_s *r =
+      rcimmix_alloc(sizeof(record_s) + (to_fixnum(sz) * sizeof(gc_obj)));
   r->type = RECORD_TAG;
-  
+
   return tag_ptr(r);
 }
 
@@ -1013,16 +1019,14 @@ INLINE gc_obj SCM_RECORD_SET(gc_obj r, gc_obj idx, gc_obj val) {
   auto rec = to_record(r);
   auto i = to_fixnum(idx);
   rec->v[i] = val;
-  //printf("log record\n");
+  // printf("log record\n");
   gc_log_fast((uint64_t)&rec->v[i]);
   return UNDEFINED;
 }
 
 ////////// Symbol table
 extern gc_obj symbol_table;
-INLINE gc_obj SCM_GET_SYM_TABLE() {
-  return symbol_table;
-}
+INLINE gc_obj SCM_GET_SYM_TABLE() { return symbol_table; }
 
 ///////math
 INLINE gc_obj SCM_SIN(gc_obj f) {
@@ -1044,7 +1048,6 @@ INLINE gc_obj SCM_ACOS(gc_obj f) {
   double d = to_double(f);
   return double_to_gc_slow(acos(d));
 }
-
 
 INLINE gc_obj SCM_TAN(gc_obj f) {
   double d = to_double(f);
@@ -1098,33 +1101,31 @@ INLINE void SCM_WRITE_SHADOW_STACK(gc_obj pos, gc_obj obj) {
   shadow_stack[to_fixnum(pos)] = obj;
 }
 
-INLINE gc_obj SCM_READ_SHADOW_STACK(uint64_t pos) {
-  return shadow_stack[pos];
-}
+INLINE gc_obj SCM_READ_SHADOW_STACK(uint64_t pos) { return shadow_stack[pos]; }
 
-static uint64_t hashmix( uint64_t key ){
+static uint64_t hashmix(uint64_t key) {
   key += (key << 10);
   key ^= (key >> 6);
   return key;
 }
 INLINE gc_obj SCM_EQ_HASH(gc_obj h) {
-  return (gc_obj){.value=(long)hashmix(h.value)<<3};
+  return (gc_obj){.value = (long)hashmix(h.value) << 3};
 }
-static uint64_t stringhash(char* str, uint64_t len) {
+static uint64_t stringhash(char *str, uint64_t len) {
   uint64_t hash = 401887359;
-  uint64_t* strp = (void*)str;
+  uint64_t *strp = (void *)str;
   while (len > 8) {
     hash += *strp;
     hash = hashmix(hash);
     len -= 8;
     strp++;
-    str+= 8;
+    str += 8;
   }
-  while(len > 0) {
+  while (len > 0) {
     hash += *str;
     hash = hashmix(hash);
     len -= 1;
-    str+= 1;
+    str += 1;
   }
   return hash;
 }
@@ -1132,10 +1133,11 @@ static uint64_t stringhash(char* str, uint64_t len) {
 INLINE gc_obj SCM_STRING_HASH(gc_obj h) {
   auto str = to_string(h);
   auto hash = stringhash(str->str, to_fixnum(str->len));
-  //auto hash = XXH3_64bits(str->str, to_fixnum(str->len));
+  // auto hash = XXH3_64bits(str->str, to_fixnum(str->len));
   return tag_fixnum((int)hash);
 }
-INLINE gc_obj SCM_STRING_CPY(gc_obj tostr, gc_obj tostart, gc_obj fromstr, gc_obj fromstart, gc_obj fromend) {
+INLINE gc_obj SCM_STRING_CPY(gc_obj tostr, gc_obj tostart, gc_obj fromstr,
+                             gc_obj fromstart, gc_obj fromend) {
   auto from_pos = to_fixnum(fromstart);
   auto len = to_fixnum(fromend) - from_pos;
   auto start = to_fixnum(tostart);
@@ -1160,7 +1162,8 @@ INLINE gc_obj SCM_OPEN_FD(gc_obj filename, gc_obj input) {
   assert(to_fixnum(str->len) < 255);
   name[to_fixnum(str->len)] = '\0';
   auto readonly = input.value == TRUE_REP.value;
-  return tag_fixnum(open(name, readonly ? O_RDONLY : O_WRONLY | O_CREAT | O_TRUNC, 0777));
+  return tag_fixnum(
+      open(name, readonly ? O_RDONLY : O_WRONLY | O_CREAT | O_TRUNC, 0777));
 }
 
 INLINE gc_obj SCM_READ_FD(gc_obj scmfd, gc_obj scmbuf) {
@@ -1191,7 +1194,8 @@ INLINE gc_obj SCM_WRITE_FD(gc_obj scmfd, gc_obj scmlen, gc_obj scmbuf) {
 INLINE gc_obj SCM_CLOSE_FD(gc_obj fd) {
   auto res = close((int)to_fixnum(fd));
   if (res != 0) {
-    printf("Error closing fd %li, res %i, errno %i\n", to_fixnum(fd), res, errno);
+    printf("Error closing fd %li, res %i, errno %i\n", to_fixnum(fd), res,
+           errno);
     perror("foo");
     exit(-1);
   }
@@ -1220,9 +1224,7 @@ INLINE gc_obj SCM_DELETE_FILE(gc_obj scmname) {
   return tag_fixnum(unlink(name));
 }
 /////// FLONUMS
-INLINE gc_obj SCM_FLONUM_BOX(double d) {
-  return double_to_gc_slow(d);
-}
+INLINE gc_obj SCM_FLONUM_BOX(double d) { return double_to_gc_slow(d); }
 INLINE double SCM_FLONUM_UNBOX(gc_obj d) { return to_double(d); }
 INLINE double SCM_INEXACT_UNBOXED(gc_obj fix) {
   if (is_flonum(fix)) {
