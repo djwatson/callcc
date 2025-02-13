@@ -9,15 +9,24 @@
 	(set! id (+ id 1))
 	res))))
 
-(define-record-type fun (%make-fun code name last-label args thunk) fun?
+(define-record-type fun (%make-fun code name last-label args thunk debug-id debug-loc-id) fun?
 		    (code fun-code fun-code-set!)
 		    (name fun-name fun-name-set!)
 		    (last-label fun-last-label fun-last-label-set!)
 		    (args fun-args fun-args-set!)
-		    (thunk fun-thunk fun-thunk-set!))
+		    (thunk fun-thunk fun-thunk-set!)
+		    (debug-id fun-debug-id)
+		    (debug-loc-id fun-debug-loc-id))
+
+(define next-debug-id
+  (let ((id 5))
+    (lambda ()
+      (set! id (+ id 1))
+      id)))
+(define debug-strings '())
 
 (define (make-fun name)
-  (%make-fun '() name "entry" '() #f))
+  (%make-fun '() name "entry" '() #f (next-debug-id) (next-debug-id)))
 
 (define (push-instr! fun instr)
   (fun-code-set! fun (cons instr (fun-code fun))))
@@ -74,19 +83,21 @@
 		      (let* ((len (length (to-proper (second case))))
 			     (argpos (next-id)))
 			(push-instr! fun (format "store i64 ~a, ptr @wanted_argcnt" (- len 1)))
-			(push-instr! fun (format "%v~a = call i64 @consargs_stub(~a)" argpos
+			(push-instr! fun (format "%v~a = call i64 @consargs_stub(~a), !dbg !~a" argpos
 						 (join ", "
 						       (omap arg default-param-list
-							     (format "i64 ~a" arg)))))
+							     (format "i64 ~a" arg)))
+						 (fun-debug-loc-id fun)))
 			(if (> len max-reg-args)
 			    default-param-list
 			    (append (take default-param-list (- len 1)) (list (format "%v~a" argpos))))))))
-	     (push-instr! fun (format "%v~a = musttail call i64 @\"~a\"(~a)"
+	     (push-instr! fun (format "%v~a = musttail call i64 @\"~a\"(~a), !dbg !~a"
 				      call-res (format "~a_case~a" var i)
-				      (reg-args-to-call-list arglist))))
+				      (reg-args-to-call-list arglist)
+				      (fun-debug-loc-id fun))))
 	   (push-instr! fun (format "ret i64 %v~a" call-res))
 	   (push-instr! fun (format "l~a:" false-label)))))
-  (push-instr! fun (format "%res = call i64 @SCM_ARGCNT_FAIL()"))
+  (push-instr! fun (format "%res = call i64 @SCM_ARGCNT_FAIL(), !dbg !~a" (fun-debug-loc-id fun)))
   (push-instr! fun (format "ret i64 %res"))
   
   (for (case i) (cases (iota (length cases)))
@@ -155,9 +166,12 @@
   (let ((id (next-id)))
     (let-values (((reg-args stack-args) (split-arglist args)))
       (for (arg i) (stack-args (iota (length stack-args)))
-	   (push-instr! fun (format "call void @SCM_WRITE_SHADOW_STACK(i64 ~a, i64 ~a)" (* 8 i) arg)))
-      (push-instr! fun (format "%v~a = ~a call i64 ~a(~a) #0"
-			       id (if tail "musttail" "") label (reg-args-to-call-list reg-args))))
+	   (push-instr! fun (format "call void @SCM_WRITE_SHADOW_STACK(i64 ~a, i64 ~a), !dbg !~a"
+				    (* 8 i) arg
+				    (fun-debug-loc-id fun))))
+      (push-instr! fun (format "%v~a = ~a call i64 ~a(~a) #0, !dbg !~a"
+			       id (if tail "musttail" "") label (reg-args-to-call-list reg-args)
+			       (fun-debug-loc-id fun))))
     (format "%v~a" id)))
 
 (define (emit sexp env fun tail)
@@ -182,8 +196,8 @@
     ((define ,var ,val)
      (let ((val (emit val env fun #f))
 	   (sym (emit-const var)))
-       (push-instr! fun (format "call void @SCM_SET_GLOBAL(i64 ~a, i64 ~a)"
-				sym val)))
+       (push-instr! fun (format "call void @SCM_SET_GLOBAL(i64 ~a, i64 ~a), !dbg !~a"
+				sym val (fun-debug-loc-id fun))))
      (finish undefined-tag))
     ((flonum-op ,op ,a ,b)
      (let ((av (emit a env fun #f))
@@ -198,8 +212,8 @@
 	    (funp (cadr args))
 	    (stack-args (cdr args))
 	    (lenshift (next-id)))
-       (push-instr! fun (format "%v~a = call ptr @SCM_LOAD_CLOSURE_PTR(i64 ~a)"
-				clo-id funp))
+       (push-instr! fun (format "%v~a = call ptr @SCM_LOAD_CLOSURE_PTR(i64 ~a), !dbg !~a"
+				clo-id funp (fun-debug-loc-id fun)))
        (push-instr! fun (format "%v~a = ashr i64 ~a, 3" lenshift len))
        (push-instr! fun (format "store i64 %v~a, ptr @argcnt" lenshift))
        (finish (emit-call fun tail (format "%v~a" clo-id) stack-args))))
@@ -209,18 +223,19 @@
      (let* ((id (next-id))
 	    (args (omap arg args (format "i64 ~a" (emit arg env fun #f))))
 	    (argstr (join ", " args)))
-       (push-instr! fun (format "%v~a = call ~a i64 @\"~a\"(~a) #0"
+       (push-instr! fun (format "%v~a = call ~a i64 @\"~a\"(~a) #0, !dbg !~a"
 				id
 				(if (equal? "SCM_CALLCC" name)
 				    "preserve_nonecc" "")
-				name argstr))
+				name argstr (fun-debug-loc-id fun)))
        (finish (format "%v~a" id))))
     ((primcall ,var ,vals ___)
      (let* ((vals (omap val vals (emit val env fun #f)))
 	    (arglist (join ", " (omap val vals (format "i64 ~a" val))))
 	    (id (next-id)))
-       (push-instr! fun (format "%v~a = call i64 @\"~a\"(~a)"
-				id (string-append "SCM_" (symbol->string var)) arglist))
+       (push-instr! fun (format "%v~a = call i64 @\"~a\"(~a), !dbg !~a"
+				id (string-append "SCM_" (symbol->string var)) arglist
+				(fun-debug-loc-id fun)))
        (finish (format "%v~a" id))))
     ((if ,a ,b ,c)
      (let ((id (next-id))
@@ -268,8 +283,8 @@
     ((call ,args ___)
      (let* ((args (omap arg args (emit arg env fun #f)))
 	    (clo-id (next-id)))
-       (push-instr! fun (format "%v~a = call ptr @SCM_LOAD_CLOSURE_PTR(i64 ~a)"
-				clo-id (car args)))
+       (push-instr! fun (format "%v~a = call ptr @SCM_LOAD_CLOSURE_PTR(i64 ~a), !dbg !~a"
+				clo-id (car args) (fun-debug-loc-id fun)))
        (push-instr! fun (format "store i64 ~a, ptr @argcnt" (length args)))
        (finish (emit-call fun tail (format "%v~a" clo-id) args))))
     ((label-call ,label ,args ___)
@@ -289,12 +304,12 @@
     ((closure (label ,label) ,args ___)
      (let* ((args (omap arg args (emit arg env fun #f)))
 	    (id (next-id)))
-       (push-instr! fun ( format "%v~a = call i64 @SCM_CLOSURE(i64 ptrtoint (ptr @\"~a\" to i64), i64 ~a)"
-			  id label (length args)))
+       (push-instr! fun ( format "%v~a = call i64 @SCM_CLOSURE(i64 ptrtoint (ptr @\"~a\" to i64), i64 ~a), !dbg !~a"
+			  id label (length args) (fun-debug-loc-id fun)))
        
        (for (arg i) (args (iota (length args)))
-	    (push-instr! fun (format "call void @SCM_CLOSURE_SET_FAST(i64 %v~a, i64 ~a, i64 ~a)"
-				     id arg i)))
+	    (push-instr! fun (format "call void @SCM_CLOSURE_SET_FAST(i64 %v~a, i64 ~a, i64 ~a), !dbg !~a"
+				     id arg i (fun-debug-loc-id fun))))
        (format "%v~a" id)))
     ((const-closure (label ,label))
      (finish (emit-const `($const-closure ,label))))
@@ -332,7 +347,7 @@
 	   (id (next-id))
 	   (pid (next-id))
 	   (resid (next-id)))
-       (push-instr! fun (format "%v~a = call i64 @SCM_LOAD_GLOBAL(i64 ~a)" id sym))
+       (push-instr! fun (format "%v~a = call i64 @SCM_LOAD_GLOBAL(i64 ~a), !dbg !~a" id sym (fun-debug-loc-id fun)))
        ;; ;; Offset in to the global.
        ;; (push-instr! fun (format "%v~a = add i64 ~a, ~a" id sym (+ (- ptr-tag) 16)))
        ;; (push-instr! fun (format "%v~a = inttoptr i64 %v~a to i64*" pid id))
@@ -515,6 +530,16 @@ declare void @gc_init ()
 @argcnt = dso_local global i64 0
 @wanted_argcnt = dso_local global i64 0
 attributes #0 = { returns_twice}
+
+!llvm.dbg.cu = !{!0}
+!llvm.module.flags = !{!2, !3}
+!0 = distinct !DICompileUnit(language: DW_LANG_C, file: !1, producer: \"popl\", emissionKind: FullDebug, nameTableKind: None)
+!1 = !DIFile(filename: \"fib2.scm\", directory: \"/home/davejwatson/projects/popl\")
+!2 = !{i32 7, !\"Dwarf Version\", i32 3}
+!3 = !{i32 2, !\"Debug Info Version\", i32 3}
+!4 = !DISubroutineType(types: !5)
+!5 = !{null}
+
 "))
 
 (define (compile file verbose)
@@ -543,7 +568,7 @@ attributes #0 = { returns_twice}
       (pretty-print lowered (current-error-port))
       )
 					;;(exit)
-					(emit lowered '() main-fun #t)
+    (emit lowered '() main-fun #t)
     (emit-header)
 
     (let ((sym-vec (emit-const (list->vector symbol-table))))
@@ -557,27 +582,38 @@ attributes #0 = { returns_twice}
     (set! functions (reverse! (cons main-fun functions)))
     (for func functions
 	 (fun-code-set! func (reverse! (fun-code func)))
-
 	 (newline)
 
-	 (let-values (((reg-args stack-args) (split-arglist (fun-args func))))
-	   (display (format "define ~a i64 @\"~a\"(~a) #0 {\n" 
+	 (let-values (((reg-args stack-args) (split-arglist (fun-args func)))
+		      ((debug-id) (fun-debug-id func))
+		      ((debug-loc-id) (fun-debug-loc-id func)))
+	   ;; Set debug info
+	   (push! debug-strings
+		  (format "!~a = distinct !DISubprogram(name: \"~a\", scope: !1, file: !1, type: !4, unit: !0)"
+			  debug-id (fun-name func)))
+	   (push! debug-strings
+		  (format "!~a = !DILocation(line:1, scope: !~a)" debug-loc-id debug-id))
+	   
+	   (display (format "define ~a i64 @\"~a\"(~a) #0 !dbg !~a {\n" 
 			    (if (equal? (fun-name func) "main")
 				"" "internal")
 			    (fun-name func)
-			    (reg-args-to-param-list reg-args)))
+			    (reg-args-to-param-list reg-args)
+			    (fun-debug-id func)))
 	   (display (format " entry:\n"))
 	   (when (equal? "main" (fun-name func))
 	     (display (format "  call void @gc_init()\n")))
 	   (for (arg i) (stack-args (iota (length stack-args)))
-		(display (format "  ~a = call i64 @SCM_READ_SHADOW_STACK(i64 ~a)\n"
-				 arg i)))
+		(display (format "  ~a = call i64 @SCM_READ_SHADOW_STACK(i64 ~a), !dbg !~a\n"
+				 arg i (fun-debug-loc-id func))))
 	   (for line (fun-code func)
 		(if (loop-var? line)
 		    (for phi (loop-var-phis line)
 			 (display (format "  ~a\n" phi)))
 		    (display (format "  ~a\n" line))))
-	   (display "}\n")))))
+	   (display "}\n"))))
+  (for line (reverse! debug-strings)
+       (display line) (newline)))
 
 (for file (cdr (command-line))
      (compile file #t))
