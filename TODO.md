@@ -1,5 +1,4 @@
 # known bugs:
- * Call/cc broken with --coverage in clang.
 
 # benchmarks:
   * Needs inliner to remove alloc: graphs

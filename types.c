@@ -871,7 +871,7 @@ typedef struct ccsave {
 
 ccsave *cur_link = NULL;
 static uint8_t tmpstack[100];
-static gc_obj ccresthunk(gc_obj unused, gc_obj n) {
+gc_obj ccresthunk(gc_obj unused, gc_obj n) {
   ccsave *c = (ccsave *)to_closure(unused);
   cur_link = c->prev_link;
 
@@ -922,22 +922,16 @@ static gc_obj ccresthunk(gc_obj unused, gc_obj n) {
   return n;
 }
 
-// We can 'preserve_none' here because we are explicitly loading the arg,
-// and we don't need to preserve anything.
-static __attribute__((preserve_none)) void need_more_frames() {
-  gc_obj res;
-  // This is called as a return point.  In x86_64, the return is in rax.
 #if defined(__x86_64__)
-  asm volatile("mov %%rax, %0\n\t" : "=r"(res) : : "rax");
-  // In aarch return and arg1 are equal, so this could be
-  // need_more_frames(int64_t res),
-  // but let's do it like this for consistency.
+extern void need_more_frames();
 #elif defined(__aarch64__)
-  asm volatile("mov %0, x0\n\t" : "=r"(res) : : "x0");
-#endif
-  // assert(cur_link);
+static void need_more_frames(gc_obj res) {
+  assert(cur_link);
   ccresthunk(tag_closure((closure_s *)cur_link), res);
 }
+#else
+#error "Arch not supported for CALLCC"
+#endif
 
 extern int64_t argcnt;
 extern int64_t wanted_argcnt;
