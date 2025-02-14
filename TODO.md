@@ -1,5 +1,13 @@
+
 # known bugs:
 
+# plan
+  * get bignum/ratnum/compnum constants lifted / working
+    * test pi/chudnovsky
+  * get ratnum/compnum working
+  * moar self-compile
+     * get-double-as-u64
+  
 # benchmarks:
   * Needs inliner to remove alloc: graphs
   * faster with float type: fft fibfp mbrot pnpoly simplex sumfp
@@ -19,7 +27,9 @@
 * And do same thing for static symbols?
 * Cleanup the GC roots, some should be in types, add_root unused currently.
 * Remove the radix tree: just use pre-allocated virtual space.
-	
+
+# OTHER
+
 * storage use analysis: unboxing flonums, longjmp/setjmp call/cc, and typecheck removal.
    * call/cc can just be a simple escape analysis? global though
 

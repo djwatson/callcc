@@ -1357,3 +1357,31 @@ INLINE double SCM_INEXACT_UNBOXED(gc_obj fix) {
   }
   return (double)to_fixnum(fix);
 }
+
+gc_obj SCM_BIGNUM_STR(gc_obj b) {
+  auto bignum = to_bignum(b);
+  // +2 per manual for null-termination and -
+  auto len = mpz_sizeinbase(bignum->x, 10) + 2;
+  // Align.
+  len = (len + 7)&~7;
+  string_s* str = rcimmix_alloc(sizeof(string_s) + len);
+  mpz_get_str(str->str, 10, bignum->x);
+  str->len = tag_fixnum(strlen(str->str));
+  str->type = STRING_TAG;
+  return tag_string(str);
+}
+gc_obj SCM_FLONUM_STR(gc_obj b) {
+  string_s* str = rcimmix_alloc(sizeof(string_s) + 40);
+  str->type = STRING_TAG;
+  double d = to_double(b);
+    snprintf(str->str, 40 - 3, "%g", d);
+  if (strpbrk(str->str, ".eE") == nullptr) {
+    size_t len = strlen(str->str);
+    str->str[len] = '.';
+    str->str[len + 1] = '0';
+    str->str[len + 2] = '\0';
+  }
+  str->len = tag_fixnum(strlen(str->str));
+
+  return tag_string(str);
+}
