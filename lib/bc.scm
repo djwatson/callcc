@@ -605,7 +605,7 @@ attributes #0 = { returns_twice}
 			    (fun-debug-id func)))
 	   (display (format " entry:\n"))
 	   (when (equal? "main" (fun-name func))
-	     (display (format "  call void @gc_init()\n")))
+	     (display (format "  call void @gc_init(), !dbg !~a\n" (fun-debug-loc-id func))))
 	   (for (arg i) (stack-args (iota (length stack-args)))
 		(display (format "  ~a = call i64 @SCM_READ_SHADOW_STACK(i64 ~a), !dbg !~a\n"
 				 arg i (fun-debug-loc-id func))))
