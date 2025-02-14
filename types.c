@@ -1001,7 +1001,8 @@ static const uint64_t reg_arg_cnt = 6;
 /* #endif */
 
 // TODO: gc shadow_stack
-gc_obj shadow_stack[100];
+static constexpr uint64_t shadow_stack_size = 3000;
+gc_obj shadow_stack[shadow_stack_size];
 gc_obj consargs_stub(gc_obj a0, gc_obj a1, gc_obj a2, gc_obj a3, gc_obj a4,
                      gc_obj a5) {
   auto cnt = argcnt - wanted_argcnt;
@@ -1218,10 +1219,14 @@ INLINE gc_obj SCM_LOG(gc_obj f) {
 ///// Shadow stack
 
 INLINE void SCM_WRITE_SHADOW_STACK(gc_obj pos, gc_obj obj) {
+  assert(to_fixnum(pos) < shadow_stack_size);
   shadow_stack[to_fixnum(pos)] = obj;
 }
 
-INLINE gc_obj SCM_READ_SHADOW_STACK(uint64_t pos) { return shadow_stack[pos]; }
+INLINE gc_obj SCM_READ_SHADOW_STACK(uint64_t pos) {
+  assert(pos < shadow_stack_size);
+  return shadow_stack[pos];
+}
 
 static uint64_t hashmix(uint64_t key) {
   key += (key << 10);

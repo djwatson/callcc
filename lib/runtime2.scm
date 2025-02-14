@@ -13,6 +13,9 @@
       (- p)
       p))
 
+(define (numerator x) x)
+(define (denominator x) 1)
+
 (define (sin f)
   (sys:FOREIGN_CALL "SCM_SIN" (inexact f)))
 (define (cos f)
@@ -285,8 +288,14 @@
   (case-lambda
    ((n) (display n (current-output-port)))
    ((n port)
-    ((port-fillflush port) port)
-    (sys:FOREIGN_CALL "SCM_DISPLAY" n (port-fd port)))))
+    (cond
+     ((string? n) (do ((i 0 (+ i 1)))
+		      ((= (string-length n) i))
+		    (write-char (string-ref n i) port)))
+     (else (error "Unkonwn write")))
+    ;((port-fillflush port) port)
+    ;(sys:FOREIGN_CALL "SCM_DISPLAY" n (port-fd port))
+    )))
 
 (define write
   (case-lambda
@@ -408,8 +417,8 @@
 (define (symbol? x) (symbol? x))
 (define (vector? x) (vector? x))
 (define (flonum? x) (sys:FOREIGN_CALL "SCM_IS_FLONUM" x))
-(define (complex? x) #t)
-(define (real? x) #t)
+(define (complex? x) (number? x))
+(define (real? x) (number? x))
 (define (rational? x) (fixnum? x))
 (define write display)
 
@@ -510,12 +519,15 @@
 	(if (eq? obj (car list)) 
 	    list
 	    (loop (cdr list))))))
-(define (member obj list)
-  (let loop ((list list))
-    (if (null? list) #f
-	(if (equal? obj (car list)) 
-	    list
-	    (loop (cdr list))))))
+(define member
+  (case-lambda
+   ((obj list) (member obj list equal?))
+   ((obj list cmp)
+    (let loop ((list list))
+      (if (null? list) #f
+	  (if (cmp obj (car list)) 
+	      list
+	      (loop (cdr list))))))))
 
 (define (assq obj1 alist1)
   (let loop ((obj obj1) (alist alist1))
@@ -559,7 +571,7 @@
 	    (proc (car lst1) (car lst2))
 	    (loop proc (cdr lst1) (cdr lst2))))))
    ((proc . lsts)
-    (unless (any list? lsts) (error "circular for-each"))
+    ;TODO (unless (any list? lsts) (error "circular for-each"))
     (let loop ((lsts lsts))
       (let ((hds (let loop2 ((lsts lsts))
 		   (if (null? lsts)
@@ -1057,7 +1069,7 @@
 (define (current-input-port) *current-input-port*)
 (define *current-output-port* (make-port #f #f 1 0 port-buffer-size (make-string port-buffer-size) port-fd-flush))
 (define (current-output-port) *current-output-port*)
-(define *current-error-port* (make-port #t #f 2 0 0 (make-string port-buffer-size) port-fd-fill))
+(define *current-error-port* (make-port #t #f 2 0 0 (make-string port-buffer-size) port-fd-flush))
 (define (current-error-port) *current-error-port*)
 
 (define (open-input-file file)
@@ -1205,6 +1217,7 @@
 	  cell))))
 
 (define (command-line) '("test" "test.scm"))
-(define (environment . lst) '())
-(define (eval expr env)
-  (display "EVAL:") (display expr) (newline))
+
+
+
+

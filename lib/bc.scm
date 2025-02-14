@@ -547,6 +547,7 @@ attributes #0 = { returns_twice}
   (let* ((libman (make-libman))
 	 (unused (set! library-search-paths (cons "./srfi2" library-search-paths)))
 	 (runtime-input (with-input-from-file "runtime2.scm" read-file))
+	 (eval-input (with-input-from-file "eval.scm" read-file))
 
 	 (pre-input (with-input-from-file file read-file))
 
@@ -554,18 +555,20 @@ attributes #0 = { returns_twice}
 	 (input
 	  (match pre-input
 	    (((import ,anything ___) ,body ___) pre-input)
-	    (,else `((import (scheme base) (scheme r5rs) (scheme time) (scheme file) (scheme inexact)) ,@pre-input))))
+	    (,else `((import  (scheme base) (scheme r5rs) (scheme time) (scheme file) (scheme inexact) ) ,@pre-input))))
 	 (unused (expander-init libman))
 	 (runtime (expand-program runtime-input "" libman))
+	 (evals (expand-program eval-input "" libman))
 	 (prog (expand-program input "PROG-" libman))
 	 (lowered (r7-pass `(begin  	,@runtime
+					,@evals
 					,@prog
 					0 ;; return value.
 					) #f))
 	 (main-fun (make-fun "main")))
     (when verbose
       (display (format "Compiling ~a\n" file) (current-error-port))
-      (pretty-print lowered (current-error-port))
+      ;(pretty-print lowered (current-error-port))
       )
 					;;(exit)
     (emit lowered '() main-fun #t)

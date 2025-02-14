@@ -13,6 +13,6 @@
 ;; there is no error checking for list dimention.
 ;; Also unsupported: ,x ___ ___  on destruction.
 (define-library (match)
-  (export match)
+  (export match ilength)
   (import (scheme base) (scheme write))
   (include "match.scm"))
