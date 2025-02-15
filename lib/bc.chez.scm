@@ -5,6 +5,7 @@
 (import (srfi :28))
 (import (srfi :26))
 (import (srfi :37))
+(import (srfi :151))
 
 (define-syntax cond-expand
   (syntax-rules (and or not else chez)
@@ -51,6 +52,7 @@
 (include "library-manager.scm")
 (include "expand.scm")
 (include "passes.scm")
+(include "fix-letrec.scm")
 
 (define (list-set! list k obj)
   (if (= k 0)
@@ -118,6 +120,8 @@
   (bytevector-ieee-double-native-set! bv 0 d)
   (put-bytevector p bv))
 (display (cdr (command-line)))
+(define (get-double-as-u64 x) 0)
+
 (include "bc.scm")
 
 ;(for-each (lambda (x) (compile-file x #t)) (cdr (command-line)))

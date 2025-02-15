@@ -407,6 +407,8 @@
   (case-lambda
    ((a b)
     (string-append2 a b))
+   ((a b c)
+    (string-append2 a (string-append2 b c)))
    ((a b c d e)
     (string-append2 a (string-append2 b (string-append2 c (string-append2 d e)))))
    (strs
