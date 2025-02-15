@@ -5,4 +5,7 @@
 	(srfi 1)
 	(srfi 69)
 	(format))
+(define (get-double-as-u64 x) 0)
+(define (bit-field-rotate a b c d) 0)
+(define (bitwise-and a b ) 0)
 (include "bc.scm")

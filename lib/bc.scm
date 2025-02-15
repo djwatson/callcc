@@ -33,6 +33,7 @@
 
 (define functions '())
 (define consts '())
+(define complex-consts '())
 (define const-hash (make-hash-table equal?))
 (define symbol-table '())
 
@@ -363,6 +364,7 @@
 			   (const-label-label const)))
      (let ((id (next-id)))
        (push-instr! fun (format "%v~a = load i64, ptr @~a" id (const-label-label const)))
+       (push! complex-consts (format "@~a" id))
        (finish (format "%v~a" id))))
     (,const
      (guard (not (pair? const)))
