@@ -205,6 +205,10 @@
 	   (id (next-id)))
        (push-instr! fun (format "%f~a = ~a double ~a, ~a" id op av bv))
        (format "%f~a" id)))
+    ((primcall const-init ,const ,call)
+     (let ((res (emit call env fun #f)))
+       (push-instr! fun (format "store i64 ~a, ptr @~a" res (const-label-label const)))
+       #f))
     ((primcall APPLY ,args ___)
      (let* ((args (omap arg args (emit arg env fun #f)))
 	    (clo-id (next-id))
@@ -352,6 +356,13 @@
        ;; (push-instr! fun (format "%v~a = add i64 ~a, ~a" id sym (+ (- ptr-tag) 16)))
        ;; (push-instr! fun (format "%v~a = inttoptr i64 %v~a to i64*" pid id))
        ;; (push-instr! fun (format "%v~a = load i64, i64* %v~a" resid pid))
+       (finish (format "%v~a" id))))
+    (,const
+     (guard (const-label? const))
+     (push! consts (format "@~a = private unnamed_addr global i64 0, align 8\n"
+			   (const-label-label const)))
+     (let ((id (next-id)))
+       (push-instr! fun (format "%v~a = load i64, ptr @~a" id (const-label-label const)))
        (finish (format "%v~a" id))))
     (,const
      (guard (not (pair? const)))

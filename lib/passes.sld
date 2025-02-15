@@ -11,7 +11,7 @@
      (util)
      (third-party pp)
      (match))
-  (export r7-pass escapes-table global-labels)
+  (export r7-pass escapes-table global-labels const-label-label const-needs-label const-label?)
   (include "qq.scm")
   (include "passes.scm")
   (include "fix-letrec.scm"))

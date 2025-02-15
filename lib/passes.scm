@@ -3,11 +3,18 @@
 ;; Some routines for parsing output of expander
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+(define-record-type const-label (%make-const-label label needs-label) const-label?
+		    (label const-label-label)
+		    (needs-label const-needs-label))
+
+(define (make-const-label needs-label)
+  (%make-const-label (gen-label "constant") needs-label))
 ;; TODO just put these in the expander directly.
 (define (unquoted? x)
   (or
    (bytevector? x)
-    (char? x)
+   (const-label? x)
+   (char? x)
     (boolean? x)
     (number? x)
     (string? x)
@@ -106,6 +113,69 @@ TODO: boxes could be passed down through funcs
   ((,(parse-expanded op) ,args ___)
    (guard (not (memq op '(if begin letrec letrec* lambda case-lambda case set! define quote))))
    `(call ,op ,@(map parse-expanded args))))
+
+(define (is-bignum? x)
+  (and (number? x) (exact? x) (integer? x)
+       (or (> x #xffffffffffff)
+	   (< x #x-ffffffffffff))))
+
+(define (is-ratnum? x)
+  (and (number? x) (exact? x) (rational? x) (not (integer? x))))
+
+(define (is-compnum? x)
+   (and (number? x) (not (real? x)) (not (rational? x))))
+
+(define gen-label
+  (let ((num 0))
+    (lambda (str)
+      (set! num (+ num 1))
+      (string-append  str "_" (number->string num)))))
+
+(define (lift-bignums e)
+  (define (contains-complex-const? x)
+    (match x
+      ((,x . ,y)
+       (or (contains-complex-const? x) (contains-complex-const? y)))
+      (#(,x ___)
+       (any contains-complex-const? x))
+      (,x
+       (guard (or (is-compnum? x) (is-bignum? x) (is-ratnum? x) ))
+       #t)
+      (,else
+       #f)))
+  (define (build-complex x)
+    (match x
+      ((,(build-complex x) . ,(build-complex y))
+       `(call cons ,x ,y))
+      (#(,(build-complex x) ___)
+       `(call vector ,x ___))
+      (,x
+       (guard (or (is-compnum? x) (is-bignum? x) (is-ratnum? x) ))
+       `(call string->number ,(number->string x)))
+      (,else
+       `(quote ,else))))
+  (define bignums '())
+  (define-pass lift
+    ((quote ,x)
+     (guard (contains-complex-const? x))
+     (let ((tmp (make-const-label #t)))
+       (push! bignums (cons (build-complex x) tmp))
+       tmp))
+    (,x
+     (guard (or (is-compnum? x)(is-bignum? x) (is-ratnum? x) ))
+     (cond
+      ((assoc x bignums) => cdr)
+      (else
+       (let ((tmp (make-const-label #t)))
+	 (push! bignums (cons `(call string->number ,(number->string x)) tmp))
+	 tmp)))))
+  (define res (lift e))
+  (define (is-string->number? x) (and (pair? x) (eq? 'define (first x)) (eq? 'string->number (second x))))
+  (define-values (before after) (split-at (cdr res) (+ 1 (or (list-index is-string->number? (cdr res)) -1))))
+  `(begin
+     ,@before
+     ,@(omap num bignums `(primcall const-init ,(cdr num) ,(car num)))
+     ,@after))
 
 (define ops '((< . LT)
 	      (> . GT)
@@ -713,6 +783,8 @@ TODO: boxes could be passed down through funcs
   (-> x
       deep-copy
       parse-expanded
+      lift-bignums
+      ;debug-print
       integrate-r5rs
       ;make-a-program
       fix-letrec
