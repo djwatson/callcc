@@ -87,10 +87,10 @@
   (sys:DIV a b))
 (define /
   (case-lambda
-   ((a) (base/ (inexact 1) a))
-   ((a b) (base/ (inexact a) b))
-   ((a b c) (base/ (base/ (inexact a) b) c))
-   ((a . rest) (reducer base/ (inexact a) rest))))
+   ((a) (base/ 1 a))
+   ((a b) (base/ a b))
+   ((a b c) (base/ (base/ a b) c))
+   ((a . rest) (reducer base/ a rest))))
 
 (define (comparer f args)
   (let loop ((args args))
@@ -294,7 +294,7 @@
 		    (write-char (string-ref n i) port)))
      ((number? n) (display (number->string n) port))
      ((char? n) (write-char n port))
-     ((vector? n) (display (vector->list n) port))
+     ((vector? n) (display "#" port) (display (vector->list n) port))
      ((null? n) (display "()" port))
      ((symbol? n) (display (symbol->string n) port))
      ((record? n) (display "#<record>" port))
@@ -650,7 +650,7 @@
 	 (equal? (cdr a) (cdr b))) #t)
    (else #f)))
 (define (eqv? a b)
-  (or (eq? a b) (and (flonum? a) (flonum? b) (= a b))))
+  (or (eq? a b) (and (number? a) (number? b) (= a b))))
 
 (define (eq? a b)
   (eq? a b))
@@ -1107,6 +1107,7 @@
 (define (close-input-port p)
   (close-port p))
 (define (close-output-port p)
+  (flush-output-port p)
   (close-port p))
 (define (close-port p)
   (when (port-fd p)
