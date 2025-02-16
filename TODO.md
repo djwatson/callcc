@@ -2,8 +2,7 @@
 # known bugs:
 
 # plan
-  * get bignum/ratnum/compnum constants lifted / working
-    * test pi/chudnovsky
+  * improve eqv? perf
   * get ratnum/compnum working
   * moar self-compile
      * get-double-as-u64

@@ -390,11 +390,7 @@
    ((n) (sys:FOREIGN_CALL "SCM_MAKE_STRING" n #f))
    ((n fill) (sys:FOREIGN_CALL "SCM_MAKE_STRING" n fill))))
 (define (string-copy! tostr tostart fromstr fromstart fromend)
-  (let loop ((frompos fromstart) (topos tostart))
-    (if (< frompos fromend)
-	(begin
-	  (string-set! tostr topos (string-ref fromstr frompos))
-	  (loop (+ frompos 1) (+ topos 1))))))
+  (sys:FOREIGN_CALL "SCM_STRING_CPY" tostr tostart fromstr fromstart fromend))
 (define (string-append2 a b)
   (let* ((lena (string-length a))
 	 (lenb (string-length b))
@@ -409,10 +405,6 @@
   (case-lambda
    ((a b)
     (string-append2 a b))
-   ((a b c)
-    (string-append2 a (string-append2 b c)))
-   ((a b c d e)
-    (string-append2 a (string-append2 b (string-append2 c (string-append2 d e)))))
    (strs
     (let* ((totallen (apply + (map string-length strs)))
 	   (newstr (make-string totallen)))
@@ -420,7 +412,8 @@
 	(if (not (null? strs))
 	    (let* ((cur_str (car strs))
  		   (cur_len (string-length cur_str)))
-	      (string-copy! newstr place (car strs) 0 cur_len)
+	      (sys:FOREIGN_CALL "SCM_STRING_CPY" newstr place (car strs) 0 cur_len)
+	      ;(string-copy! newstr place (car strs) 0 cur_len)
 	      (loop (cdr strs) (+ place cur_len)))))
       newstr))))
 

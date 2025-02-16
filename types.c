@@ -999,7 +999,7 @@ static const uint64_t reg_arg_cnt = 6;
 /* #endif */
 
 // TODO: gc shadow_stack
-static constexpr uint64_t shadow_stack_size = 3000;
+static constexpr uint64_t shadow_stack_size = 10000;
 gc_obj shadow_stack[shadow_stack_size];
 gc_obj consargs_stub(gc_obj a0, gc_obj a1, gc_obj a2, gc_obj a3, gc_obj a4,
                      gc_obj a5) {
