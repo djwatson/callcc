@@ -49,6 +49,12 @@ typedef struct freelist_s {
   slab_info* slab;
 } freelist_s;
 
+extern int64_t symbol_table;
+extern uint64_t* complex_constants[];
+extern int64_t complex_constants_len;
+extern  int64_t shadow_stack[100];
+
+
 static uintptr_t align(uintptr_t val, uintptr_t alignment) {
   return (val + alignment - 1) & ~(alignment - 1);
 }
@@ -181,7 +187,7 @@ void gc_init() {
 #else
 #error "Unknown OS: Can't get stack base"
 #endif
-  printf("frametop %p pthreadtop %p\n", stacktop, addr);
+  /* printf("frametop %p pthreadtop %p\n", stacktop, addr); */
   stacktop = addr;
 
   // Set defaults so we don't have to check for wrapping in
@@ -246,9 +252,6 @@ static void mark() {
     }
   }
 }
-
-extern int64_t symbol_table;
-extern  int64_t shadow_stack[100];
 
 static void merge_and_free_slab(slab_info* slab) {
   // TODO: actual merge.
@@ -381,6 +384,11 @@ __attribute__((noinline, preserve_none)) static void rcimmix_collect() {
   kv_push(markstack, ((range){(uint64_t*)&shadow_stack[0], (uint64_t*)&shadow_stack[100]}));
 
   kv_push(markstack, ((range){(uint64_t*)&cur_link, (uint64_t*)(&cur_link+8)}));
+
+  for(uint64_t i = 0; i < complex_constants_len; i++) {
+    uint64_t* ptr = complex_constants[i];
+    kv_push(markstack, ((range){ptr, ptr+1}));
+  }
 
   // Run mark loop.
   mark();

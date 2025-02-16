@@ -1,6 +1,5 @@
 
 # known bugs:
-  * gcroot constant inits locs
 
 # plan
   * get bignum/ratnum/compnum constants lifted / working

@@ -364,7 +364,7 @@
 			   (const-label-label const)))
      (let ((id (next-id)))
        (push-instr! fun (format "%v~a = load i64, ptr @~a" id (const-label-label const)))
-       (push! complex-consts (format "@~a" id))
+       (push! complex-consts (format "@~a" (const-label-label const)))
        (finish (format "%v~a" id))))
     (,const
      (guard (not (pair? const)))
@@ -596,6 +596,11 @@ attributes #0 = { returns_twice}
 
       (display (format "@symbol_table = constant i64 ~a\n"
 		       sym-vec)))
+
+    (display (format "@complex_constants = constant [~a x ptr] [~a]\n"
+		     (length complex-consts) (join ", " (omap const complex-consts (format "ptr ~a" const)))))
+    (display (format "@complex_constants_len = constant i64 ~a\n"
+		     (length complex-consts)))
 
     (set! functions (reverse! (cons main-fun functions)))
     (for func functions
