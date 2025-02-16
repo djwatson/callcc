@@ -1,7 +1,8 @@
 (define-library
     (srfi 69)
   (import (scheme r5rs)
-	  (scheme base))
+	  (scheme base)
+	  (prefix (flow sys) sys:))
   (export make-hash-table hash-table? alist->hash-table
 	  hash-table-equivalence-function hash-table-hash-function
 	  hash-table-ref hash-table-ref/default hash-table-set! hash-table-delete! hash-table-exists?
@@ -24,7 +25,7 @@
 
     (define (string-hash s . maybe-bound)
       (let ((bound (if (null? maybe-bound) *default-bound* (car maybe-bound))))
-	(%string-hash s (lambda (x) x) bound)))
+	(modulo (sys:FOREIGN_CALL "SCM_STRING_HASH" s) bound)))
 
     (define (string-ci-hash s . maybe-bound)
       (let ((bound (if (null? maybe-bound) *default-bound* (car maybe-bound))))
@@ -32,7 +33,7 @@
 
     (define (symbol-hash s . maybe-bound)
       (let ((bound (if (null? maybe-bound) *default-bound* (car maybe-bound))))
-	(%string-hash (symbol->string s) (lambda (x) x) bound)))
+	(modulo (sys:FOREIGN_CALL "SCM_STRING_HASH" (symbol->string s)) bound)))
 
     (define (hash obj . maybe-bound)
       (let ((bound (if (null? maybe-bound) *default-bound* (car maybe-bound))))
