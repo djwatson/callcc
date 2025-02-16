@@ -175,10 +175,12 @@
 	    (args (append2 firstargs (car rlst))))
        (apply fun args)))))
 
-  (define (expt num exp)
-    (let loop ((n 1) (cnt exp))
-      (if (= cnt 0) n
-	  (loop (* num n) (- cnt 1)))))
+;; TODO: use bitops
+(define (expt num exp)
+  (let loop ((ret 1) (num num) (exp exp))
+    (if (= exp 0)
+	ret
+	(loop (if (odd? exp) (* ret num) ret) (* num num) (/ exp 2)))))
 
 (define (remainder a b)
   (sys:MOD a b))
@@ -448,6 +450,21 @@
 (define (exact? x) (or (fixnum? x) (bignum? x)))
 (define (inexact? x) (flonum? x))
 
+(define (exact-integer-sqrt s)
+  (unless (and (exact? s)
+	       (positive? s))
+    (error "not exact" s))
+  (if (bignum? s)
+      (let ((res (sys:FOREIGN_CALL "SCM_BIGNUM_SQRT" s)))
+	(values res (- s (* res res))))
+      (if (<= s 1)
+	  (values s s)
+	  (let* ((x0 (quotient s 2))
+		 (x1 (quotient (+ x0 (quotient s x0)) 2)))
+	    (let loop ((x0 x0) (x1 x1))
+	      (if (< x1 x0)
+		  (loop x1 (quotient (+ x1 (quotient s x1)) 2))
+		  (values x0 (- s (* x0 x0)))))))))
 (define (inexact->exact a)
   (sys:FOREIGN_CALL "SCM_EXACT" a))
 (define (exact x) (inexact->exact x))

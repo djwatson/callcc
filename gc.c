@@ -12,6 +12,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <gmp.h>
 
 #include "alloc_table.h"
 #include "gc.h"
@@ -187,7 +188,21 @@ bool get_partial_range(uint64_t sz_class, freelist_s *fl) {
   assert((uintptr_t)fl->start_ptr >= (uintptr_t)fl->slab->start);
   assert((uintptr_t)fl->end_ptr <= (uintptr_t)fl->slab->end);
   return true;
+ }
+
+static void* rcimmix_alloc_align(size_t sz) {
+  return rcimmix_alloc(align(sz, sizeof(void*)));
 }
+static void *rcimmix_realloc_align(void *p, size_t old_sz, size_t new_sz) {
+  auto res = rcimmix_alloc_align(new_sz);
+  auto copy_sz = old_sz;
+  if (new_sz < old_sz) {
+    copy_sz = new_sz;
+  }
+  memcpy(res, p, copy_sz);
+  return res;
+}
+static void rcimmix_free(void*, size_t){}
 
 void gc_init() {
   stacktop = (uint64_t *)__builtin_frame_address(0);
@@ -221,6 +236,8 @@ void gc_init() {
   for(uint64_t i = 0; i < page_classes; i++) {
     kv_init(pages_free[i]);
   }
+
+  mp_set_memory_functions(rcimmix_alloc_align, rcimmix_realloc_align, rcimmix_free);
 }
 
 void gc_add_root(uint64_t *rootp) { kv_push(roots, rootp); }

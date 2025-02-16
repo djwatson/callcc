@@ -441,6 +441,34 @@ INLINE void *SCM_LOAD_CLOSURE_PTR(gc_obj a) {
 #endif
 }
 
+INLINE gc_obj SCM_EXACT(gc_obj flo) {
+  if (!is_flonum(flo)) {
+    return flo;
+  }
+  return tag_fixnum(to_double(flo));
+}
+
+INLINE gc_obj SCM_INEXACT(gc_obj fix) {
+  if (is_flonum(fix)) {
+    return fix;
+  }
+  if (is_fixnum(fix)) {
+    return double_to_gc_slow((double)to_fixnum(fix));
+  }
+  assert(is_bignum(fix));
+  return double_to_gc_slow(mpz_get_d(to_bignum(fix)->x));
+}
+
+static void get_bignum(gc_obj obj, mpz_t* loc) {
+  assert(!is_flonum(obj));
+  if (is_bignum(obj)) {
+    mpz_init_set(*loc, to_bignum(obj)->x);
+    return;
+  }
+  assert(is_fixnum(obj));
+  mpz_init_set_si(*loc, to_fixnum(obj));
+}
+
 static uint64_t get_math_type(gc_obj o) {
   if (is_ptr(o)) {
     return get_ptr_tag(o);
@@ -466,71 +494,37 @@ static gc_obj tag_bignum(mpz_t a) {
   return tag_ptr(res);
 }
 
+// TODO: fix can't swap -
 #define MATH_OVERFLOW_OP(OPNAME, OPLCNAME, OP, SHIFT)                          \
   NOINLINE __attribute__((preserve_most)) gc_obj SCM_##OPNAME##_SLOW(          \
       gc_obj a, gc_obj b) {                                                    \
-    auto ta = get_math_type(a);                                                \
-    auto tb = get_math_type(b);                                                \
-    if (tb > ta) {                                                             \
-      SWAP(ta, tb);                                                            \
-      SWAP(a, b);                                                              \
-    }                                                                          \
-    switch (ta) {                                                              \
-    case FIXNUM_TAG: {                                                         \
+    if (is_flonum(a) | is_flonum(b)) {                                         \
+      return double_to_gc_slow(OP(to_double(SCM_INEXACT(a)), to_double(SCM_INEXACT(b)))); \
+    } else if (is_bignum(a) || is_bignum(b)) {                                 \
+      mpz_t ba, bb, res;                                                       \
+      mpz_init(res);                                                           \
+      get_bignum(a, &ba);                                                      \
+      get_bignum(b, &bb);                                                      \
+      mpz_##OPLCNAME(res, ba, bb);                                             \
+      return tag_bignum(res);                                                  \
+    } else if (is_fixnum(a) && is_fixnum(b)) {                                 \
       gc_obj res;                                                              \
       if (!__builtin_##OPLCNAME##_overflow(a.value, SHIFT(b.value),            \
                                            &res.value)) {                      \
         return res;                                                            \
       }                                                                        \
       /* make it a bignum, result overflowed */                                \
-      mpz_t ba;                                                                \
-      mpz_t bb;                                                                \
-      mpz_t bres;                                                              \
-      mpz_init(bres);                                                          \
-      mpz_init_set_si(ba, to_fixnum(a));                                       \
-      mpz_init_set_si(bb, to_fixnum(b));                                       \
-      mpz_##OPLCNAME(bres, ba, bb);                                            \
-      return tag_bignum(bres);                                                 \
+      mpz_t ba, bb, bres;                                                       \
+      mpz_init(bres);                                                           \
+      get_bignum(a, &ba);                                                      \
+      get_bignum(b, &bb);                                                      \
+      mpz_##OPLCNAME(bres, ba, bb);                                             \
+      return tag_bignum(bres);                                                  \
     }                                                                          \
-    case FLONUM_TAG:                                                           \
-    case FLONUM1_TAG:                                                          \
-    case FLONUM2_TAG:                                                          \
-    case FLONUM3_TAG:                                                          \
-      double fb;                                                               \
-      double fa = to_double(a);                                                \
-      if (tb == FIXNUM_TAG) {                                                  \
-        fb = to_fixnum(b);                                                     \
-      } else {                                                                 \
-        fb = to_double(b);                                                     \
-      }                                                                        \
-      return double_to_gc_slow(OP(fb, fa));                                    \
-    case BIGNUM_TAG:                                                           \
-      mpz_t bres;                                                              \
-      mpz_init(bres);                                                          \
-      switch (tb) {                                                            \
-      case FIXNUM_TAG:                                                         \
-        mpz_t bb;                                                              \
-        mpz_init_set_si(bb, to_fixnum(b));                                     \
-        mpz_##OPLCNAME(bres, to_bignum(a)->x, bb);                             \
-        return tag_bignum(bres);                                               \
-      case FLONUM_TAG:                                                         \
-      case FLONUM1_TAG:                                                        \
-      case FLONUM2_TAG:                                                        \
-      case FLONUM3_TAG:                                                        \
-        double fa = mpz_get_d(to_bignum(a)->x);                                \
-        return double_to_gc_slow(OP(fa, to_double(b)));                        \
-      case BIGNUM_TAG:                                                         \
-        mpz_##OPLCNAME(bres, to_bignum(a)->x, to_bignum(b)->x);                \
-        return tag_bignum(bres);                                               \
-      default:                                                                 \
-        abort();                                                               \
-      }                                                                        \
-    default:                                                                   \
-      printf(#OPNAME ": not a number:");                                       \
-      SCM_DISPLAY(a, tag_fixnum(0));                                           \
-      printf("\n");                                                            \
-      abort();                                                                 \
-    }                                                                          \
+    printf(#OPNAME ": not a number:");                                         \
+    SCM_DISPLAY(a, tag_fixnum(0));                                             \
+    printf("\n");                                                              \
+    abort();                                                                   \
   }                                                                            \
                                                                                \
   INLINE gc_obj SCM_##OPNAME(gc_obj a, gc_obj b) {                             \
@@ -564,51 +558,24 @@ MATH_OVERFLOW_OP(ADD, add, MATH_ADD, NOSHIFT)
 MATH_OVERFLOW_OP(SUB, sub, MATH_SUB, NOSHIFT)
 MATH_OVERFLOW_OP(MUL, mul, MATH_MUL, SHIFT)
 
-INLINE gc_obj SCM_EXACT(gc_obj flo) {
-  if (!is_flonum(flo)) {
-    return flo;
-  }
-  return tag_fixnum(to_double(flo));
-}
-
-INLINE gc_obj SCM_INEXACT(gc_obj fix) {
-  if (is_flonum(fix)) {
-    return fix;
-  }
-  if (is_fixnum(fix)) {
-    return double_to_gc_slow((double)to_fixnum(fix));
-  }
-  assert(is_bignum(fix));
-  return double_to_gc_slow(mpz_get_d(to_bignum(fix)->x));
-}
-
-static void get_bignum(gc_obj obj, mpz_t* loc) {
-  assert(!is_flonum(obj));
-  if (is_bignum(obj)) {
-    mpz_init_set(*loc, to_bignum(obj)->x);
-    return;
-  }
-  assert(is_fixnum(obj));
-  mpz_init_set_si(*loc, to_fixnum(obj));
-}
-
-#define MATH_SIMPLE_OP(OPNAME, OP, FPOP, BIGOP)				\
+#define MATH_SIMPLE_OP(OPNAME, OP, FPOP, BIGOP)                                \
                                                                                \
   NOINLINE gc_obj SCM_##OPNAME##_SLOW(gc_obj a, gc_obj b) {                    \
-    if (is_flonum(a) || is_flonum(b)) {				\
-    return double_to_gc_slow(FPOP(to_double(SCM_INEXACT(a)), to_double(SCM_INEXACT(b)))); \
-    } else if (is_bignum(a) || is_bignum(b)) {				\
-    mpz_t ba,bb,res;							\
-    mpz_init(res);							\
-      get_bignum(a, &ba);						\
-      get_bignum(b, &bb);						\
-      mpz_tdiv_##BIGOP(res, ba, bb);					\
-				    return tag_bignum(res);		\
-				    } else if (is_fixnum(a) && is_fixnum(b)) { \
-					return tag_fixnum(OP(to_fixnum(a), to_fixnum(b))); \
-				      }					\
-    abort();								\
-  }									\
+    if (is_flonum(a) || is_flonum(b)) {                                        \
+      return double_to_gc_slow(                                                \
+          FPOP(to_double(SCM_INEXACT(a)), to_double(SCM_INEXACT(b))));         \
+    } else if (is_bignum(a) || is_bignum(b)) {                                 \
+      mpz_t ba, bb, res;                                                       \
+      mpz_init(res);                                                           \
+      get_bignum(a, &ba);                                                      \
+      get_bignum(b, &bb);                                                      \
+      mpz_tdiv_##BIGOP(res, ba, bb);                                           \
+      return tag_bignum(res);                                                  \
+    } else if (is_fixnum(a) && is_fixnum(b)) {                                 \
+      return tag_fixnum(OP(to_fixnum(a), to_fixnum(b)));                       \
+    }                                                                          \
+    abort();                                                                   \
+  }                                                                            \
                                                                                \
   INLINE gc_obj SCM_##OPNAME(gc_obj a, gc_obj b) {                             \
     if (likely((is_fixnum(a) & is_fixnum(b)) == 1)) {                          \
@@ -1385,6 +1352,14 @@ gc_obj SCM_BIGNUM_STR(gc_obj b) {
   str->type = STRING_TAG;
   return tag_string(str);
 }
+
+gc_obj SCM_BIGNUM_SQRT(gc_obj b) {
+  mpz_t res;
+  mpz_init(res);
+  mpz_sqrt(res, to_bignum(b)->x);
+  return tag_bignum(res);
+}
+
 gc_obj SCM_FLONUM_STR(gc_obj b) {
   string_s* str = rcimmix_alloc(sizeof(string_s) + 40);
   str->type = STRING_TAG;
