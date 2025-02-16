@@ -9,7 +9,12 @@
 
 #include "gc.h"
 
-#define LOW_TAGS                                                               \
+#define likely(x) __builtin_expect(x, 1)
+#define unlikely(x) __builtin_expect(x, 0)
+#define NOINLINE __attribute__((noinline))
+#define INLINE __attribute__((always_inline))
+
+#define LOW_TAGS							\
   X(FIXNUM, 0)                                                                 \
   X(FLONUM1, 1)                                                                \
   X(PTR, 2)                                                                    \
@@ -184,11 +189,17 @@ static bool is_flonum(gc_obj obj) {
   return is_flonum_fast(obj) || (is_ptr(obj) && get_ptr_tag(obj) == FLONUM_TAG);
 }
 
-gc_obj SCM_IS_FLONUM(gc_obj obj) {
-  if (is_flonum(obj)) {
+INLINE gc_obj SCM_IS_FLONUM_SLOW(gc_obj obj) {
+    if (is_flonum(obj)) {
     return TRUE_REP;
   }
   return FALSE_REP;
+}
+INLINE gc_obj SCM_IS_FLONUM(gc_obj obj) {
+  if (!is_flonum_fast(obj) && !is_ptr(obj)) {
+    return FALSE_REP;
+  }
+  [[clang::musttail]] return SCM_IS_FLONUM_SLOW(obj);
 }
 
 gc_obj SCM_IS_BIGNUM(gc_obj obj) {
@@ -378,10 +389,6 @@ gc_obj SCM_DISPLAY(gc_obj obj, gc_obj scmfd) {
 }
 
 ////////////// MATH
-#define likely(x) __builtin_expect(x, 1)
-#define unlikely(x) __builtin_expect(x, 0)
-#define NOINLINE __attribute__((noinline))
-#define INLINE __attribute__((always_inline))
 
 NOINLINE gc_obj SCM_LOAD_GLOBAL_FAIL(gc_obj a) {
   auto str = to_string(to_symbol(a)->name);
