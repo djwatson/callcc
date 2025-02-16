@@ -28,27 +28,31 @@
       (car seq)
       (fold-left f (car seq) (cdr seq)))))
 
-(define (join sep strs)
-  (if (null? strs)
-      ""
-      (let* ((sep-len (string-length sep))
-	     (totallen (+ (* (- (length strs) 1) sep-len) (apply + (map string-length strs))))
-	     (newstr (make-string totallen)))
-	(let loop ((strs strs) (place 0))
-	  (if (not (null? strs))
-	      (let* ((cur_str (car strs))
- 		     (cur_len (string-length cur_str)))
-		(unless (= place 0)
-		  (string-copy! newstr place sep 0 sep-len)
-		  (set! place (+ place sep-len)))
-		(string-copy! newstr place  (car strs) 0 cur_len)
-		(loop (cdr strs) (+ place cur_len)))))
-	newstr)))
+(define (join sep lst)
+  (reduce-left (lambda (x y) (string-append x sep y)) "" lst))
+
+;; Seems to break chez?  Is there a bug?
+;; (define (join2 sep strs)
+;;   (if (null? strs)
+;;       ""
+;;       (let* ((sep-len (string-length sep))
+;; 	     (totallen (+ (* (- (length strs) 1) sep-len) (apply + (map string-length strs))))
+;; 	     (newstr (make-string totallen)))
+;; 	(let loop ((strs strs) (place 0))
+;; 	  (if (not (null? strs))
+;; 	      (let* ((cur_str (car strs))
+;;  		     (cur_len (string-length cur_str)))
+;; 		(unless (= place 0)
+;; 		  (string-copy! newstr place sep 0 sep-len))
+;; 		(let ((new-place (if (= place 0) (+ place sep-len) place)))
+;; 		  (string-copy! newstr new-place  (car strs) 0 cur_len)
+;; 		  (loop (cdr strs) (+ new-place cur_len))))))
+;; 	newstr)))
 
 ;; Used for handling rest arguments.
 (define (ilength lst)
   (do ((lst lst (cdr lst)) (cnt 0 (+ 1 cnt)))
-    ((not (pair? lst)) cnt)))
+      ((not (pair? lst)) cnt)))
 
 (define (to-proper l)
   (if (null? l)
