@@ -564,27 +564,51 @@ MATH_OVERFLOW_OP(ADD, add, MATH_ADD, NOSHIFT)
 MATH_OVERFLOW_OP(SUB, sub, MATH_SUB, NOSHIFT)
 MATH_OVERFLOW_OP(MUL, mul, MATH_MUL, SHIFT)
 
-#define MATH_SIMPLE_OP(OPNAME, OP, FPOP)                                       \
+INLINE gc_obj SCM_EXACT(gc_obj flo) {
+  if (!is_flonum(flo)) {
+    return flo;
+  }
+  return tag_fixnum(to_double(flo));
+}
+
+INLINE gc_obj SCM_INEXACT(gc_obj fix) {
+  if (is_flonum(fix)) {
+    return fix;
+  }
+  if (is_fixnum(fix)) {
+    return double_to_gc_slow((double)to_fixnum(fix));
+  }
+  assert(is_bignum(fix));
+  return double_to_gc_slow(mpz_get_d(to_bignum(fix)->x));
+}
+
+static void get_bignum(gc_obj obj, mpz_t* loc) {
+  assert(!is_flonum(obj));
+  if (is_bignum(obj)) {
+    mpz_init_set(*loc, to_bignum(obj)->x);
+    return;
+  }
+  assert(is_fixnum(obj));
+  mpz_init_set_si(*loc, to_fixnum(obj));
+}
+
+#define MATH_SIMPLE_OP(OPNAME, OP, FPOP, BIGOP)				\
                                                                                \
   NOINLINE gc_obj SCM_##OPNAME##_SLOW(gc_obj a, gc_obj b) {                    \
-    double fa, fb;                                                             \
-    if (is_fixnum(a)) {                                                        \
-      fa = to_fixnum(a);                                                       \
-    } else if (is_flonum(a)) {                                                 \
-      fa = to_double(a);                                                       \
-    } else {                                                                   \
-      abort();                                                                 \
-    }                                                                          \
-    if (is_fixnum(b)) {                                                        \
-      fb = to_fixnum(b);                                                       \
-    } else if (is_flonum(b)) {                                                 \
-      fb = to_double(b);                                                       \
-    } else {                                                                   \
-      abort();                                                                 \
-    }                                                                          \
-                                                                               \
-    return double_to_gc_slow(FPOP(fa, fb));                                    \
-  }                                                                            \
+    if (is_flonum(a) || is_flonum(b)) {				\
+    return double_to_gc_slow(FPOP(to_double(SCM_INEXACT(a)), to_double(SCM_INEXACT(b)))); \
+    } else if (is_bignum(a) || is_bignum(b)) {				\
+    mpz_t ba,bb,res;							\
+    mpz_init(res);							\
+      get_bignum(a, &ba);						\
+      get_bignum(b, &bb);						\
+      mpz_tdiv_##BIGOP(res, ba, bb);					\
+				    return tag_bignum(res);		\
+				    } else if (is_fixnum(a) && is_fixnum(b)) { \
+					return tag_fixnum(OP(to_fixnum(a), to_fixnum(b))); \
+				      }					\
+    abort();								\
+  }									\
                                                                                \
   INLINE gc_obj SCM_##OPNAME(gc_obj a, gc_obj b) {                             \
     if (likely((is_fixnum(a) & is_fixnum(b)) == 1)) {                          \
@@ -605,8 +629,8 @@ MATH_OVERFLOW_OP(MUL, mul, MATH_MUL, SHIFT)
 #define MATH_DIV(a, b) ((a) / (b))
 #define MATH_MOD(a, b) ((a) % (b))
 #define MATH_FPMOD(a, b) (fmod((a), (b)))
-MATH_SIMPLE_OP(DIV, MATH_DIV, MATH_DIV)
-MATH_SIMPLE_OP(MOD, MATH_MOD, MATH_FPMOD)
+MATH_SIMPLE_OP(DIV, MATH_DIV, MATH_DIV, q)
+MATH_SIMPLE_OP(MOD, MATH_MOD, MATH_FPMOD, r)
 
 #define MATH_COMPARE_OP(OPNAME, OP)                                            \
   NOINLINE __attribute__((preserve_most)) gc_obj SCM_##OPNAME##_SLOW(          \
@@ -1113,22 +1137,6 @@ INLINE gc_obj SCM_MAKE_SYMBOL(gc_obj str) {
   return tag_symbol(sym);
 }
 
-INLINE gc_obj SCM_EXACT(gc_obj flo) { return tag_fixnum(to_double(flo)); }
-
-INLINE gc_obj SCM_INEXACT(gc_obj fix) {
-  if (is_flonum(fix)) {
-    return fix;
-  }
-  gc_obj res;
-  double d = (double)to_fixnum(fix);
-  if (double_to_gc(d, &res)) {
-    return res;
-  }
-  flonum_s *f = rcimmix_alloc(sizeof(flonum_s));
-  f->type = FLONUM_TAG;
-  f->x = d;
-  return tag_ptr(f);
-}
 ////// records
 INLINE gc_obj SCM_MAKE_RECORD(gc_obj sz) {
   assert(gc_is_small(sizeof(record_s) + (to_fixnum(sz) * sizeof(gc_obj))));
