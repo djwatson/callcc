@@ -455,7 +455,7 @@ static gc_obj tag_bignum(mpz_t a) {
   }
   bignum_s *res = rcimmix_alloc(sizeof(bignum_s));
   res->type = BIGNUM_TAG;
-  mpz_set(res->x, a);
+  mpz_init_set(res->x, a);
   return tag_ptr(res);
 }
 

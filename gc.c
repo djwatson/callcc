@@ -1,6 +1,9 @@
 #define _POSIX_C_SOURCE 200112L
 #define _GNU_SOURCE
 #define GENGC 1
+//#define USE_MPROTECT
+
+#include <sys/mman.h>
 
 #include <assert.h>
 #include <pthread.h>
@@ -83,10 +86,26 @@ static kvec_t(uint64_t *) roots;
 static constexpr uint16_t page_classes = 16;
 static kvec_t(slab_info *) pages_free[page_classes];
 
-static uint16_t sz_to_page_class(uint64_t sz) {
-  assert(sz >= PAGE_SIZE);
-  uint32_t zeros = 32 - __builtin_clz(sz-1); // Find next-largest power of two.
-  return zeros - 12; // Page bits.
+static uint64_t page_class_to_sz(uint64_t page_class) {
+  return (1UL << page_class)* PAGE_SIZE;
+}
+static uint64_t sz_to_page_class(uint64_t sz, bool check) {
+  assert(sz >= PAGE_SIZE); // Must be at least one page
+  assert(sz % PAGE_SIZE == 0);
+
+  // Convert size to number of pages
+  uint64_t pages = sz / PAGE_SIZE;
+
+  uint32_t class = 64- __builtin_clzll(pages);
+
+  // If already a power of two, go down one class.
+  if ((pages & (pages - 1)) == 0) {
+    class -- ;
+  } else if (check) {
+      assert(false);
+  }
+
+  return class;
 }
 
 bool find_next_bit(uint64_t const* bits, uint64_t maxbit, uint64_t bit, bool invert, uint64_t* result) {
@@ -258,17 +277,19 @@ static void merge_and_free_slab(slab_info* slab) {
   if (slab->class <size_classes) {
     slab->start -= mark_byte_cnt;
   }
-  auto page_class = sz_to_page_class(slab->end - slab->start);
-  //printf("Page class %i sz class %i\n", page_class, slab->class);
+  auto page_class = sz_to_page_class(slab->end - slab->start, true);
   if (page_class >= page_classes) {
     // Direct free
     //printf("Freeing huge %i\n", slab->class*8);
+    alloc_table_set_range(&atable, nullptr, slab->start, slab->end - slab->start);
     free(slab->start);
     free(slab);
     return;
   }
   init_list_head(&slab->link);
-  //printf("Freeing slab %i\n", slab->class);
+  #ifdef USE_MPROTECT
+  mprotect(slab->start, slab->end - slab->start, PROT_NONE);
+  #endif
   kv_push(pages_free[page_class], slab);
 }
 
@@ -457,13 +478,24 @@ __attribute__((noinline, preserve_none)) static void rcimmix_collect() {
 
 static slab_info *alloc_slab(uint64_t sz_class) {
   auto sz = sz_class < size_classes ? default_slab_size : align(sz_class * 8, PAGE_SIZE);
-  auto page_class = sz_to_page_class(sz);
+  // Find page class: Choose next largest class to ensure we have enough room.
+  // TODO: no need to increment if perfect size.
+  auto page_class = sz_to_page_class(sz, false);
+  sz = page_class_to_sz(page_class);
 
   // TODO: split the range here based on actual size.
   // TODO: check larger bins & split.
   if (page_class < page_classes && kv_size(pages_free[page_class])) {
     slab_info* free = kv_pop(pages_free[page_class]);
     if (free) {
+      if (sz > (free->end - free->start)) {
+	printf("Bad sizing\n");
+	exit(0);
+      }
+      assert(sz <= (free->end - free->start));
+      #ifdef USE_MPROTECT
+      mprotect(free->start, free->end - free->start, PROT_READ|PROT_WRITE);
+      #endif
       free->class = sz_class;
       list_add(&free->link, &live_slabs);
       return free;
