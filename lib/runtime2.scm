@@ -252,7 +252,8 @@
 (define (call-with-current-continuation x)
   (let* ((winds *here*)
 	 (res (sys:FOREIGN_CALL "SCM_CALLCC" x)))
-    (reroot! winds)
+    (unless (eq? *here* winds)
+      (reroot! winds))
     res))
 
 (define (car a)

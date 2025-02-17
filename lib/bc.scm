@@ -230,7 +230,7 @@
 	    (argstr (join ", " args)))
        (push-instr! fun (format "%v~a = call ~a i64 @\"~a\"(~a) #0, !dbg !~a"
 				id
-				(if (equal? "SCM_CALLCC" name)
+				(if (equal? "SCM_CALLCC" (substring name 0 (min (string-length name) 10)))
 				    "preserve_nonecc" "")
 				name argstr (fun-debug-loc-id fun)))
        (finish (format "%v~a" id))))
@@ -486,6 +486,7 @@ declare i64 @SCM_LOAD_GLOBAL(i64)
 declare void @SCM_SET_GLOBAL(i64, i64)
 declare ptr @SCM_LOAD_CLOSURE_PTR(i64)
 declare preserve_nonecc i64 @SCM_CALLCC (i64)  #0
+declare preserve_nonecc i64 @SCM_CALLCC_ONESHOT (i64)  #0
 declare void @consargs_stub () #0
 declare i64 @SCM_CONS (i64, i64)
 declare i64 @SCM_CAR (i64)

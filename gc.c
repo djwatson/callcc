@@ -419,6 +419,7 @@ __attribute__((noinline, preserve_none)) static void rcimmix_collect() {
     uint64_t *symbol = (uint64_t *)(v[2 + i] & ~7);
     kv_push(markstack, ((range){&symbol[1], &symbol[3]}));
   }
+  // TODO: fix shadow stack size
   kv_push(markstack, ((range){(uint64_t*)&shadow_stack[0], (uint64_t*)&shadow_stack[100]}));
 
   kv_push(markstack, ((range){(uint64_t*)&cur_link, (uint64_t*)(&cur_link+8)}));

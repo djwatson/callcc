@@ -934,6 +934,8 @@ static void need_more_frames(gc_obj res) {
 extern int64_t argcnt;
 extern int64_t wanted_argcnt;
 
+void ccresthunk_oneshot();
+
 __attribute__((returns_twice, noinline, preserve_none)) gc_obj
 SCM_CALLCC(gc_obj cont) {
   assert(is_closure(cont));

@@ -1,11 +1,23 @@
 
 # known bugs:
+  * new join is broken in chez?
 
 # plan
+  * remove GENSYM-for emitted syms????????
   * improve eqv? perf
   * get ratnum/compnum working
   * moar self-compile
      * get-double-as-u64
+	 
+# full r7rs
+  * unicode
+  * r7rs test
+  * argtype stress test
+  * division tests
+  * macro tests
+  * port tests
+  * unicode-tests
+  * copyish tests
   
 # benchmarks:
   * Needs inliner to remove alloc: graphs
@@ -17,25 +29,10 @@
   
   * stack size check: earley, divrec
 
-  * exact-integer-sqrt: pi
-  * bignums: pi chudnovsky
-
-# GC stuff:
-* cleanup vector sizing: just use another header for large similar to small logbits?
-  * large could always use markbits, but it doesn't show up in any tests currently.
-* And do same thing for static symbols?
-* Cleanup the GC roots, some should be in types, add_root unused currently.
-* Remove the radix tree: just use pre-allocated virtual space.
-
-* Long term: Could do precise GC, using LLVM's stackmaps + non-integral pointer types. 
-     This will probably break some optimizations based on type: Would need
-	 a typecheck-removal pass
-
 # OTHER
 
 * storage use analysis: unboxing flonums, longjmp/setjmp call/cc, and typecheck removal.
    * call/cc can just be a simple escape analysis? global though
-
 
 * auto-listify globals: consargs stub in compiler called a lot: 
   * vector. Hand-coded in chez
@@ -50,12 +47,22 @@
 * inliner?? graphs is slow without
   * can be simple called-once??? check graphs
 
-* self-compile
 * gc fd's.
 * gset check
-* bignums, compnums, ratnums
+* compnums, ratnums
 
 * recheck GC get stack top
+
+# GC stuff:
+* cleanup vector sizing: just use another header for large similar to small logbits?
+  * large could always use markbits, but it doesn't show up in any tests currently.
+* And do same thing for static symbols?
+* Cleanup the GC roots, some should be in types, add_root unused currently.
+* Remove the radix tree: just use pre-allocated virtual space.
+
+* Long term: Could do precise GC, using LLVM's stackmaps + non-integral pointer types. 
+     This will probably break some optimizations based on type: Would need
+	 a typecheck-removal pass
 
 # call/cc
   * call/cc: figure out valgrind or address santizer workings?
