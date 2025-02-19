@@ -77,6 +77,11 @@ typedef struct bignum_s {
   mpz_t x;
 } bignum_s;
 
+typedef struct ratnum_s {
+  uint64_t type;
+  mpq_t x;
+} ratnum_s;
+
 typedef struct string_s {
   uint64_t type;
   gc_obj len;
@@ -117,6 +122,7 @@ string_s *to_string(gc_obj obj) { return (string_s *)(obj.value - PTR_TAG); }
 symbol *to_symbol(gc_obj obj) { return (symbol *)(obj.value - PTR_TAG); }
 int64_t to_fixnum(gc_obj obj) { return obj.value >> 3; }
 bignum_s *to_bignum(gc_obj obj) { return (bignum_s *)(obj.value - PTR_TAG); }
+ratnum_s *to_ratnum(gc_obj obj) { return (ratnum_s *)(obj.value - PTR_TAG); }
 cons_s *to_cons(gc_obj obj) { return (cons_s *)(obj.value - CONS_TAG); }
 vector_s *to_vector(gc_obj obj) { return (vector_s *)(obj.value - VECTOR_TAG); }
 record_s *to_record(gc_obj obj) { return (record_s *)(obj.value - PTR_TAG); }
@@ -146,6 +152,7 @@ bool is_vector(gc_obj obj) { return get_tag(obj) == VECTOR_TAG; }
 bool is_symbol(gc_obj obj) { return get_tag(obj) == SYMBOL_TAG; }
 bool is_fixnum(gc_obj obj) { return get_tag(obj) == FIXNUM_TAG; }
 bool is_bignum(gc_obj obj) { return is_ptr(obj) && get_ptr_tag(obj) == BIGNUM_TAG; }
+bool is_ratnum(gc_obj obj) { return is_ptr(obj) && get_ptr_tag(obj) == RATNUM_TAG; }
 bool is_heap_object(gc_obj obj) { return !is_fixnum(obj) && !is_literal(obj); }
 gc_obj tag_fixnum(int64_t num) {
   assert(((num << 3) >> 3) == num);
@@ -204,6 +211,13 @@ INLINE gc_obj SCM_IS_FLONUM(gc_obj obj) {
 
 gc_obj SCM_IS_BIGNUM(gc_obj obj) {
   if (is_bignum(obj)) {
+    return TRUE_REP;
+  }
+  return FALSE_REP;
+}
+
+gc_obj SCM_IS_RATNUM(gc_obj obj) {
+  if (is_ratnum(obj)) {
     return TRUE_REP;
   }
   return FALSE_REP;
@@ -315,7 +329,12 @@ gc_obj SCM_DISPLAY(gc_obj obj, gc_obj scmfd) {
       auto bn = to_bignum(obj);
       char *gstr = mpz_get_str(nullptr, 10, bn->x);
       dprintf(fd, "%s", gstr);
-      free(gstr);
+      break;
+    }
+    case RATNUM_TAG: {
+      auto rat = to_ratnum(obj);
+      char *gstr = mpq_get_str(nullptr, 10, rat->x);
+      dprintf(fd, "%s", gstr);
       break;
     }
     default:
@@ -461,12 +480,29 @@ INLINE gc_obj SCM_INEXACT(gc_obj fix) {
 
 static void get_bignum(gc_obj obj, mpz_t* loc) {
   assert(!is_flonum(obj));
+  assert(!is_ratnum(obj));
   if (is_bignum(obj)) {
     mpz_init_set(*loc, to_bignum(obj)->x);
     return;
   }
   assert(is_fixnum(obj));
   mpz_init_set_si(*loc, to_fixnum(obj));
+}
+
+static void get_ratnum(gc_obj obj, mpq_t* loc) {
+  mpq_init(*loc);
+  if (is_ratnum(obj)) {
+    auto rat = to_ratnum(obj);
+    mpq_set(*loc, rat->x);
+  } else if (is_bignum(obj)) {
+    auto big = to_bignum(obj);
+    mpq_set_z(*loc, big->x);
+  } else if (is_fixnum(obj)) {
+    auto fix = to_fixnum(obj);
+    mpq_set_si(*loc, fix, 1);
+  } else {
+    assert(false);
+  }
 }
 
 static uint64_t get_math_type(gc_obj o) {
@@ -491,6 +527,25 @@ static gc_obj tag_bignum(mpz_t a) {
   bignum_s *res = rcimmix_alloc(sizeof(bignum_s));
   res->type = BIGNUM_TAG;
   mpz_init_set(res->x, a);
+  return tag_ptr(res);
+}
+
+static gc_obj tag_ratnum(mpq_t a) {
+  // Simplify to fixnum if possible.
+  mpq_canonicalize(a);
+  mpz_t den;
+  mpz_init(den);
+  mpq_get_den(den, a);
+  if (mpz_cmp_si(den, 1) == 0) {
+    mpz_t num;
+    mpz_init(num);
+    mpq_get_num(num, a);
+    return tag_bignum(num);
+  }
+  ratnum_s *res = rcimmix_alloc(sizeof(ratnum_s));
+  res->type = RATNUM_TAG;
+  mpq_init(res->x);
+  mpq_set(res->x, a);
   return tag_ptr(res);
 }
 
@@ -564,23 +619,19 @@ MATH_OVERFLOW_OP(MUL, mul, MATH_MUL, SHIFT)
     if (is_flonum(a) || is_flonum(b)) {                                        \
       return double_to_gc_slow(                                                \
           FPOP(to_double(SCM_INEXACT(a)), to_double(SCM_INEXACT(b))));         \
-    } else if (is_bignum(a) || is_bignum(b)) {                                 \
-      mpz_t ba, bb, res;                                                       \
-      mpz_init(res);                                                           \
-      get_bignum(a, &ba);                                                      \
-      get_bignum(b, &bb);                                                      \
-      mpz_tdiv_##BIGOP(res, ba, bb);                                           \
-      return tag_bignum(res);                                                  \
-    } else if (is_fixnum(a) && is_fixnum(b)) {                                 \
-      return tag_fixnum(OP(to_fixnum(a), to_fixnum(b)));                       \
+    } else {								\
+      mpq_t ra, rb, rres;							\
+      mpq_init(rres);							\
+      get_ratnum(a, &ra);						\
+      get_ratnum(b, &rb);						\
+      mpq_##BIGOP(rres, ra, rb);						\
+      return tag_ratnum(rres);						\
     }                                                                          \
     abort();                                                                   \
   }                                                                            \
                                                                                \
   INLINE gc_obj SCM_##OPNAME(gc_obj a, gc_obj b) {                             \
-    if (likely((is_fixnum(a) & is_fixnum(b)) == 1)) {                          \
-      return tag_fixnum(OP(to_fixnum(a), to_fixnum(b)));                       \
-    } else if (likely((is_flonum_fast(a) & is_flonum_fast(b)) == 1)) {         \
+    if (likely((is_flonum_fast(a) & is_flonum_fast(b)) == 1)) {         \
       gc_obj res;                                                              \
       if (likely(double_to_gc(FPOP(to_double_fast(a), to_double_fast(b)),      \
                               &res))) {                                        \
@@ -596,8 +647,8 @@ MATH_OVERFLOW_OP(MUL, mul, MATH_MUL, SHIFT)
 #define MATH_DIV(a, b) ((a) / (b))
 #define MATH_MOD(a, b) ((a) % (b))
 #define MATH_FPMOD(a, b) (fmod((a), (b)))
-MATH_SIMPLE_OP(DIV, MATH_DIV, MATH_DIV, q)
-MATH_SIMPLE_OP(MOD, MATH_MOD, MATH_FPMOD, r)
+MATH_SIMPLE_OP(DIV, MATH_DIV, MATH_DIV, div)
+MATH_SIMPLE_OP(MOD, MATH_MOD, MATH_FPMOD, mul)
 
 #define MATH_COMPARE_OP(OPNAME, OP)                                            \
   NOINLINE __attribute__((preserve_most)) gc_obj SCM_##OPNAME##_SLOW(          \
@@ -1350,6 +1401,20 @@ gc_obj SCM_BIGNUM_STR(gc_obj b) {
   len = (len + 7)&~7;
   string_s* str = rcimmix_alloc(sizeof(string_s) + len);
   mpz_get_str(str->str, 10, bignum->x);
+  str->len = tag_fixnum(strlen(str->str));
+  str->type = STRING_TAG;
+  return tag_string(str);
+}
+
+gc_obj SCM_RATNUM_STR(gc_obj b) {
+  auto ratnum = to_ratnum(b);
+  // +2 per manual for null-termination and -
+  auto len = mpz_sizeinbase(mpq_numref(ratnum->x), 10) +
+    mpz_sizeinbase(mpq_denref(ratnum->x), 10) + 3;
+  // Align.
+  len = (len + 7)&~7;
+  string_s* str = rcimmix_alloc(sizeof(string_s) + len);
+  mpq_get_str(str->str, 10, ratnum->x);
   str->len = tag_fixnum(strlen(str->str));
   str->type = STRING_TAG;
   return tag_string(str);

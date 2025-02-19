@@ -425,7 +425,7 @@
 (define (boolean? x) (boolean? x))
 (define (char? x) (char? x))
 (define (null? x) (null? x))
-(define (number? x) (or (fixnum? x) (flonum? x) (bignum? x)))
+(define (number? x) (or (fixnum? x) (flonum? x) (bignum? x) (ratnum? x)))
 (define (pair? x) (pair? x))
 (define (procedure? x) (procedure? x))
 (define (string? x) (string? x))
@@ -439,6 +439,7 @@
 
 (define (fixnum? x) (fixnum? x))
 (define (bignum? x) (sys:FOREIGN_CALL "SCM_IS_BIGNUM" x))
+(define (ratnum? x) (sys:FOREIGN_CALL "SCM_IS_RATNUM" x))
 (define (integer? x) (fixnum? x))
 (define (exact-integer? x) (fixnum? x))
 (define (exact? x) (or (fixnum? x) (bignum? x)))
@@ -1024,7 +1025,7 @@
 	   (buffer (make-string buflen)))
       (cond ((flonum? num) (sys:FOREIGN_CALL "SCM_FLONUM_STR" num))
 	    ((bignum? num) (sys:FOREIGN_CALL "SCM_BIGNUM_STR" num))
-	    ;; ((ratnum? num) (error "numbratnum->str" num))
+	    ((ratnum? num) (sys:FOREIGN_CALL "SCM_RATNUM_STR" num))
 	    ;; ((compnum? num) (string-append
 	    ;; 		     (number->string (real-part num))
 	    ;; 		     (if (not (or (negative? (imag-part num))
@@ -1038,7 +1039,7 @@
 	       (let loop ((p buflen) (n (if neg (- 0 num) num)))
 		 (cond ((eq? n 0)
 			(if neg
-			    (begin
+ 			    (begin
 			      (set! p (- p 1))
 			      (string-set! buffer p #\-)))
 			(substring buffer p buflen))

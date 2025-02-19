@@ -503,6 +503,7 @@ declare i64 @SCM_EQ (i64, i64)
 declare i64 @SCM_MAKE_STRING (i64, i64)
 declare i64 @SCM_IS_FLONUM(i64)
 declare i64 @SCM_IS_BIGNUM(i64)
+declare i64 @SCM_IS_RATNUM(i64)
 declare i64 @SCM_CHAR_INTEGER(i64)
 declare i64 @SCM_INTEGER_CHAR(i64)
 declare i64 @SCM_SYMBOL_STRING(i64)
@@ -529,6 +530,7 @@ declare i64 @SCM_EXP(i64)
 declare i64 @SCM_LOG(i64)
 declare i64 @SCM_EQ_HASH(i64)
 declare i64 @SCM_BIGNUM_STR(i64)
+declare i64 @SCM_RATNUM_STR(i64)
 declare i64 @SCM_BIGNUM_SQRT(i64)
 declare i64 @SCM_FLONUM_STR(i64)
 declare i64 @SCM_STRING_HASH(i64)
@@ -578,7 +580,7 @@ attributes #0 = { returns_twice}
 	 (evals (expand-program eval-input "" libman))
 	 (prog (expand-program input "PROG-" libman))
 	 (lowered (r7-pass `(begin  	,@runtime
-					,@evals
+					;,@evals
 					,@prog
 					0 ;; return value.
 					) #f))

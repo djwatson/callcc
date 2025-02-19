@@ -3,11 +3,12 @@
   * new join is broken in chez?
 
 # plan
-  * remove GENSYM-for emitted syms????????
-  * improve eqv? perf
   * get ratnum/compnum working
   * moar self-compile
      * get-double-as-u64
+
+* remove GENSYM-for emitted syms????????
+  * improve eqv? perf
 	 
 # full r7rs
   * unicode
