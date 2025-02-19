@@ -182,6 +182,8 @@
 	ret
 	(loop (if (odd? exp) (* ret num) ret) (* num num) (quotient exp 2)))))
 
+(define (square x) (* x x))
+
 (define (remainder a b)
   (sys:MOD a b))
 (define (modulo x y)

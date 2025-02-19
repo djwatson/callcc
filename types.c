@@ -555,6 +555,13 @@ static gc_obj tag_ratnum(mpq_t a) {
       gc_obj a, gc_obj b) {                                                    \
     if (is_flonum(a) | is_flonum(b)) {                                         \
       return double_to_gc_slow(OP(to_double(SCM_INEXACT(a)), to_double(SCM_INEXACT(b)))); \
+    } else if (is_ratnum(a) || is_ratnum(b)) {				\
+      mpq_t ba, bb, res;						\
+      mpq_init(res);							\
+      get_ratnum(a, &ba);						\
+      get_ratnum(b, &bb);						\
+      mpq_##OPLCNAME(res, ba, bb);					\
+      return tag_ratnum(res);						\
     } else if (is_bignum(a) || is_bignum(b)) {                                 \
       mpz_t ba, bb, res;                                                       \
       mpz_init(res);                                                           \
@@ -685,63 +692,27 @@ INLINE gc_obj SCM_DIV(gc_obj a, gc_obj b) {
 #define MATH_COMPARE_OP(OPNAME, OP)                                            \
   NOINLINE __attribute__((preserve_most)) gc_obj SCM_##OPNAME##_SLOW(          \
       gc_obj a, gc_obj b) {                                                    \
-    auto ta = get_math_type(a);                                                \
-    auto tb = get_math_type(b);                                                \
-    auto fail = FALSE_REP;                                                     \
-    auto ok = TRUE_REP;                                                        \
-    if (tb > ta) {                                                             \
-      SWAP(ta, tb);                                                            \
-      SWAP(a, b);                                                              \
-      SWAP(ok, fail);                                                          \
-    }                                                                          \
-    switch (ta) {                                                              \
-    case FIXNUM_TAG:                                                           \
-      if (OP(a.value, b.value)) {                                              \
-        return ok;                                                             \
-      }                                                                        \
-      break;                                                                   \
-    case FLONUM_TAG:                                                           \
-    case FLONUM1_TAG:                                                          \
-    case FLONUM2_TAG:                                                          \
-    case FLONUM3_TAG:                                                          \
-      if (tb == FIXNUM_TAG) {                                                  \
-        if (OP(to_double(a), to_fixnum(b))) {                                  \
-          return ok;                                                           \
-        }                                                                      \
-      } else {                                                                 \
-        if (OP(to_double(a), to_double(b))) {                                  \
-          return ok;                                                           \
-        }                                                                      \
-      }                                                                        \
-      break;                                                                   \
-    case BIGNUM_TAG:                                                           \
-      switch (tb) {                                                            \
-      case FIXNUM_TAG:                                                         \
-        if (OP(mpz_cmp_si(to_bignum(a)->x, to_fixnum(b)), 0)) {                \
-          return ok;                                                           \
-        }                                                                      \
-        break;                                                                 \
-      case FLONUM_TAG:                                                         \
-      case FLONUM1_TAG:                                                        \
-      case FLONUM2_TAG:                                                        \
-      case FLONUM3_TAG:                                                        \
-        if (OP(mpz_cmp_d(to_bignum(a)->x, to_double(b)), 0)) {                 \
-          return ok;                                                           \
-        }                                                                      \
-        break;                                                                 \
-      case BIGNUM_TAG:                                                         \
-        if (OP(mpz_cmp(to_bignum(a)->x, to_bignum(b)->x), 0)) {                \
-          return ok;                                                           \
-        }                                                                      \
-        break;                                                                 \
-      default:                                                                 \
-        abort();                                                               \
-      }                                                                        \
-      break;                                                                   \
-    default:                                                                   \
-      abort();                                                                 \
-    }                                                                          \
-    return fail;                                                               \
+    bool res;								\
+    if (is_flonum(a)||is_flonum(b)) {					\
+      res = OP(to_double(SCM_INEXACT(a)), to_double(SCM_INEXACT(b)));	\
+    } else if (is_ratnum(a) || is_ratnum(b)) {				\
+      mpq_t ba, bb;						\
+      get_ratnum(a, &ba);						\
+      get_ratnum(b, &bb);						\
+      res = OP(mpq_cmp(ba, bb), 0);				\
+    } else if (is_bignum(a) || is_bignum(b)) {                                 \
+      mpz_t ba, bb;                                                       \
+      get_bignum(a, &ba);                                                      \
+      get_bignum(b, &bb);                                                      \
+      res = OP(mpz_cmp(ba, bb), 0);					\
+    } else if (is_fixnum(a) && is_fixnum(b)) {                                 \
+      res = OP(to_fixnum(a), to_fixnum(b));				\
+    }									\
+    if (res) {\
+      return TRUE_REP;							\
+    } else {\
+      return FALSE_REP;							\
+    }									\
   }                                                                            \
                                                                                \
   INLINE gc_obj SCM_##OPNAME(gc_obj a, gc_obj b) {                             \
