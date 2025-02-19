@@ -180,7 +180,7 @@
   (let loop ((ret 1) (num num) (exp exp))
     (if (= exp 0)
 	ret
-	(loop (if (odd? exp) (* ret num) ret) (* num num) (/ exp 2)))))
+	(loop (if (odd? exp) (* ret num) ret) (* num num) (quotient exp 2)))))
 
 (define (remainder a b)
   (sys:MOD a b))
@@ -245,7 +245,7 @@
 
 (define (even? x)
   (= 0 (modulo x 2)))
-(define (quotient a b) (sys:FOREIGN_CALL "SCM_DIV" a b))
+(define (quotient a b) (sys:FOREIGN_CALL "SCM_QUOTIENT" a b))
 
 
 (define (not a) (if a #f #t))

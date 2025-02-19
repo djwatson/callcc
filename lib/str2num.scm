@@ -244,5 +244,5 @@
 
 (define string->number
   (case-lambda
-   ((str) (prefix0 str (string-length str) 0))
-   ((str base) (prefix2 str (string-length str) 0 base #f))))
+   ((str) (sys:FOREIGN_CALL "SCM_DISPLAY" str 0) (prefix0 str (string-length str) 0))
+   ((str base) (sys:FOREIGN_CALL "SCM_DISPLAY" str 0)(prefix2 str (string-length str) 0 base #f))))

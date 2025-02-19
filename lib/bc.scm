@@ -468,6 +468,7 @@
 declare i64 @SCM_DISPLAY (i64)
 declare i64 @SCM_ADD (i64, i64)
 declare i64 @SCM_DIV (i64, i64)
+declare i64 @SCM_QUOTIENT (i64, i64)
 declare i64 @SCM_MUL (i64, i64)
 declare i64 @SCM_MOD (i64, i64)
 declare i64 @SCM_LT (i64, i64)
@@ -580,7 +581,7 @@ attributes #0 = { returns_twice}
 	 (evals (expand-program eval-input "" libman))
 	 (prog (expand-program input "PROG-" libman))
 	 (lowered (r7-pass `(begin  	,@runtime
-					;,@evals
+					,@evals
 					,@prog
 					0 ;; return value.
 					) #f))

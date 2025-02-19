@@ -613,25 +613,29 @@ MATH_OVERFLOW_OP(ADD, add, MATH_ADD, NOSHIFT)
 MATH_OVERFLOW_OP(SUB, sub, MATH_SUB, NOSHIFT)
 MATH_OVERFLOW_OP(MUL, mul, MATH_MUL, SHIFT)
 
-#define MATH_SIMPLE_OP(OPNAME, OP, FPOP, BIGOP)                                \
+     #define MATH_SIMPLE_OP(OPNAME, OP, FPOP, BIGOP)                                \
                                                                                \
   NOINLINE gc_obj SCM_##OPNAME##_SLOW(gc_obj a, gc_obj b) {                    \
     if (is_flonum(a) || is_flonum(b)) {                                        \
       return double_to_gc_slow(                                                \
           FPOP(to_double(SCM_INEXACT(a)), to_double(SCM_INEXACT(b))));         \
-    } else {								\
-      mpq_t ra, rb, rres;							\
-      mpq_init(rres);							\
-      get_ratnum(a, &ra);						\
-      get_ratnum(b, &rb);						\
-      mpq_##BIGOP(rres, ra, rb);						\
-      return tag_ratnum(rres);						\
+    } else if (is_bignum(a) || is_bignum(b)) {                                 \
+      mpz_t ba, bb, res;                                                       \
+      mpz_init(res);                                                           \
+      get_bignum(a, &ba);                                                      \
+      get_bignum(b, &bb);                                                      \
+      mpz_tdiv_##BIGOP(res, ba, bb);                                           \
+      return tag_bignum(res);                                                  \
+    } else if (is_fixnum(a) && is_fixnum(b)) {                                 \
+      return tag_fixnum(OP(to_fixnum(a), to_fixnum(b)));                       \
     }                                                                          \
     abort();                                                                   \
   }                                                                            \
                                                                                \
   INLINE gc_obj SCM_##OPNAME(gc_obj a, gc_obj b) {                             \
-    if (likely((is_flonum_fast(a) & is_flonum_fast(b)) == 1)) {         \
+    if (likely((is_fixnum(a) & is_fixnum(b)) == 1)) {                          \
+      return tag_fixnum(OP(to_fixnum(a), to_fixnum(b)));                       \
+    } else if (likely((is_flonum_fast(a) & is_flonum_fast(b)) == 1)) {         \
       gc_obj res;                                                              \
       if (likely(double_to_gc(FPOP(to_double_fast(a), to_double_fast(b)),      \
                               &res))) {                                        \
@@ -647,8 +651,36 @@ MATH_OVERFLOW_OP(MUL, mul, MATH_MUL, SHIFT)
 #define MATH_DIV(a, b) ((a) / (b))
 #define MATH_MOD(a, b) ((a) % (b))
 #define MATH_FPMOD(a, b) (fmod((a), (b)))
-MATH_SIMPLE_OP(DIV, MATH_DIV, MATH_DIV, div)
-MATH_SIMPLE_OP(MOD, MATH_MOD, MATH_FPMOD, mul)
+MATH_SIMPLE_OP(QUOTIENT, MATH_DIV, MATH_DIV, q)
+MATH_SIMPLE_OP(MOD, MATH_MOD, MATH_FPMOD, r)
+
+NOINLINE gc_obj SCM_DIV_SLOW(gc_obj a, gc_obj b) {
+  if (is_flonum(a) || is_flonum(b)) {
+    return double_to_gc_slow(to_double(SCM_INEXACT(a)) /
+                             to_double(SCM_INEXACT(b)));
+  } else {
+    mpq_t ra, rb, rres;
+    mpq_init(rres);
+    get_ratnum(a, &ra);
+    get_ratnum(b, &rb);
+    mpq_div(rres, ra, rb);
+    return tag_ratnum(rres);
+  }
+  abort();
+}
+
+INLINE gc_obj SCM_DIV(gc_obj a, gc_obj b) {
+  if (likely((is_flonum_fast(a) & is_flonum_fast(b)) == 1)) {
+    gc_obj res;
+    if (likely(double_to_gc(to_double_fast(a) / to_double_fast(b), &res))) {
+      return res;
+    } else {
+      [[clang::musttail]] return SCM_DIV_SLOW(a, b);
+    }
+  } else {
+    [[clang::musttail]] return SCM_DIV_SLOW(a, b);
+  }
+}
 
 #define MATH_COMPARE_OP(OPNAME, OP)                                            \
   NOINLINE __attribute__((preserve_most)) gc_obj SCM_##OPNAME##_SLOW(          \
