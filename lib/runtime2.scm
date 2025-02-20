@@ -1119,7 +1119,13 @@
     (unless (and (number? num) (fixnum? base) (<= 1 base 16)) (error "bad number->string" num))
     (let* ((buflen 100)
 	   (buffer (make-string buflen)))
-      (cond ((flonum? num) (sys:FOREIGN_CALL "SCM_FLONUM_STR" num))
+      (cond ((flonum? num)
+	     (cond
+	      ((nan? num) "+nan.0")
+	      ((and (infinite? num) (positive? num)) "+inf.0")
+	      ((infinite? num) "-inf.0")
+	      (else
+	       (sys:FOREIGN_CALL "SCM_FLONUM_STR" num))))
 	    ((bignum? num) (sys:FOREIGN_CALL "SCM_BIGNUM_STR" num))
 	    ((ratnum? num) (sys:FOREIGN_CALL "SCM_RATNUM_STR" num))
 	    ((compnum? num) (string-append
