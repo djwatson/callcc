@@ -525,7 +525,7 @@
 (define (compnum? x) (sys:FOREIGN_CALL "SCM_IS_COMPNUM" x))
 (define (integer? x) (or (fixnum? x) (bignum? x) (and (ratnum? x) (= 1 (denominator x))) (and (flonum? x) (not (nan? x)) (not (infinite? x)) (= 1 (denominator (exact x))))))
 (define (exact-integer? x) (fixnum? x))
-(define (exact? x) (or (fixnum? x) (bignum? x)))
+(define (exact? x) (or (fixnum? x) (bignum? x) (ratnum? x) (and (compnum? x) (exact? (real-part x)) (exact? (imag-part x)))))
 (define (inexact? x) (or (flonum? x)
 			 (and (compnum? x) (or (inexact? (real-part x)) (inexact? (imag-part x))))))
 (define (nan? x) (or (and (flonum? x) (sys:FOREIGN_CALL "SCM_ISNAN" x))
