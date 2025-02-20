@@ -473,8 +473,25 @@
   (case-lambda
    ((n) (sys:FOREIGN_CALL "SCM_MAKE_STRING" n #f))
    ((n fill) (sys:FOREIGN_CALL "SCM_MAKE_STRING" n fill))))
-(define (string-copy! tostr tostart fromstr fromstart fromend)
-  (sys:FOREIGN_CALL "SCM_STRING_CPY" tostr tostart fromstr fromstart fromend))
+(define string-copy!
+  (case-lambda
+   ((to at from) (string-copy! to at from 0 (string-length from)))
+   ((to at from start) (string-copy! to at from start (string-length from)))
+   ((to at from start end)
+    (let ((to-len (string-length to))
+	  (from-len (string-length from)))
+      (unless (<= 0 at to-len) (error "to string-copy!" start to-len))
+      (unless (and (fixnum? start) (fixnum? end) (fixnum? at)) (error "fix string-copy!" start))
+      (unless (or (< -1 start from-len)
+		  (= start end)) (error "len string-copy!" start from-len))
+      (unless (<= 0 end from-len) (error "end string-copy!" end from-len))
+      (when (> start end) (error "start end string-copy!" start end))
+      (unless (and (or (< -1 at to-len)
+		       (= start end))
+		   (<= (+ at (- end start))
+		       to-len))
+	(error "bad string-copy! at" at start end))
+      (sys:FOREIGN_CALL "SCM_STRING_CPY" to at from start end)))))
 (define (string-append2 a b)
   (let* ((lena (string-length a))
 	 (lenb (string-length b))
@@ -537,6 +554,11 @@
       (not (infinite? num))))
 
 (define boolean=?
+  (case-lambda
+    ((a b) (eq? a b))
+    (rest
+     (comparer eq? rest))))
+(define symbol=?
   (case-lambda
     ((a b) (eq? a b))
     (rest
@@ -609,6 +631,19 @@
     (if (zero? n)
 	(car lst)
 	(loop (cdr lst) (- n 1)))))
+(define (list-tail lst k)
+  (let loop ((lst lst) (k k))
+    (if (> k 0)
+	(loop (cdr lst) (- k 1))
+	lst)))
+(define (list-set! list k obj)
+  (if (= k 0)
+      (set-car! list obj)
+      (list-set! (cdr list) (- k 1) obj)))
+(define (list-copy lst)
+  (if (pair? lst)
+      (cons (car lst) (list-copy (cdr lst)))
+      lst))
 (define (cons* first . rest)
   (let recur ((x first) (rest rest))
     (if (pair? rest)
@@ -886,16 +921,41 @@
     ((a b) (<= (char->integer a) (char->integer b)))
     (rest
      (comparer (lambda (a b) (char<=? a b)) rest))))
-(define (char-ci=? x y)
-  (char=? (char-downcase x) (char-downcase y)))
-(define (char-ci>? x y)
-  (char>? (char-downcase x) (char-downcase y)))
-(define (char-ci<? x y)
-  (char<? (char-downcase x) (char-downcase y)))
-(define (char-ci>=? x y)
-  (char>=? (char-downcase x) (char-downcase y)))
-(define (char-ci<=? x y)
-  (char<=? (char-downcase x) (char-downcase y)))
+(define char-ci=?
+  (case-lambda
+    ((a b)
+     (unless (and (char? a) (char? b)) (error "not chars:" a b))
+     (eq? (char-downcase a) (char-downcase b)))
+    (rest
+     (comparer (lambda (a b) (char-ci=? a b)) rest))))
+(define char-ci>?
+  (case-lambda
+    ((a b)
+     (unless (and (char? a) (char? b)) (error "not chars:" a b))
+     (char>? (char-downcase a) (char-downcase b)))
+    (rest
+     (comparer (lambda (a b) (char-ci>? a b)) rest))))
+(define char-ci<?
+  (case-lambda
+    ((a b)
+     (unless (and (char? a) (char? b)) (error "not chars:" a b))
+     (char<? (char-downcase a) (char-downcase b)))
+    (rest
+     (comparer (lambda (a b) (char-ci<? a b)) rest))))
+(define char-ci>=?
+  (case-lambda
+    ((a b)
+     (unless (and (char? a) (char? b)) (error "not chars:" a b))
+     (char>=? (char-downcase a) (char-downcase b)))
+    (rest
+     (comparer (lambda (a b) (char-ci>=? a b)) rest))))
+(define char-ci<=?
+  (case-lambda
+    ((a b)
+     (unless (and (char? a) (char? b)) (error "not chars:" a b))
+     (char<=? (char-downcase a) (char-downcase b)))
+    (rest
+     (comparer (lambda (a b) (char-ci<=? a b)) rest))))
 (define (char-alphabetic? c)
   (let ((n (char->integer c)))
     (cond ((< n #x41) #f)		; A
@@ -926,17 +986,78 @@
 	    (> n #x5a))		; Z
 	(integer->char n)
 	(integer->char (+ n 32)))))
+(define char-foldcase char-downcase)
 
 (define (char-upcase c)
   (let ((n (char->integer c)))
-    (if (or (< n #x61)		; a
-	    (> n #x7a))		; z
+    (if (or (< n #x61)			; a
+	    (> n #x7a))			; z
 	(integer->char n)
 	(integer->char (- n 32)))))
 
 (define (char-whitespace? c)
   (let ((n (char->integer c)))
     (or (eq? n 32) (eq? n 9) (eq? n 12) (eq? n 10) (eq? n 13))))
+(define (digit-value ch)
+  (unless (char? ch) (error "not a char: "c))
+  (let ((n (char->integer ch)))
+    (let lp ((lo 0) (hi (- (vector-length zeros) 1)))
+      (if (> lo hi)
+          #f
+          (let* ((mid (+ lo (quotient (- hi lo) 2)))
+                 (mid-zero (char->integer (vector-ref zeros mid))))
+            (cond
+             ((<= mid-zero n (+ mid-zero 9))
+              (- n mid-zero))
+             ((< n mid-zero)
+              (lp lo (- mid 1)))
+             (else
+              (lp (+ mid 1) hi))))))))
+;; Zeros taken from chibi
+(define zeros
+    '#(#\x0030                ;DIGIT ZERO
+       #\x0660                ;ARABIC-INDIC DIGIT ZERO
+       #\x06F0                ;EXTENDED ARABIC-INDIC DIGIT ZERO
+       #\x07C0                ;NKO DIGIT ZERO
+       #\x0966                ;DEVANAGARI DIGIT ZERO
+       #\x09E6                ;BENGALI DIGIT ZERO
+       #\x0A66                ;GURMUKHI DIGIT ZERO
+       #\x0AE6                ;GUJARATI DIGIT ZERO
+       #\x0B66                ;ORIYA DIGIT ZERO
+       #\x0BE6                ;TAMIL DIGIT ZERO
+       #\x0C66                ;TELUGU DIGIT ZERO
+       #\x0CE6                ;KANNADA DIGIT ZERO
+       #\x0D66                ;MALAYALAM DIGIT ZERO
+       #\x0E50                ;THAI DIGIT ZERO
+       #\x0ED0                ;LAO DIGIT ZERO
+       #\x0F20                ;TIBETAN DIGIT ZERO
+       #\x1040                ;MYANMAR DIGIT ZERO
+       #\x1090                ;MYANMAR SHAN DIGIT ZERO
+       #\x17E0                ;KHMER DIGIT ZERO
+       #\x1810                ;MONGOLIAN DIGIT ZERO
+       #\x1946                ;LIMBU DIGIT ZERO
+       #\x19D0                ;NEW TAI LUE DIGIT ZERO
+       #\x1A80                ;TAI THAM HORA DIGIT ZERO
+       #\x1A90                ;TAI THAM THAM DIGIT ZERO
+       #\x1B50                ;BALINESE DIGIT ZERO
+       #\x1BB0                ;SUNDANESE DIGIT ZERO
+       #\x1C40                ;LEPCHA DIGIT ZERO
+       #\x1C50                ;OL CHIKI DIGIT ZERO
+       #\xA620                ;VAI DIGIT ZERO
+       #\xA8D0                ;SAURASHTRA DIGIT ZERO
+       #\xA900                ;KAYAH LI DIGIT ZERO
+       #\xA9D0                ;JAVANESE DIGIT ZERO
+       #\xAA50                ;CHAM DIGIT ZERO
+       #\xABF0                ;MEETEI MAYEK DIGIT ZERO
+       #\xFF10                ;FULLWIDTH DIGIT ZERO
+       #\x104A0               ;OSMANYA DIGIT ZERO
+       #\x11066               ;BRAHMI DIGIT ZERO
+       #\x1D7CE               ;MATHEMATICAL BOLD DIGIT ZERO
+       #\x1D7D8               ;MATHEMATICAL DOUBLE-STRUCK DIGIT ZERO
+       #\x1D7E2               ;MATHEMATICAL SANS-SERIF DIGIT ZERO
+       #\x1D7EC               ;MATHEMATICAL SANS-SERIF BOLD DIGIT ZERO
+       #\x1D7F6               ;MATHEMATICAL MONOSPACE DIGIT ZERO
+       ))
 ;;;;;;;;; string
 (define (strcmp eq? f a b eq lt gt)
   (let loop ((pos 0) (rema (string-length a)) (remb (string-length b)))
@@ -949,24 +1070,71 @@
      (else
       (f (string-ref a pos) (string-ref b pos))))))
 
-(define (string<? a b) (strcmp char=? char<? a b #f #t #f))
-(define (string>? a b) (strcmp char=? char>? a b #f #f #f))
-(define (string<=? a b) (strcmp char=? char<=? a b #t #t #f))
-(define (string>=? a b) (strcmp char=? char>=? a b #t #f #f))
-(define (string-ci<? a b) (strcmp char-ci=? char-ci<? a b #f #t #f))
-(define (string-ci>? a b) (strcmp char-ci=? char-ci>? a b #f #f #f))
-(define (string-ci<=? a b) (strcmp char-ci=? char-ci<=? a b #t #t #f))
-(define (string-ci>=? a b) (strcmp char-ci=? char-ci>=? a b #t #f #f))
-(define (string-ci=? a b) (strcmp char-ci=? char-ci=? a b #t #f #f))
-(define (string=? a b) (strcmp char=? char=? a b #t #f #f))
+(define-syntax define-strcmp
+  (syntax-rules (strcmp)
+    ((_ name (strcmp eq? cmp? a b eq lt gt))
+     (define name
+       (case-lambda
+	((a b) (strcmp eq? cmp? a b eq lt gt))
+	(rest
+	 (comparer name rest)))))))
+(define-strcmp string<? (strcmp char=? char<? a b #f #t #f))
+(define-strcmp string>? (strcmp char=? char>? a b #f #f #f))
+(define-strcmp string<=? (strcmp char=? char<=? a b #t #t #f))
+(define-strcmp string>=? (strcmp char=? char>=? a b #t #f #f))
+(define-strcmp string=? (strcmp char=? char=? a b #t #f #f))
+(define-strcmp string-ci<?  (strcmp char-ci=? char-ci<? a b #f #t #f))
+(define-strcmp string-ci>?  (strcmp char-ci=? char-ci>? a b #f #f #f))
+(define-strcmp string-ci<=?  (strcmp char-ci=? char-ci<=? a b #t #t #f))
+(define-strcmp string-ci>=?  (strcmp char-ci=? char-ci>=? a b #t #f #f))
+(define-strcmp string-ci=?  (strcmp char-ci=? char-ci=? a b #t #f #f))
+(define (string-downcase s)
+  (let loop ((out '()) (in (string->list s)))
+    (cond
+     ((null? in) (list->string (reverse out)))
+     ((= (char->integer (car in)) #x0130)
+      (loop (cons (integer->char #x0307) (cons (integer->char #x0069) out)) (cdr in)))
+     (else (loop (cons (char-downcase (car in)) out) (cdr in))))))
+(define (string-upcase s)
+  (let loop ((out '()) (in (string->list s)))
+    (cond
+     ((null? in) (list->string (reverse out)))
+     ;; ((assv (char->integer (car in)) uppercase-special) =>
+     ;;  (lambda (x)
+     ;; 	(loop (append (reverse (map integer->char (cadr x))) out) (cdr in))))
+     (else (loop (cons (char-upcase (car in)) out) (cdr in))))))
+(define (string-foldcase s)
+  (string-downcase (string-upcase s)))
 (define (string-ref str idx) (sys:FOREIGN_CALL "SCM_STRING_REF" str idx))
 (define (string-set! str idx val) (sys:FOREIGN_CALL "SCM_STRING_SET" str idx val))
-(define (string->list str)
-  (let ((n (string-length str)))
-    (let loop ((i (- n 1)) (lst '()))
-      (if (< i 0)
-	  lst
-	  (loop (- i 1) (cons (string-ref str i) lst))))))
+(define string->list
+  (case-lambda
+    ((str) (string->list str 0 (string-length str)))
+    ((str start) (string->list str start (string-length str)))
+    ((str start end)
+     (unless (and (fixnum? start)
+		  (fixnum? end)) (error "string->list" start))
+     (unless (or (< -1 start (string-length str))
+		 (= start end)) (error "Bad start string->list" start))
+     (unless (<= 0 end (string-length str)) (error "Bad end string->list" end))
+     (when (> start end) (error "Bad end string->list" end))
+     (let string->list-loop ((pos start) (buf '()))
+       (if (= pos end)
+	   (reverse buf)
+	   (string->list-loop (+ pos 1) (cons (string-ref str pos) buf)))))))
+(define string-fill!
+  (case-lambda
+    ((string fill) (string-fill! string fill 0 (string-length string)))
+    ((string fill start) (string-fill! string fill start (string-length string)))
+    ((string fill start end)
+     (unless (fixnum? start) (error "string->fill!" start))
+     (unless (or (< -1 start (string-length string))
+		 (= start end)) (error "Bad start string->fill!" start))
+     (unless (<= 0 end (string-length string)) (error "Bad end string->fill!" end))
+     (when (> start end) (error "Bad end string->fill!" end))
+     (do ((i start (+ i 1)))
+	 ((= i end))
+       (string-set! string i fill)))))
 (define (string . chars) (list->string chars))
 (define (list->string chars)
   (let* ((len (length chars))

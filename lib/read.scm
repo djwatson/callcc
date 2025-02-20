@@ -11,6 +11,7 @@
 		      ))
 
 (define (read-error msg . irritants)
+  (apply error msg irritants)
   (raise (make-error-object 'read msg irritants)))
 (define (lower-case s)
   (string-map char-downcase s))

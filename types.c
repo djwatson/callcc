@@ -134,7 +134,7 @@ cons_s *to_cons(gc_obj obj) { return (cons_s *)(obj.value - CONS_TAG); }
 vector_s *to_vector(gc_obj obj) { return (vector_s *)(obj.value - VECTOR_TAG); }
 record_s *to_record(gc_obj obj) { return (record_s *)(obj.value - PTR_TAG); }
 closure_s *to_closure(gc_obj obj) { return (closure_s *)(obj.value - PTR_TAG); }
-char to_char(gc_obj obj) { return (char)(obj.value >> 8); }
+uint32_t to_char(gc_obj obj) { return (uint32_t)(obj.value >> 8); }
 
 uint8_t get_tag(gc_obj obj) { return obj.value & TAG_MASK; }
 uint8_t get_imm_tag(gc_obj obj) { return obj.value & IMMEDIATE_MASK; }
@@ -181,7 +181,7 @@ gc_obj tag_cont(closure_s *s) {
 gc_obj tag_closure(closure_s *s) {
   return (gc_obj){.value = ((int64_t)s + PTR_TAG)};
 }
-gc_obj tag_char(char ch) {
+gc_obj tag_char(uint32_t ch) {
   return (gc_obj){.value = (((int64_t)ch << 8) + CHAR_TAG)};
 }
 gc_obj tag_symbol(symbol *s) {
