@@ -749,33 +749,53 @@
 		     (if (null? lsts)
 			 '()
 			 (cons (cdr (car lsts)) (loop3 (cdr lsts)))))))))))))
+
+(define string-for-each
+  (case-lambda
+    ((proc str)
+     (let ((len (string-length str)))
+       (do ((i 0 (+ i 1)) (pos 0 (+ pos 1)))
+	   ((= i len))
+	 (proc (string-ref str pos)))))
+    ((proc . strs)
+     (let ((len (apply min (map string-length strs))))
+       (do ((i 0 (+ i 1)))
+	   ((= i len))
+	 (apply proc (map (lambda (x) (string-ref x i)) strs)))))))
+
+(define (vector-for-each proc . vecs)
+  (let ((len (apply min (map vector-length vecs))))
+    (do ((i 0 (+ i 1)))
+	((= i len))
+      (apply proc (map (lambda (x) (vector-ref x i)) vecs)))))
+
 (define map
   (case-lambda
-    ((f lst)
-     (let loop ((f f) (lst lst))
-       (if (null? lst) '()
-	   (cons (f (car lst)) (loop f (cdr lst))))))
-    ((f lst1 lst2)
-     (let loop ((f f) (lst1 lst1) (lst2 lst2))
-       (if (or (null? lst2) (null? lst1)) '()
-	   (cons (f (car lst1) (car lst2)) (loop f (cdr lst1) (cdr lst2))))))
+   ((f lst)
+    (let loop ((f f) (lst lst))
+      (if (null? lst) '()
+	  (cons (f (car lst)) (loop f (cdr lst))))))
+   ((f lst1 lst2)
+    (let loop ((f f) (lst1 lst1) (lst2 lst2))
+      (if (or (null? lst2) (null? lst1)) '()
+	  (cons (f (car lst1) (car lst2)) (loop f (cdr lst1) (cdr lst2))))))
    (lst (let loop ((lsts (cons (cadr lst) (cddr lst))))
-    (let ((hds (let loop2 ((lsts lsts))
-		 (if (null? lsts)
-		     '()
-		     (let ((x (car lsts)))
-		       (and (not (null? x))
-			    (let ((r (loop2 (cdr lsts))))
-			      (and r (cons (car x) r)))))))))
-      (if hds
-	  (cons
-	   (apply (car lst) hds)
-	   (loop
-	    (let loop3 ((lsts lsts))
-	      (if (null? lsts)
-		  '()
-		  (cons (cdr (car lsts)) (loop3 (cdr lsts)))))))
-	  '()))))))
+	  (let ((hds (let loop2 ((lsts lsts))
+		       (if (null? lsts)
+			   '()
+			   (let ((x (car lsts)))
+			     (and (not (null? x))
+				  (let ((r (loop2 (cdr lsts))))
+				    (and r (cons (car x) r)))))))))
+	    (if hds
+		(cons
+		 (apply (car lst) hds)
+		 (loop
+		  (let loop3 ((lsts lsts))
+		    (if (null? lsts)
+			'()
+			(cons (cdr (car lsts)) (loop3 (cdr lsts)))))))
+		'()))))))
 
 
 

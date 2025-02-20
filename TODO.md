@@ -3,8 +3,15 @@
   * new join is broken in chez?
 
 # plan
-  * get compnum working
   * get r7rs-tests working
+    * unicode
+	* environments/eval
+	* bytevectors
+	* exceptions
+	* input/output
+	* read syntax
+	* numeric syntax
+	* sys interface
   * moar self-compile
      * get-double-as-u64
 
