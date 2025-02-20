@@ -1530,3 +1530,12 @@ gc_obj SCM_FLONUM_STR(gc_obj b) {
 
   return tag_string(str);
 }
+
+gc_obj SCM_DOUBLE_AS_U64(gc_obj b) {
+  double d = to_double(b);
+  int64_t di;
+  memcpy(&di, &d, sizeof(di));
+  mpz_t res;
+  mpz_init_set_si(res, di);
+  return tag_bignum(res);
+}

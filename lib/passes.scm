@@ -749,7 +749,7 @@ TODO: boxes could be passed down through funcs
 (define-pass find-global-labels sexp
   ((define ,var (labels ((,label ,lam)) (let ((,closure (const-closure (label ,label2))))
 					  (begin ,closure2))))
-   (guard (eq? label label2))
+   (guard (and (eq? label label2) (eq? closure closure2)))
    (if (hash-table-exists? assigned var)
        (display (format "Global assigned:~a\n" var) (current-error-port))
        (begin
@@ -784,7 +784,6 @@ TODO: boxes could be passed down through funcs
       deep-copy
       parse-expanded
       lift-bignums
-      ;debug-print
       integrate-r5rs
       ;make-a-program
       fix-letrec
@@ -805,6 +804,7 @@ TODO: boxes could be passed down through funcs
 
       find-global-labels
       programify
+      ;;debug-print
       
 ;      storage-use-analysis
       ))
