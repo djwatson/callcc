@@ -584,7 +584,7 @@ attributes #0 = { returns_twice}
 	 (input
 	  (match pre-input
 	    (((import ,anything ___) ,body ___) pre-input)
-	    (,else `((import  (scheme base) (scheme r5rs) (scheme time) (scheme file) (scheme inexact) ) ,@pre-input))))
+	    (,else `((import  (scheme base) (scheme r5rs) (scheme time) (scheme file) (scheme inexact) (scheme complex)) ,@pre-input))))
 	 (unused (expander-init libman))
 	 (runtime (expand-program runtime-input "" libman))
 	 (evals (expand-program eval-input "" libman))

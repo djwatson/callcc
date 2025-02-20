@@ -12,8 +12,6 @@
 	* read syntax
 	* numeric syntax
 	* sys interface
-  * moar self-compile
-     * get-double-as-u64
 
 * remove GENSYM-for emitted syms????????
   * improve eqv? perf
@@ -58,7 +56,6 @@
 
 * gc fd's.
 * gset check
-* compnums
 
 * recheck GC get stack top
 
