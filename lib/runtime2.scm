@@ -2,7 +2,9 @@
 
 (include "memory_layout.scm")
 
-;;;;;;;;math 
+;;;;;;;;math
+(define (nan? x) #f)
+(define (infinite? x) #f)
 (define (negative? p)
   (< p 0))
 
@@ -13,8 +15,16 @@
       (- p)
       p))
 
-(define (numerator x) x)
-(define (denominator x) 1)
+(define (numerator a)
+  (cond
+   ((inexact? a) (inexact (numerator (exact a))))
+   ((ratnum? a) (sys:FOREIGN_CALL "SCM_NUMERATOR" a))
+   (else a)))
+(define (denominator x)
+  (cond
+   ((inexact? x) (inexact (denominator (exact x))))
+   ((ratnum? x) (sys:FOREIGN_CALL "SCM_DENOMINATOR" x))
+   (else 1)))
 
 (define (sin f)
   (sys:FOREIGN_CALL "SCM_SIN" (inexact f)))
@@ -26,19 +36,86 @@
   (sys:FOREIGN_CALL "SCM_ACOS" (inexact f)))
 (define (tan f)
   (sys:FOREIGN_CALL "SCM_TAN" (inexact f)))
-(define (atan f)
-  (sys:FOREIGN_CALL "SCM_ATAN" (inexact f)))
-(define (sqrt f)
-  (sys:FOREIGN_CALL "SCM_SQRT" (inexact f)))
+(define atan
+  (case-lambda
+    ((num) (sys:FOREIGN_CALL "SCM_ATAN" (inexact num)))
+    ((num1 num2)
+     (let ((res (sys:FOREIGN_CALL "SCM_ATAN" (/ (inexact num1) (inexact num2)))))
+       (if (< num2 0)
+	   (if (or (negative? num1) (eqv? -inf.0 (/ 1.0 num1))) ;; hack to check for -0.0
+	       (- res 3.14159265358979)
+	       (+ res 3.14159265358979))
+	   res)))))
+(define (sqrt x)
+  (if (negative? x)
+      (make-rectangular 0.0 (sqrt (abs x)))
+      (sys:FOREIGN_CALL "SCM_SQRT" (inexact x))))
 (define (floor f)
   (sys:FOREIGN_CALL "SCM_FLOOR" (inexact f)))
 (define (ceiling f)
   (sys:FOREIGN_CALL "SCM_CEILING" (inexact f)))
 
+;; complex
+(define (make-polar r angle)
+  (make-rectangular  (* r (cos angle)) (* r (sin angle))))
+(define (magnitude z)
+  (sqrt (+ (square (real-part z)) (square (imag-part z)))))
+(define (angle z)
+  (atan (imag-part z) (real-part z)))
+
 (define (truncate x)
   (if (negative? x)
       (ceiling x)
       (floor x)))
+(define (floor/ a b)
+  (let* ((div (floor (/ a b)))
+	 (rem (- a (* b div))))
+    (values div rem)))
+(define (truncate/ a b)
+  (let* ((div (truncate (quotient a b)))
+	 (rem (- a (* b div))))
+    (values div rem)))
+(define (rationalize x e)
+  ;; Implementation by Alan Bawden.
+  (define (simplest-rational x y)
+    (define (simplest-rational-internal x y)
+      ;; Assumes 0 < X < Y
+      (let ((fx (floor x))
+            (fy (floor y)))
+        (cond ((not (< fx x))
+               fx)
+              ((= fx fy)
+               (+ fx
+                  (/ (simplest-rational-internal
+                      (/ (- y fy))
+                      (/ (- x fx))))))
+              (else
+               (+ 1 fx)))))
+    ;; do some juggling to satisfy preconditions
+    ;; of simplest-rational-internal.
+    (cond ((< y x)
+           (simplest-rational y x))
+          ((not (< x y))
+           (cond ((rational? x)
+                  x)
+                 ((and (flonum? x) (not (finite? x)))
+                  (if (and (flonum? e) (or (nan? e) (= x e)))
+                      +nan.0
+                      x))
+                 (else
+                  (assertion-violation 'rationalize
+                                       "Expected a real number"
+                                       x e))))
+          ((positive? x)
+           (simplest-rational-internal x y))
+          ((negative? y)
+           (- (simplest-rational-internal (- y)
+                                          (- x))))
+          (else
+           (if (and (exact? x) (exact? y))
+               0
+               0.0))))
+  (simplest-rational (- x e) (+ x e)))
 
 (define (exp num) (sys:FOREIGN_CALL "SCM_EXP" (inexact num)))
 
@@ -174,6 +251,12 @@
 	    (firstargs (reverse (cdr rlst)))
 	    (args (append2 firstargs (car rlst))))
        (apply fun args)))))
+
+(define (make-rectangular real imag)
+  (sys:FOREIGN_CALL "SCM_MAKE_RECTANGULAR" real imag))
+
+(define (real-part x) (sys:FOREIGN_CALL "SCM_REAL_PART" x))
+(define (imag-part x) (sys:FOREIGN_CALL "SCM_IMAG_PART" x))
 
 ;; TODO: use bitops
 (define (expt num exp)
@@ -427,7 +510,7 @@
 (define (boolean? x) (boolean? x))
 (define (char? x) (char? x))
 (define (null? x) (null? x))
-(define (number? x) (or (fixnum? x) (flonum? x) (bignum? x) (ratnum? x)))
+(define (number? x) (or (fixnum? x) (flonum? x) (bignum? x) (ratnum? x) (compnum? x)))
 (define (pair? x) (pair? x))
 (define (procedure? x) (procedure? x))
 (define (string? x) (string? x))
@@ -435,17 +518,26 @@
 (define (vector? x) (vector? x))
 (define (flonum? x) (sys:FOREIGN_CALL "SCM_IS_FLONUM" x))
 (define (complex? x) (number? x))
-(define (real? x) (number? x))
-(define (rational? x) (fixnum? x))
-(define write display)
+(define (real? x) (and (number? x) (not (compnum? x))))
+(define (rational? x) (and (number? x) (not (compnum? x)) (not (and (flonum? x) (or (sys:FOREIGN_CALL "SCM_ISNAN" x) (sys:FOREIGN_CALL "SCM_ISINF" x))))))
 
 (define (fixnum? x) (fixnum? x))
 (define (bignum? x) (sys:FOREIGN_CALL "SCM_IS_BIGNUM" x))
 (define (ratnum? x) (sys:FOREIGN_CALL "SCM_IS_RATNUM" x))
-(define (integer? x) (fixnum? x))
+(define (compnum? x) (sys:FOREIGN_CALL "SCM_IS_COMPNUM" x))
+(define (integer? x) (or (fixnum? x) (bignum? x) (and (ratnum? x) (= 1 (denominator x))) (and (flonum? x) (= 1 (denominator (exact x))))))
 (define (exact-integer? x) (fixnum? x))
 (define (exact? x) (or (fixnum? x) (bignum? x)))
-(define (inexact? x) (flonum? x))
+(define (inexact? x) (or (flonum? x)
+			 (and (compnum? x) (or (inexact? (real-part x)) (inexact? (imag-part x))))))
+(define (nan? x) (or (and (flonum? x) (sys:FOREIGN_CALL "SCM_ISNAN" x))
+			   (and (compnum? x) (or (nan? (real-part x)) (nan? (imag-part x))))))
+(define (infinite? x) (or (and (flonum? x) (sys:FOREIGN_CALL "SCM_ISINF" x))
+			  (and (compnum? x) (or (infinite? (real-part x)) (infinite? (imag-part x))))))
+(define (finite? num)
+  (or (not (number? num))
+      (not (infinite? num))))
+
 
 (define (exact-integer-sqrt s)
   (unless (and (exact? s)
@@ -1028,13 +1120,13 @@
       (cond ((flonum? num) (sys:FOREIGN_CALL "SCM_FLONUM_STR" num))
 	    ((bignum? num) (sys:FOREIGN_CALL "SCM_BIGNUM_STR" num))
 	    ((ratnum? num) (sys:FOREIGN_CALL "SCM_RATNUM_STR" num))
-	    ;; ((compnum? num) (string-append
-	    ;; 		     (number->string (real-part num))
-	    ;; 		     (if (not (or (negative? (imag-part num))
-	    ;; 				  (nan? (imag-part num))
-	    ;; 				  (infinite? (imag-part num))))
-	    ;; 			 "+" "")
-	    ;; 		     (number->string (imag-part num)) "i"))
+	    ((compnum? num) (string-append
+			     (number->string (real-part num))
+			     (if (not (or (negative? (imag-part num))
+					  (nan? (imag-part num))
+					  (infinite? (imag-part num))))
+				 "+" "")
+			     (number->string (imag-part num)) "i"))
 	    ((eq? num 0) "0")
 	    (else
 	     (let ((neg (negative? num)))

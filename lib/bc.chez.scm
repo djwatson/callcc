@@ -115,15 +115,13 @@
 (define (open-binary-output-file f) (open-file-output-port f (file-options no-fail) ))
 (define arithmetic-shift (lambda (i c) (bitwise-arithmetic-shift i c)))
 
-(define (write-double d p)
+(define (get-double-as-u64 d)
   (define bv (make-bytevector 8))
-  (bytevector-ieee-double-native-set! bv 0 d)
-  (put-bytevector p bv))
-(display (cdr (command-line)))
-(define (get-double-as-u64 x) 0)
+  (bytevector-ieee-double-native-set! bv 0 d )
+  (bytevector-s64-ref bv 0 (endianness little)))
 
 (include "bc.scm")
 
-;(for-each (lambda (x) (compile-file x #t)) (cdr (command-line)))
+
 
 

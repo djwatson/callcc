@@ -82,6 +82,12 @@ typedef struct ratnum_s {
   mpq_t x;
 } ratnum_s;
 
+typedef struct compnum_s {
+  uint64_t type;
+  gc_obj real;
+  gc_obj imag;
+} compnum_s;
+
 typedef struct string_s {
   uint64_t type;
   gc_obj len;
@@ -123,6 +129,7 @@ symbol *to_symbol(gc_obj obj) { return (symbol *)(obj.value - PTR_TAG); }
 int64_t to_fixnum(gc_obj obj) { return obj.value >> 3; }
 bignum_s *to_bignum(gc_obj obj) { return (bignum_s *)(obj.value - PTR_TAG); }
 ratnum_s *to_ratnum(gc_obj obj) { return (ratnum_s *)(obj.value - PTR_TAG); }
+compnum_s *to_compnum(gc_obj obj) { return (compnum_s *)(obj.value - PTR_TAG); }
 cons_s *to_cons(gc_obj obj) { return (cons_s *)(obj.value - CONS_TAG); }
 vector_s *to_vector(gc_obj obj) { return (vector_s *)(obj.value - VECTOR_TAG); }
 record_s *to_record(gc_obj obj) { return (record_s *)(obj.value - PTR_TAG); }
@@ -153,6 +160,7 @@ bool is_symbol(gc_obj obj) { return get_tag(obj) == SYMBOL_TAG; }
 bool is_fixnum(gc_obj obj) { return get_tag(obj) == FIXNUM_TAG; }
 bool is_bignum(gc_obj obj) { return is_ptr(obj) && get_ptr_tag(obj) == BIGNUM_TAG; }
 bool is_ratnum(gc_obj obj) { return is_ptr(obj) && get_ptr_tag(obj) == RATNUM_TAG; }
+bool is_compnum(gc_obj obj) { return is_ptr(obj) && get_ptr_tag(obj) == COMPNUM_TAG; }
 bool is_heap_object(gc_obj obj) { return !is_fixnum(obj) && !is_literal(obj); }
 gc_obj tag_fixnum(int64_t num) {
   assert(((num << 3) >> 3) == num);
@@ -218,6 +226,13 @@ gc_obj SCM_IS_BIGNUM(gc_obj obj) {
 
 gc_obj SCM_IS_RATNUM(gc_obj obj) {
   if (is_ratnum(obj)) {
+    return TRUE_REP;
+  }
+  return FALSE_REP;
+}
+
+gc_obj SCM_IS_COMPNUM(gc_obj obj) {
+  if (is_compnum(obj)) {
     return TRUE_REP;
   }
   return FALSE_REP;
@@ -335,6 +350,14 @@ gc_obj SCM_DISPLAY(gc_obj obj, gc_obj scmfd) {
       auto rat = to_ratnum(obj);
       char *gstr = mpq_get_str(nullptr, 10, rat->x);
       dprintf(fd, "%s", gstr);
+      break;
+    }
+    case COMPNUM_TAG: {
+      auto c = to_compnum(obj);
+      SCM_DISPLAY(c->real, scmfd);
+      dprintf(fd, "+");
+      SCM_DISPLAY(c->imag, scmfd);
+      dprintf(fd, "i");
       break;
     }
     default:
@@ -460,65 +483,6 @@ INLINE void *SCM_LOAD_CLOSURE_PTR(gc_obj a) {
 #endif
 }
 
-INLINE gc_obj SCM_EXACT(gc_obj flo) {
-  if (!is_flonum(flo)) {
-    return flo;
-  }
-  return tag_fixnum(to_double(flo));
-}
-
-INLINE gc_obj SCM_INEXACT(gc_obj fix) {
-  if (is_flonum(fix)) {
-    return fix;
-  }
-  if (is_fixnum(fix)) {
-    return double_to_gc_slow((double)to_fixnum(fix));
-  }
-  assert(is_bignum(fix));
-  return double_to_gc_slow(mpz_get_d(to_bignum(fix)->x));
-}
-
-static void get_bignum(gc_obj obj, mpz_t* loc) {
-  assert(!is_flonum(obj));
-  assert(!is_ratnum(obj));
-  if (is_bignum(obj)) {
-    mpz_init_set(*loc, to_bignum(obj)->x);
-    return;
-  }
-  assert(is_fixnum(obj));
-  mpz_init_set_si(*loc, to_fixnum(obj));
-}
-
-static void get_ratnum(gc_obj obj, mpq_t* loc) {
-  mpq_init(*loc);
-  if (is_ratnum(obj)) {
-    auto rat = to_ratnum(obj);
-    mpq_set(*loc, rat->x);
-  } else if (is_bignum(obj)) {
-    auto big = to_bignum(obj);
-    mpq_set_z(*loc, big->x);
-  } else if (is_fixnum(obj)) {
-    auto fix = to_fixnum(obj);
-    mpq_set_si(*loc, fix, 1);
-  } else {
-    assert(false);
-  }
-}
-
-static uint64_t get_math_type(gc_obj o) {
-  if (is_ptr(o)) {
-    return get_ptr_tag(o);
-  }
-  return get_tag(o);
-}
-
-#define SWAP(a, b)                                                             \
-  do {                                                                         \
-    typeof(a) temp = a;                                                        \
-    (a) = b;                                                                   \
-    (b) = temp;                                                                \
-  } while (0)
-
 static gc_obj tag_bignum(mpz_t a) {
   // Simplify to fixnum if possible.
   if (mpz_fits_sint_p(a)) {
@@ -547,6 +511,107 @@ static gc_obj tag_ratnum(mpq_t a) {
   mpq_init(res->x);
   mpq_set(res->x, a);
   return tag_ptr(res);
+}
+
+gc_obj SCM_MAKE_RECTANGULAR(gc_obj real, gc_obj imag) {
+  compnum_s* r = rcimmix_alloc(sizeof(compnum_s));
+  r->type = COMPNUM_TAG;
+  r->real = real;
+  r->imag = imag;
+  return tag_ptr(r);
+}
+
+INLINE gc_obj SCM_EXACT(gc_obj flo) {
+  if (is_compnum(flo)) {
+    auto c = to_compnum(flo);
+    return SCM_MAKE_RECTANGULAR(SCM_EXACT(c->real), SCM_EXACT(c->imag));
+  }
+  if (is_compnum(flo)) {
+    abort();
+  }
+  if (!is_flonum(flo)) {
+    return flo;
+  }
+  assert(is_flonum(flo));
+  mpq_t res;
+  mpq_init(res);
+  mpq_set_d(res, to_double(flo));
+  return tag_ratnum(res);
+}
+
+gc_obj SCM_INEXACT(gc_obj fix) {
+  if (is_compnum(fix)) {
+    auto c = to_compnum(fix);
+    return SCM_MAKE_RECTANGULAR(SCM_INEXACT(c->real), SCM_INEXACT(c->imag));
+  }
+  if (is_flonum(fix)) {
+    return fix;
+  }
+  if (is_fixnum(fix)) {
+    return double_to_gc_slow((double)to_fixnum(fix));
+  }
+  if (is_ratnum(fix)) {
+    auto r = to_ratnum(fix);
+    return double_to_gc_slow(mpq_get_d(r->x));
+  }
+  assert(is_bignum(fix));
+  return double_to_gc_slow(mpz_get_d(to_bignum(fix)->x));
+}
+
+static void get_bignum(gc_obj obj, mpz_t* loc) {
+  assert(!is_flonum(obj));
+  assert(!is_ratnum(obj));
+  if (is_bignum(obj)) {
+    mpz_init_set(*loc, to_bignum(obj)->x);
+    return;
+  }
+  assert(is_fixnum(obj));
+  mpz_init_set_si(*loc, to_fixnum(obj));
+}
+
+gc_obj SCM_NUMERATOR(gc_obj obj) {
+  mpz_t num;
+  mpz_init(num);
+  mpq_get_num(num, to_ratnum(obj)->x);
+  return tag_bignum(num);
+}
+gc_obj SCM_DENOMINATOR(gc_obj obj) {
+  mpz_t num;
+  mpz_init(num);
+  mpq_get_den(num, to_ratnum(obj)->x);
+  return tag_bignum(num);
+}
+
+static void get_ratnum(gc_obj obj, mpq_t* loc) {
+  mpq_init(*loc);
+  if (is_ratnum(obj)) {
+    auto rat = to_ratnum(obj);
+    mpq_set(*loc, rat->x);
+  } else if (is_bignum(obj)) {
+    auto big = to_bignum(obj);
+    mpq_set_z(*loc, big->x);
+  } else if (is_fixnum(obj)) {
+    auto fix = to_fixnum(obj);
+    mpq_set_si(*loc, fix, 1);
+  } else {
+    assert(false);
+  }
+}
+
+static gc_obj get_compnum(gc_obj num) {
+  if (is_compnum(num)) {
+    return num;
+  }
+  return SCM_MAKE_RECTANGULAR(num, tag_fixnum(0));
+}
+
+gc_obj SCM_REAL_PART(gc_obj comp) {
+  auto r = to_compnum(comp);
+  return r->real;
+}
+gc_obj SCM_IMAG_PART(gc_obj comp) {
+  auto r = to_compnum(comp);
+  return r->imag;
 }
 
 // TODO: fix can't swap -
@@ -689,11 +754,13 @@ INLINE gc_obj SCM_DIV(gc_obj a, gc_obj b) {
   }
 }
 
-#define MATH_COMPARE_OP(OPNAME, OP)                                            \
+#define MATH_COMPARE_OP(OPNAME, OP, COMPCMP)					\
   NOINLINE __attribute__((preserve_most)) gc_obj SCM_##OPNAME##_SLOW(          \
       gc_obj a, gc_obj b) {                                                    \
     bool res;								\
-    if (is_flonum(a)||is_flonum(b)) {					\
+    if (is_compnum(a)||is_compnum(b)) {\
+      res = COMPCMP(a, b);						\
+    } else if (is_flonum(a)||is_flonum(b)) {				\
       res = OP(to_double(SCM_INEXACT(a)), to_double(SCM_INEXACT(b)));	\
     } else if (is_ratnum(a) || is_ratnum(b)) {				\
       mpq_t ba, bb;						\
@@ -735,11 +802,38 @@ INLINE gc_obj SCM_DIV(gc_obj a, gc_obj b) {
 #define MATH_GT(a, b) ((a) > (b))
 #define MATH_GTE(a, b) ((a) >= (b))
 #define MATH_EQ(a, b) ((a) == (b))
-MATH_COMPARE_OP(LT, MATH_LT)
-MATH_COMPARE_OP(LTE, MATH_LTE)
-MATH_COMPARE_OP(GT, MATH_GT)
-MATH_COMPARE_OP(GTE, MATH_GTE)
-MATH_COMPARE_OP(NUM_EQ, MATH_EQ)
+static bool COMP_FAIL(gc_obj a, gc_obj b) {
+  printf("Not a real number!\n");
+  abort();
+}
+
+gc_obj SCM_NUM_EQ(gc_obj a, gc_obj b);
+static bool COMP_CMP_EQ(gc_obj a, gc_obj b) {
+  auto ca = to_compnum(get_compnum(a));
+  auto cb = to_compnum(get_compnum(b));
+  return SCM_NUM_EQ(ca->real, cb->real).value == TRUE_REP.value &&
+    SCM_NUM_EQ(ca->imag, cb->imag).value == TRUE_REP.value;
+}
+MATH_COMPARE_OP(LT, MATH_LT, COMP_FAIL)
+MATH_COMPARE_OP(LTE, MATH_LTE, COMP_FAIL)
+MATH_COMPARE_OP(GT, MATH_GT, COMP_FAIL)
+MATH_COMPARE_OP(GTE, MATH_GTE, COMP_FAIL)
+MATH_COMPARE_OP(NUM_EQ, MATH_EQ, COMP_CMP_EQ)
+
+gc_obj SCM_ISNAN(gc_obj obj) {
+  auto f = to_double(obj);
+  if (isnan(f)) {
+    return TRUE_REP;
+  }
+  return FALSE_REP;
+}
+gc_obj SCM_ISINF(gc_obj obj) {
+  auto f = to_double(obj);
+  if (isinf(f)) {
+    return TRUE_REP;
+  }
+  return FALSE_REP;
+}
 
 INLINE gc_obj SCM_CAR(gc_obj obj) {
 #ifndef UNSAFE
@@ -1387,15 +1481,6 @@ INLINE gc_obj SCM_DELETE_FILE(gc_obj scmname) {
   return tag_fixnum(unlink(name));
 }
 /////// FLONUMS
-INLINE gc_obj SCM_FLONUM_BOX(double d) { return double_to_gc_slow(d); }
-INLINE double SCM_FLONUM_UNBOX(gc_obj d) { return to_double(d); }
-INLINE double SCM_INEXACT_UNBOXED(gc_obj fix) {
-  if (is_flonum(fix)) {
-    return to_double(fix);
-  }
-  return (double)to_fixnum(fix);
-}
-
 gc_obj SCM_BIGNUM_STR(gc_obj b) {
   auto bignum = to_bignum(b);
   // +2 per manual for null-termination and -

@@ -3,7 +3,8 @@
   * new join is broken in chez?
 
 # plan
-  * get ratnum/compnum working
+  * get compnum working
+  * get r7rs-tests working
   * moar self-compile
      * get-double-as-u64
 
@@ -50,7 +51,7 @@
 
 * gc fd's.
 * gset check
-* compnums, ratnums
+* compnums
 
 * recheck GC get stack top
 
