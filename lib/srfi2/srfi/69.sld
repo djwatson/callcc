@@ -37,8 +37,8 @@
 
     (define (hash obj . maybe-bound)
       (let ((bound (if (null? maybe-bound) *default-bound* (car maybe-bound))))
-	(cond ((integer? obj) (modulo obj bound))
-	      ((inexact? obj) 0)
+	(cond ((inexact? obj) 0)
+	      ((integer? obj) (modulo obj bound))
 	      ((string? obj) (string-hash obj bound))
 	      ((symbol? obj) (symbol-hash obj bound))
 	      ((real? obj) (modulo (+ (numerator obj) (denominator obj)) bound))

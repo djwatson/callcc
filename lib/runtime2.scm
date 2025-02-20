@@ -3,8 +3,6 @@
 (include "memory_layout.scm")
 
 ;;;;;;;;math
-(define (nan? x) #f)
-(define (infinite? x) #f)
 (define (negative? p)
   (< p 0))
 
@@ -525,7 +523,7 @@
 (define (bignum? x) (sys:FOREIGN_CALL "SCM_IS_BIGNUM" x))
 (define (ratnum? x) (sys:FOREIGN_CALL "SCM_IS_RATNUM" x))
 (define (compnum? x) (sys:FOREIGN_CALL "SCM_IS_COMPNUM" x))
-(define (integer? x) (or (fixnum? x) (bignum? x) (and (ratnum? x) (= 1 (denominator x))) (and (flonum? x) (= 1 (denominator (exact x))))))
+(define (integer? x) (or (fixnum? x) (bignum? x) (and (ratnum? x) (= 1 (denominator x))) (and (flonum? x) (not (nan? x)) (not (infinite? x)) (= 1 (denominator (exact x))))))
 (define (exact-integer? x) (fixnum? x))
 (define (exact? x) (or (fixnum? x) (bignum? x)))
 (define (inexact? x) (or (flonum? x)
@@ -538,7 +536,11 @@
   (or (not (number? num))
       (not (infinite? num))))
 
-
+(define boolean=?
+  (case-lambda
+    ((a b) (eq? a b))
+    (rest
+     (comparer eq? rest))))
 (define (exact-integer-sqrt s)
   (unless (and (exact? s)
 	       (positive? s))
