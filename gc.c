@@ -25,7 +25,7 @@
 #define INLINE __attribute__((always_inline))
 
 static constexpr uint64_t size_classes = 4096 / 8;
-static constexpr uint64_t PAGE_SIZE = 1UL << 12;
+//static constexpr uint64_t PAGE_SIZE = 1UL << 12;
 static constexpr uint64_t default_slab_size = PAGE_SIZE*4;
 static uint64_t next_collect = 50000000;
 static uint64_t collect_cnt = 0;
