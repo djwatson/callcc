@@ -1570,3 +1570,15 @@ gc_obj SCM_DOUBLE_AS_U64(gc_obj b) {
   mpz_init_set_si(res, di);
   return tag_bignum(res);
 }
+
+// process-context
+gc_obj SCM_COMMAND_LINE() {
+  return NIL;
+}
+gc_obj SCM_EXIT(gc_obj code) {
+  exit(to_fixnum(code));
+}
+
+gc_obj SCM_GET_ENV_VARS() {
+  return NIL;
+}

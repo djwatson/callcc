@@ -578,6 +578,9 @@ declare i64 @SCM_FILE_EXISTS(i64)
 declare i64 @SCM_DELETE_FILE(i64)
 declare i64 @SCM_READ_SHADOW_STACK(i64)
 declare void @SCM_WRITE_SHADOW_STACK(i64, i64)
+declare i64 @SCM_COMMAND_LINE()
+declare i64 @SCM_EXIT(i64)
+declare i64 @SCM_GET_ENV_VARS()
 
 declare void @gc_init ()
 @argcnt = dso_local global i64 0
