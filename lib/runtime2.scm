@@ -1649,5 +1649,15 @@
 (define (command-line) '("test" "test.scm"))
 
 
+;; process context
+(define (command-line) (sys:FOREIGN_CALL "SCM_COMMAND_LINE"))
+;; TODO exit codes, dynamic unwinding
+(define (exit) (sys:FOREIGN_CALL "SCM_EXIT" 0))
+(define emergency-exit exit)
+(define (get-environment-variables) (sys:FOREIGN_CALL "SCM_GET_ENV_VARS"))
+(define (get-environment-variable var)
+  (cond
+   ((assoc var (get-environment-variables)) => cdr)
+   (else #f)))
 
 
