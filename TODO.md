@@ -1,8 +1,9 @@
 
 # known bugs:
-  * new join is broken in chez?
 
 # plan
+  * complex: mbrotZ
+  
   * get r7rs-tests working
     * unicode
 	* environments/eval
@@ -32,8 +33,6 @@
   * faster with list/int typecheck removal: quicksort primes puzzle array1
   * faster with single-shot continuations: ctak fibc
   
-  * complex: mbrotZ
-  
   * stack size check: earley, divrec
 
 # OTHER
@@ -46,8 +45,6 @@
   
 * cpstak:
   * argcnt needs a register, ugh.  Too slow otherwise.
-
-* fast globals
 
 * figure out strategy for intrinsics????
 * cleanup runtime
@@ -66,10 +63,19 @@
 * Cleanup the GC roots, some should be in types, add_root unused currently.
 * Remove the radix tree: just use pre-allocated virtual space.
 
+
+
+
+
+
+# PROBABLY NEVER:	 
+
+* fast globals, a.la chez
+
 * Long term: Could do precise GC, using LLVM's stackmaps + non-integral pointer types. 
      This will probably break some optimizations based on type: Would need
 	 a typecheck-removal pass
-
+	 
 # call/cc
   * call/cc: figure out valgrind or address santizer workings?
 
