@@ -57,12 +57,32 @@
   (newline)
   (exit))
 
+;; TODO: parameterize
+;; This is so we don't have GENSYM'd names emitted for functions
+;; if possible: The ASM label is known in advance (assuming the function
+;; is only defined once)
+
+(define global-fun-labels (make-hash-table equal?))
+(define (fun-to-label lam var)
+  (if (hash-table-exists? global-fun-labels lam)
+      (hash-table-ref/default global-fun-labels lam #f)
+      (begin
+	(if (hash-table-exists? global-fun-labels (second lam))
+	    (begin
+	      (hash-table-set! global-fun-labels lam var)
+	      var)
+	    (begin
+	      (hash-table-set! global-fun-labels (second lam) #t)
+	      (hash-table-set! global-fun-labels lam (second lam))
+	      (second lam))))))
+;; (define (fun-to-label lam var)
+;;   var)
 (define (emit-function fun nlambda var env)
   (define name (second nlambda))
   (define cases (cddr nlambda))
   (define last-case (last cases))
   (define last-case-jmp #f)
-  (fun-name-set! fun var)
+  (fun-name-set! fun (fun-to-label nlambda var))
 
   (when (hash-table-exists? escapes-table var)
     (fun-thunk-set! fun #t)
@@ -301,6 +321,7 @@
 	    (case-label (find-label-for-case lfun (length args) label)))
        ;; TODO: varargs inline calls
        (when (equal? case-label label)
+	 (set! case-label (fun-to-label lfun label))
 	 (push-instr! fun (format "store i64 ~a, ptr @argcnt" (length args))))
        (finish (emit-call fun tail (format "@\"~a\"" case-label) args))))
     ((let ((,vars ,vals) ___) ,body)
@@ -308,7 +329,8 @@
        (emit body (append (map cons vars args) env) fun tail)))
     ((closure (label ,label) ,args ___)
      (let* ((args (omap arg args (emit arg env fun #f)))
-	    (id (next-id)))
+	    (id (next-id))
+	    (label (fun-to-label (emit label env fun #f) label)))
        (push-instr! fun ( format "%v~a = call i64 @SCM_CLOSURE(i64 ptrtoint (ptr @\"~a\" to i64), i64 ~a), !dbg !~a"
 			  id label (length args) (fun-debug-loc-id fun)))
        
@@ -317,7 +339,9 @@
 				     id arg i (fun-debug-loc-id fun))))
        (format "%v~a" id)))
     ((const-closure (label ,label))
-     (finish (emit-const `($const-closure ,label))))
+     ;; Look up the constant label.
+     (let ((label (fun-to-label (emit label env fun #f) label)))
+       (finish (emit-const `($const-closure ,label)))))
     ((labels ((,vars ,lambdas) ___) ,body)
      (let* ((funs (map-in-order
 		   (lambda (id) (define fun (make-fun 1))

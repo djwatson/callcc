@@ -1,5 +1,6 @@
 
 # known bugs:
+  * ugh join still broken in ches
 
 # plan
   * complex: mbrotZ
