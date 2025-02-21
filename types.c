@@ -606,19 +606,46 @@ static gc_obj get_compnum(gc_obj num) {
 }
 
 gc_obj SCM_REAL_PART(gc_obj comp) {
-  auto r = to_compnum(comp);
+  auto r = to_compnum(get_compnum(comp));
   return r->real;
 }
 gc_obj SCM_IMAG_PART(gc_obj comp) {
-  auto r = to_compnum(comp);
+  auto r = to_compnum(get_compnum(comp));
   return r->imag;
+}
+
+INLINE gc_obj SCM_ADD(gc_obj a, gc_obj b);
+INLINE gc_obj SCM_SUB(gc_obj a, gc_obj b);
+INLINE gc_obj SCM_MUL(gc_obj a, gc_obj b);
+gc_obj compnum_add(gc_obj a, gc_obj b) {
+  auto ca = to_compnum(get_compnum(a));
+  auto cb = to_compnum(get_compnum(b));
+  return SCM_MAKE_RECTANGULAR(SCM_ADD(ca->real, cb->real),
+			      SCM_ADD(ca->imag, cb->imag));
+}
+gc_obj compnum_sub(gc_obj a, gc_obj b) {
+  auto ca = to_compnum(get_compnum(a));
+  auto cb = to_compnum(get_compnum(b));
+  return SCM_MAKE_RECTANGULAR(SCM_SUB(ca->real, cb->real),
+			      SCM_SUB(ca->imag, cb->imag));
+}
+gc_obj compnum_mul(gc_obj a, gc_obj b) {
+  auto ca = to_compnum(get_compnum(a)); //a b
+  auto cb = to_compnum(get_compnum(b)); //c d
+  // ac - bd, ad + bc
+  return SCM_MAKE_RECTANGULAR(SCM_SUB(SCM_MUL(ca->real, cb->real),
+				      SCM_MUL(ca->imag, cb->imag)),
+			      SCM_ADD(SCM_MUL(ca->real, cb->imag),
+				      SCM_MUL(ca->imag, cb->real)));
 }
 
 // TODO: fix can't swap -
 #define MATH_OVERFLOW_OP(OPNAME, OPLCNAME, OP, SHIFT)                          \
   NOINLINE __attribute__((preserve_most)) gc_obj SCM_##OPNAME##_SLOW(          \
       gc_obj a, gc_obj b) {                                                    \
-    if (is_flonum(a) | is_flonum(b)) {                                         \
+    if (is_compnum(a) || is_compnum(b)) {					\
+      return compnum_##OPLCNAME(a, b);					\
+    } else if (is_flonum(a) || is_flonum(b)) {				\
       return double_to_gc_slow(OP(to_double(SCM_INEXACT(a)), to_double(SCM_INEXACT(b)))); \
     } else if (is_ratnum(a) || is_ratnum(b)) {				\
       mpq_t ba, bb, res;						\
@@ -688,7 +715,9 @@ MATH_OVERFLOW_OP(MUL, mul, MATH_MUL, SHIFT)
      #define MATH_SIMPLE_OP(OPNAME, OP, FPOP, BIGOP)                                \
                                                                                \
   NOINLINE gc_obj SCM_##OPNAME##_SLOW(gc_obj a, gc_obj b) {                    \
-    if (is_flonum(a) || is_flonum(b)) {                                        \
+    if (is_compnum(a)||is_compnum(b)) {\
+    abort();							\
+    }else if (is_flonum(a) || is_flonum(b)) {				\
       return double_to_gc_slow(                                                \
           FPOP(to_double(SCM_INEXACT(a)), to_double(SCM_INEXACT(b))));         \
     } else if (is_bignum(a) || is_bignum(b)) {                                 \
@@ -727,7 +756,9 @@ MATH_SIMPLE_OP(QUOTIENT, MATH_DIV, MATH_DIV, q)
 MATH_SIMPLE_OP(MOD, MATH_MOD, MATH_FPMOD, r)
 
 NOINLINE gc_obj SCM_DIV_SLOW(gc_obj a, gc_obj b) {
-  if (is_flonum(a) || is_flonum(b)) {
+    if (is_compnum(a)||is_compnum(b)) {
+      abort();
+    } else if (is_flonum(a) || is_flonum(b)) {
     return double_to_gc_slow(to_double(SCM_INEXACT(a)) /
                              to_double(SCM_INEXACT(b)));
   } else {

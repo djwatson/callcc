@@ -3,8 +3,6 @@
   * ugh join still broken in ches
 
 # plan
-  * complex: mbrotZ
-  
   * get r7rs-tests working
     * unicode
 	* environments/eval
