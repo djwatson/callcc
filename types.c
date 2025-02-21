@@ -1582,3 +1582,20 @@ gc_obj SCM_EXIT(gc_obj code) {
 gc_obj SCM_GET_ENV_VARS() {
   return NIL;
 }
+//// time
+#include <time.h>
+
+gc_obj SCM_CURRENT_JIFFY() {
+  struct timespec ts;
+  clock_gettime(CLOCK_MONOTONIC, &ts);
+  uint64_t us = ts.tv_sec * 1000000 + ts.tv_nsec / 1000;
+  return tag_fixnum(us);
+}
+
+gc_obj SCM_CURRENT_SECOND() {
+  struct timespec ts;
+  clock_gettime(CLOCK_TAI, &ts);
+  double offset = 37; // TODO should be based on leap seconds.
+  double f = ts.tv_sec + (double)ts.tv_nsec / 1000000000.0 + offset;
+  return double_to_gc_slow(f);
+}

@@ -581,6 +581,8 @@ declare void @SCM_WRITE_SHADOW_STACK(i64, i64)
 declare i64 @SCM_COMMAND_LINE()
 declare i64 @SCM_EXIT(i64)
 declare i64 @SCM_GET_ENV_VARS()
+declare i64 @SCM_CURRENT_JIFFY()
+declare i64 @SCM_CURRENT_SECOND()
 
 declare void @gc_init ()
 @argcnt = dso_local global i64 0

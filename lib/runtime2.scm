@@ -1582,7 +1582,7 @@
   (sys:FOREIGN_CALL "SCM_FILE_EXISTS" name))
 
 (define (delete-file name)
-  (sys:FOREIGN_CALL "SCM_FILE_EXISTS" name))
+  (sys:FOREIGN_CALL "SCM_DELETE_FILE" name))
 
 (define read-line
   (case-lambda
@@ -1661,3 +1661,10 @@
    (else #f)))
 
 
+;;; time
+(define (current-jiffy) (sys:FOREIGN_CALL "SCM_CURRENT_JIFFY"))
+(define (jiffies-per-second) 1000000)
+(define (current-second) (sys:FOREIGN_CALL "SCM_CURRENT_SECOND"))
+(define feature-flags '(r7rs exact-closed exact-complex ieee-float
+	 full-unicode ratios r7))
+(define (features) feature-flags)
