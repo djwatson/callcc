@@ -455,12 +455,18 @@ INLINE gc_obj SCM_LOAD_GLOBAL(gc_obj a) {
 #endif
 }
 
+#define PTR_TAG_SET ((1 << 2) | (1 << 3) | (1 << 7))
+static bool has_ptr_tag(gc_obj n) {
+  return (((uint32_t)1 << (n.value & 0x1f)) & (~(uint32_t)0 / 0xff * PTR_TAG_SET)) != 0;
+}
 INLINE void SCM_SET_GLOBAL(gc_obj a, gc_obj b) {
   auto sym = to_symbol(a);
   sym->val = b;
   // gclog check if static, if not, quick set
   // printf("log global\n");
-  gc_log((uint64_t)&sym->val);
+  if (has_ptr_tag(b)) {
+    gc_log((uint64_t)&sym->val);
+  }
 }
 
 NOINLINE void SCM_ARGCNT_FAIL() {
@@ -896,7 +902,9 @@ INLINE gc_obj SCM_SETCAR(gc_obj obj, gc_obj val) {
   auto c = to_cons(obj);
   c->a = val;
   //  printf("log setcar\n");
-  gc_log_fast((uint64_t)&c->a);
+  if (has_ptr_tag(val)) {
+    gc_log_fast((uint64_t)&c->a);
+  }
   return UNDEFINED;
 }
 
@@ -909,7 +917,9 @@ INLINE gc_obj SCM_SETCDR(gc_obj obj, gc_obj val) {
   auto c = to_cons(obj);
   c->b = val;
   //  printf("log setcdr\n");
-  gc_log_fast((uint64_t)&c->b);
+  if (has_ptr_tag(val)) {
+    gc_log_fast((uint64_t)&c->b);
+  }
   return UNDEFINED;
 }
 INLINE gc_obj SCM_CONS(gc_obj a, gc_obj b) {
@@ -996,7 +1006,9 @@ INLINE gc_obj SCM_VECTOR_SET(gc_obj vec, gc_obj idx, gc_obj val) {
 #endif
   v->v[i] = val;
 
-  gc_log_with_slab((uint64_t)&v->v[i], v->slab);
+  if (has_ptr_tag(val)) {
+    gc_log_with_slab((uint64_t)&v->v[i], v->slab);
+  }
 
   return UNDEFINED;
 }
@@ -1025,6 +1037,7 @@ INLINE void SCM_CLOSURE_SET(gc_obj clo, gc_obj obj, gc_obj idx) {
   auto c = to_closure(clo);
   c->v[i + 1] = obj;
   /* printf("log closure\n"); */
+  // Non-fast closure sets are always other closures, no need to check is_ptr 
   gc_log_fast((uint64_t)&c->v[i + 1]);
 }
 
@@ -1331,7 +1344,9 @@ INLINE gc_obj SCM_RECORD_SET(gc_obj r, gc_obj idx, gc_obj val) {
   auto i = to_fixnum(idx);
   rec->v[i] = val;
   // printf("log record\n");
-  gc_log_fast((uint64_t)&rec->v[i]);
+  if (has_ptr_tag(val)) {
+    gc_log_fast((uint64_t)&rec->v[i]);
+  }
   return UNDEFINED;
 }
 
