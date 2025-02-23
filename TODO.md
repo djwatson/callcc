@@ -3,6 +3,7 @@
   * ugh join still broken in ches
 
 # plan
+  * improve eqv? perf
   * get r7rs-tests working
     * unicode
 	* environments/eval
@@ -13,8 +14,6 @@
 	* numeric syntax
 	* sys interface
 
-* remove GENSYM-for emitted syms????????
-  * improve eqv? perf
 	 
 # full r7rs
   * unicode

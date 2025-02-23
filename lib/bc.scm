@@ -624,6 +624,7 @@ attributes #0 = { returns_twice}
 					0 ;; return value.
 					) #f))
 	 (main-fun (make-fun "main")))
+    (fun-args-set! main-fun '("%argc" "%argv"))
     (when verbose
       (display (format "Compiling ~a\n" file) (current-error-port))
       ;;(pretty-print lowered (current-error-port))
@@ -668,7 +669,7 @@ attributes #0 = { returns_twice}
 			    (fun-debug-id func)))
 	   (display (format " entry:\n"))
 	   (when (equal? "main" (fun-name func))
-	     (display (format "  call void @gc_init(), !dbg !~a\n" (fun-debug-loc-id func))))
+	     (display (format "  call void @gc_init(i64 %argc, i64 %argv), !dbg !~a\n" (fun-debug-loc-id func))))
 	   (for (arg i) (stack-args (iota (length stack-args)))
 		(display (format "  ~a = call i64 @SCM_READ_SHADOW_STACK(i64 ~a), !dbg !~a\n"
 				 arg i (fun-debug-loc-id func))))

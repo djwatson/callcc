@@ -1574,21 +1574,27 @@ gc_obj SCM_DOUBLE_AS_U64(gc_obj b) {
 }
 
 // process-context
-gc_obj SCM_COMMAND_LINE() {
-  return NIL;
-}
-gc_obj SCM_EXIT(gc_obj code) {
-  exit(to_fixnum(code));
-}
-
 extern char **environ;
 
+extern int argc;
+extern char** argv;
 static gc_obj from_c_str(char* str) {
   auto len = strlen(str);
   gc_obj res = SCM_MAKE_STRING(tag_fixnum(len), FALSE_REP);
   
   memcpy(to_string(res)->str, str, len);
   return res;
+}
+
+gc_obj SCM_COMMAND_LINE() {
+  gc_obj tail = NIL;
+  for (int i = argc; i > 0; i--) {
+    tail = SCM_CONS(from_c_str(argv[i-1]), tail);
+  }
+  return tail;
+}
+gc_obj SCM_EXIT(gc_obj code) {
+  exit(to_fixnum(code));
 }
 
 gc_obj SCM_GET_ENV_VARS() {

@@ -1647,9 +1647,6 @@
 	  (set! cell (car arg))
 	  cell))))
 
-(define (command-line) '("test" "test.scm"))
-
-
 ;; process context
 (define (command-line) (sys:FOREIGN_CALL "SCM_COMMAND_LINE"))
 ;; TODO exit codes, dynamic unwinding

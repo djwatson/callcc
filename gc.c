@@ -208,7 +208,11 @@ static void *rcimmix_realloc_align(void *p, size_t old_sz, size_t new_sz) {
 }
 static void rcimmix_free(void*, size_t){}
 
-void gc_init() {
+int argc;
+char** argv;
+void gc_init(int argc_in, char**argv_in) {
+  argc = argc_in;
+  argv = argv_in;
   stacktop = (uint64_t *)__builtin_frame_address(0);
 
   void *addr;
