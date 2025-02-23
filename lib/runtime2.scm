@@ -814,7 +814,7 @@
 	 (equal? (cdr a) (cdr b))) #t)
    (else #f)))
 (define (eqv? a b)
-  (or (eq? a b) (and (number? a) (number? b) (= a b))))
+  (eqv? a b))
 
 (define (eq? a b)
   (eq? a b))

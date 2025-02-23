@@ -5,7 +5,7 @@
   * is_ptr gc_log check needs to check *all* pointer types, cons, vec, etc.
 
 # plan
-  * improve eqv? perf
+  * rework cmake / build/test.
   * get r7rs-tests working
     * unicode
 	* environments/eval

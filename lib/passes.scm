@@ -186,6 +186,7 @@ TODO: boxes could be passed down through funcs
 	      (- . SUB)
 	      (* . MUL)
 	      (eq? . EQ)
+	      (eqv? . EQV)
 	      (char=? . EQ)))
 (define uni-ops '((char->integer . CHAR_INTEGER)
 		  (integer->char . INTEGER_CHAR)

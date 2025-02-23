@@ -30,10 +30,11 @@
   X(CLOSURE, 0x12)                                                             \
   X(SYMBOL, 0x1a)                                                              \
   X(CONT, 0x22)                                                                \
+  X(NUMBER, 0x2a)                                                              \
   X(FLONUM, 0x2a)                                                              \
-  X(BIGNUM, 0x32)                                                              \
-  X(RATNUM, 0x3a)                                                              \
-  X(COMPNUM, 0x42)
+  X(BIGNUM, 0x12a)                                                              \
+  X(RATNUM, 0x22a)                                                              \
+  X(COMPNUM, 0x32a)
 
 #define IMMEDIATE_TAGS                                                         \
   X(BOOL, 0x6)                                                                 \
@@ -46,7 +47,7 @@ extern char *low_tag_names[];
 extern char *ptr_tag_names[];
 extern char *immediate_tag_names[];
 
-enum : uint8_t {
+enum : uint64_t {
 #define X(name, num) name##_TAG = (num),
   LOW_TAGS IMMEDIATE_TAGS PTR_TAGS
 #undef X
@@ -144,6 +145,8 @@ uint32_t get_ptr_tag(gc_obj obj) {
 bool is_char(gc_obj obj) { return get_imm_tag(obj) == CHAR_TAG; }
 bool is_cons(gc_obj obj) { return get_tag(obj) == CONS_TAG; }
 bool is_ptr(gc_obj obj) { return get_tag(obj) == PTR_TAG; }
+bool is_number(gc_obj obj) { return (get_tag(obj) == PTR_TAG) &&
+    ((uint8_t)get_ptr_tag(obj) == NUMBER_TAG); }
 bool is_closure(gc_obj obj) {
   return is_ptr(obj) && get_ptr_tag(obj) == CLOSURE_TAG;
 }
@@ -1248,6 +1251,28 @@ INLINE gc_obj SCM_STRING_LENGTH(gc_obj obj) { return to_string(obj)->len; }
 INLINE gc_obj SCM_EQ(gc_obj a, gc_obj b) {
   if (a.value == b.value) {
     return TRUE_REP;
+  }
+  return FALSE_REP;
+}
+
+gc_obj SCM_EQV_SLOW(gc_obj a, gc_obj b) {
+  if (is_number(b)) {
+    return SCM_NUM_EQ(a, b);
+  }
+  return FALSE_REP;
+}
+
+INLINE gc_obj SCM_EQV(gc_obj a, gc_obj b) {
+  if (a.value == b.value) {
+    return TRUE_REP;
+  }
+  // We already checked for fixnum and most flonums,
+  // If ptr_tag low byte is NUMBER, do a more expensive test.
+  //
+  // Chez scheme has found checking only one of the comparison is
+  // sufficient.
+  if (unlikely(is_number(a))) {
+    [[clang::musttail]] return SCM_EQV_SLOW(a, b);
   }
   return FALSE_REP;
 }
