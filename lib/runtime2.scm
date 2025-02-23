@@ -531,6 +531,7 @@
 (define (string? x) (string? x))
 (define (symbol? x) (symbol? x))
 (define (vector? x) (vector? x))
+(define (bytevector? x) #f)
 (define (flonum? x) (sys:FOREIGN_CALL "SCM_IS_FLONUM" x))
 (define (complex? x) (number? x))
 (define (real? x) (and (number? x) (not (compnum? x))))

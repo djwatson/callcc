@@ -1015,8 +1015,10 @@ INLINE gc_obj SCM_CLOSURE(gc_obj p, uint64_t len) {
   return tag_closure(clo);
 }
 
-INLINE void SCM_CLOSURE_SET(gc_obj clo, gc_obj obj, uint64_t i) {
+INLINE void SCM_CLOSURE_SET(gc_obj clo, gc_obj obj, gc_obj idx) {
   //    printf("Closure set %li\n", i);
+  // TODO fixme: why does closure_set_fast use direct idx, but set has fixnum?
+  auto i = to_fixnum(idx);
   auto c = to_closure(clo);
   c->v[i + 1] = obj;
   /* printf("log closure\n"); */
@@ -1579,8 +1581,36 @@ gc_obj SCM_EXIT(gc_obj code) {
   exit(to_fixnum(code));
 }
 
+extern char **environ;
+
+static gc_obj from_c_str(char* str) {
+  auto len = strlen(str);
+  gc_obj res = SCM_MAKE_STRING(tag_fixnum(len), FALSE_REP);
+  
+  memcpy(to_string(res)->str, str, len);
+  return res;
+}
+
 gc_obj SCM_GET_ENV_VARS() {
-  return NIL;
+  gc_obj tail = NIL;
+
+  char **p = environ;
+  while (*p) {
+    char *split = strchr(*p, '=');
+    if (split) {
+      long len = split - *p;
+      gc_obj var = SCM_MAKE_STRING(tag_fixnum(len), FALSE_REP);
+      string_s *s = to_string(var);
+      for(uint64_t i = 0; i < len; i++) {
+	s->str[i] = (*p)[i];
+      }
+
+      gc_obj val = from_c_str(split + 1);
+      tail = SCM_CONS(SCM_CONS(var, val), tail);
+      p++;
+    }
+  }
+  return tail;
 }
 //// time
 #include <time.h>

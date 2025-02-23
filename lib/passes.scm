@@ -199,8 +199,6 @@ TODO: boxes could be passed down through funcs
 		 (procedure? . ,closure-tag)
 		 (vector? . ,vector-tag)
 		 (string? . ,string-tag)
-		 (bytevector? . ,string-tag)
-;		 (flonum? . ,flonum-tag1)
 		 (fixnum? . ,fixnum-tag)))
 (define-pass integrate-r5rs
   ;; TODO do length checking
