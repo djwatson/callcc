@@ -1,20 +1,17 @@
-
 # known bugs:
-  * ugh join still broken in ches
-  * EQV fast needs check for number?
-  * is_ptr gc_log check needs to check *all* pointer types, cons, vec, etc.
 
 # plan
-  * rework cmake / build/test.
+  * mkdir bin/install
+  * system(), get full compile working with driver
+  * run full benchmarks before unicode testing.
   * get r7rs-tests working
     * unicode
-	* environments/eval
 	* bytevectors
-	* exceptions
 	* input/output
 	* read syntax
 	* numeric syntax
-	* sys interface
+	* exceptions
+	* environments/eval
 
 	 
 # full r7rs

@@ -44,6 +44,10 @@
 (define chez-hash-table-copy hash-table-copy)
 (define (hash-table-copy table)
   (chez-hash-table-copy table #t))
+(define old-string-copy! string-copy!)
+(define (string-copy! to at from start end)
+  ;;src sstart dst dstart n
+  (old-string-copy! from start to at (- end start)))
 
 (include "util.scm")
 (include "qq.scm")
