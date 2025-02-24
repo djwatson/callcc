@@ -836,7 +836,7 @@ TODO: also maybe go back to pre-resolving idents? only internal
   (set-path input file-dir)
   input)
 
-(define (features) '())
+(define (features) '(callcc))
 
 ;; TODO should this match identifiers instead of symbols??
 ;; Would be easier to write in syntax-case?

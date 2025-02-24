@@ -1,6 +1,6 @@
 (import (scheme r5rs) (prefix (flow sys) sys:) (scheme case-lambda) (scheme base))
 
-(include "memory_layout.scm")
+(include "lib/memory_layout.scm")
 
 ;;;;;;;;math
 (define (negative? p)
@@ -214,11 +214,11 @@
 
 
 (define (error msg . args)
-  (display "Error:")
-  (display msg)
-  (display " ")
-  (display args)
-  (newline)
+  (display "Error:" (current-error-port))
+  (display msg (current-error-port))
+  (display " " (current-error-port))
+  (display args (current-error-port))
+  (newline (current-error-port))
   (0))
 (define apply
   (case-lambda
@@ -338,6 +338,7 @@
     (unless (eq? *here* winds)
       (reroot! winds))
     res))
+(define call/cc call-with-current-continuation)
 
 (define (car a)
 					;(unless (pair? a) (error "Trying to car not a pair" a))
@@ -1456,7 +1457,7 @@
 		  '()
 		  (cons fill (make-list (- k 1) fill))))))
 
-(include "str2num.scm")
+(include "lib/str2num.scm")
 
 ;;;;;;;;;;;;; IO
 (define-record-type port (make-port input fold-case fd pos len buf fillflush) port?
@@ -1490,8 +1491,10 @@
       (string-copy! new-buf 0 buf 0 (port-pos port))
       (port-buf-set! port new-buf))))
 
-(define (flush-output-port port)
-  ((port-fillflush port) port))
+(define flush-output-port
+  (case-lambda
+   (() (flush-output-port (current-output-port)))
+   ((port) ((port-fillflush port) port))))
 
 (define port-buffer-size 512)
 
@@ -1514,6 +1517,14 @@
   (make-port #f #f #f 0 port-buffer-size (make-string port-buffer-size) port-string-flush))
 (define (get-output-string port)
   (substring (port-buf port) 0 (port-pos port)))
+(define (with-output-to-file name thunk)
+  (let ((file (open-output-file name))
+	(old-port *current-output-port*))
+    ;; TODO parameterize
+    (set! *current-output-port* file)
+    (thunk)
+    (set! *current-output-port* old-port)
+    (close-output-port file)))
 
 (define (close-input-port p)
   (close-port p))
@@ -1566,7 +1577,7 @@
 	      (read-char port)
 	      (make-eof-object)))))))
 
-(include "read.scm")
+(include "lib/read.scm")
 
 (define write-char
   (case-lambda
@@ -1621,8 +1632,8 @@
 
 ;;;;;;; equals?, hash tables.
 
-(include "hashtable.scm")
-(include "equal.scm")
+(include "lib/hashtable.scm")
+(include "lib/equal.scm")
 
 ;;;;;;; Symbols
 (define (symbol->string a) (sys:FOREIGN_CALL "SCM_SYMBOL_STRING" a))
@@ -1664,5 +1675,5 @@
 (define (jiffies-per-second) 1000000)
 (define (current-second) (sys:FOREIGN_CALL "SCM_CURRENT_SECOND"))
 (define feature-flags '(r7rs exact-closed exact-complex ieee-float
-	 full-unicode ratios r7))
+	 full-unicode ratios callcc))
 (define (features) feature-flags)

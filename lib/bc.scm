@@ -1,7 +1,3 @@
-(include "qq.scm")
-(include "memory_layout.scm")
-(include "opcodes.scm")
-
 (define next-id
   (let ((id 0))
     (lambda ()
@@ -605,9 +601,9 @@ attributes #0 = { returns_twice}
 (define (compile file verbose)
   (set! functions '())
   (let* ((libman (make-libman))
-	 (unused (set! library-search-paths (cons "./srfi2" library-search-paths)))
-	 (runtime-input (with-input-from-file "runtime2.scm" read-file))
-	 (eval-input (with-input-from-file "eval.scm" read-file))
+	 (unused (set! library-search-paths (cons "./lib/srfi2" library-search-paths)))
+	 (runtime-input (with-input-from-file "./lib/runtime2.scm" read-file))
+	 (eval-input (with-input-from-file "./lib/eval.scm" read-file))
 
 	 (pre-input (with-input-from-file file read-file))
 
@@ -683,7 +679,3 @@ attributes #0 = { returns_twice}
 	   (display "}\n"))))
   (for line (reverse! debug-strings)
        (display line) (newline)))
-
-(for file (cdr (command-line))
-     (compile file #t))
-
