@@ -1,0 +1,635 @@
+SECTION(2 1)
+SECTION(3 4)
+ #<closure>
+    #<closure>
+       #<closure>
+          #<closure>
+             #<closure>
+                #<closure>
+                   #<closure>
+                      #<closure>
+                         #<closure>
+(#t #f #f #f #f #f #f #f #f)#t
+(#t #f #f #f #f #f #f #f #f)#f
+(#f #t #f #f #f #f #f #f #f)#\a
+(#f #f #t #f #f #f #f #f #f)()
+(#f #f #f #t #f #f #f #f #f)9739
+(#f #f #f #f #t #f #f #f #f)(test)
+(#f #f #f #f #f #t #f #f #f)#<closure>
+(#f #f #f #f #f #f #t #f #f)"test"
+(#f #f #f #f #f #f #t #f #f)""
+(#f #f #f #f #f #f #f #t #f)test
+(#f #f #f #f #f #f #f #f #t)#()
+(#f #f #f #f #f #f #f #f #t)#(a b c)
+SECTION(4 1 2)
+(quote (quote a))  ==> (quote a)
+(quote (quote a))  ==> (quote a)
+SECTION(4 1 3)
+(#<closure> 3 4)  ==> 12
+SECTION(4 1 4)
+(#<closure> 4)  ==> 8
+(#<closure> 7 10)  ==> 3
+(#<closure> 6)  ==> 10
+(#<closure> 3 4 5 6)  ==> (3 4 5 6)
+(#<closure> 3 4 5 6)  ==> (5 6)
+SECTION(4 1 5)
+(if yes)  ==> yes
+(if no)  ==> no
+(if 1)  ==> 1
+SECTION(4 1 6)
+(define 3)  ==> 3
+(set! 5)  ==> 5
+SECTION(4 2 1)
+(cond greater)  ==> greater
+(cond equal)  ==> equal
+(cond 2)  ==> 2
+(case composite)  ==> composite
+(case consonant)  ==> consonant
+(and #t)  ==> #t
+(and #f)  ==> #f
+(and (f g))  ==> (f g)
+(and #t)  ==> #t
+(or #t)  ==> #t
+(or #t)  ==> #t
+(or #f)  ==> #f
+(or #f)  ==> #f
+(or (b c))  ==> (b c)
+SECTION(4 2 2)
+(let 6)  ==> 6
+(let 35)  ==> 35
+(let* 70)  ==> 70
+(letrec #t)  ==> #t
+(let 5)  ==> 5
+(let 34)  ==> 34
+(let 6)  ==> 6
+(let 34)  ==> 34
+(let* 7)  ==> 7
+(let* 34)  ==> 34
+(let* 8)  ==> 8
+(let* 34)  ==> 34
+(letrec 9)  ==> 9
+(letrec 34)  ==> 34
+(letrec 10)  ==> 10
+(letrec 34)  ==> 34
+SECTION(4 2 3)
+(begin 6)  ==> 6
+SECTION(4 2 4)
+(do #(0 1 2 3 4))  ==> #(0 1 2 3 4)
+(do 25)  ==> 25
+(let 1)  ==> 1
+(let ((6 1 3) (-5 -2)))  ==> ((6 1 3) (-5 -2))
+SECTION(4 2 6)
+(quasiquote (list 3 4))  ==> (list 3 4)
+(quasiquote (list a (quote a)))  ==> (list a (quote a))
+(quasiquote (a 3 4 5 6 b))  ==> (a 3 4 5 6 b)
+(quasiquote ((foo 7) . cons))  ==> ((foo 7) . cons)
+(quasiquote #(10 5 2 4 3 8))  ==> #(10 5 2 4 3 8)
+(quasiquote 5)  ==> 5
+(quasiquote (a (quasiquote (b (unquote (+ 1 2)) (unquote (foo 4 d)) e)) f))  ==> (a (quasiquote (b (unquote (+ 1 2)) (unquote (foo 4 d)) e)) f)
+(quasiquote (a (quasiquote (b (unquote x) (unquote (quote y)) d)) e))  ==> (a (quasiquote (b (unquote x) (unquote (quote y)) d)) e)
+(quasiquote (list 3 4))  ==> (list 3 4)
+(quasiquote (quasiquote (list (unquote (+ 1 2)) 4)))  ==> (quasiquote (list (unquote (+ 1 2)) 4))
+SECTION(5 2 1)
+(define 6)  ==> 6
+(define 1)  ==> 1
+(#<closure> 6)  ==> 9
+SECTION(5 2 2)
+(define 45)  ==> 45
+(#<closure>)  ==> 5
+(define 34)  ==> 34
+(#<closure>)  ==> 5
+(define 34)  ==> 34
+(#<closure> 88)  ==> 88
+(#<closure> 4)  ==> 4
+(define 34)  ==> 34
+(internal-define 99)  ==> 99
+(internal-define 77)  ==> 77
+SECTION(6 1)
+(#<closure> #t)  ==> #f
+(#<closure> 3)  ==> #f
+(#<closure> (3))  ==> #f
+(#<closure> #f)  ==> #t
+(#<closure> ())  ==> #f
+(#<closure> ())  ==> #f
+(#<closure> nil)  ==> #f
+(#<closure> #f)  ==> #t
+(#<closure> 0)  ==> #f
+(#<closure> ())  ==> #f
+SECTION(6 2)
+(#<closure> a a)  ==> #t
+(#<closure> a b)  ==> #f
+(#<closure> 2 2)  ==> #t
+(#<closure> () ())  ==> #t
+(#<closure> 10000 10000)  ==> #t
+(#<closure> (1 . 2) (1 . 2))  ==> #f
+(#<closure> #<closure> #<closure>)  ==> #f
+(#<closure> #f nil)  ==> #f
+(#<closure> #<closure> #<closure>)  ==> #t
+(#<closure> #<closure> #<closure>)  ==> #t
+(#<closure> #<closure> #<closure>)  ==> #f
+(#<closure> #<closure> #<closure>)  ==> #f
+(#<closure> a a)  ==> #t
+(#<closure> (a) (a))  ==> #f
+(#<closure> () ())  ==> #t
+(#<closure> #<closure> #<closure>)  ==> #t
+(#<closure> (a) (a))  ==> #t
+(#<closure> #() #())  ==> #t
+(#<closure> #<closure> #<closure>)  ==> #t
+(#<closure> a a)  ==> #t
+(#<closure> (a) (a))  ==> #t
+(#<closure> (a (b) c) (a (b) c))  ==> #t
+(#<closure> "abc" "abc")  ==> #t
+(#<closure> 2 2)  ==> #t
+(#<closure> #(a a a a a) #(a a a a a))  ==> #t
+SECTION(6 3)
+(dot (a b c d e))  ==> (a b c d e)
+(#<closure> (a b c))  ==> #t
+(set-cdr! (a . 4))  ==> (a . 4)
+(#<closure> (a . 4) (a . 4))  ==> #t
+(dot (a b c . d))  ==> (a b c . d)
+(#<closure> (a . 4))  ==> #f
+(list? #f)  ==> #f
+(#<closure> (a . b))  ==> #t
+(#<closure> (a . 1))  ==> #t
+(#<closure> (a b c))  ==> #t
+(#<closure> ())  ==> #f
+(#<closure> #(a b))  ==> #f
+(#<closure> a ())  ==> (a)
+(#<closure> (a) (b c d))  ==> ((a) b c d)
+(#<closure> "a" (b c))  ==> ("a" b c)
+(#<closure> a 3)  ==> (a . 3)
+(#<closure> (a b) c)  ==> ((a b) . c)
+(#<closure> (a b c))  ==> a
+(#<closure> ((a) b c d))  ==> (a)
+(#<closure> (1 . 2))  ==> 1
+(#<closure> ((a) b c d))  ==> (b c d)
+(#<closure> (1 . 2))  ==> 2
+(#<closure> a 7 c)  ==> (a 7 c)
+(#<closure>)  ==> ()
+(#<closure> (a b c))  ==> 3
+(#<closure> (a (b) (c d e)))  ==> 3
+(#<closure> ())  ==> 0
+(#<closure> (x) (y))  ==> (x y)
+(#<closure> (a) (b c d))  ==> (a b c d)
+(#<closure> (a (b)) ((c)))  ==> (a (b) (c))
+(#<closure>)  ==> ()
+(#<closure> (a b) (c . d))  ==> (a b c . d)
+(#<closure> () a)  ==> a
+(#<closure> (a b c))  ==> (c b a)
+(#<closure> (a (b c) d (e (f))))  ==> ((e (f)) d (b c) a)
+(#<closure> (a b c d) 2)  ==> c
+(#<closure> a (a b c))  ==> (a b c)
+(#<closure> b (a b c))  ==> (b c)
+(#<closure> a (b c d))  ==> #f
+(#<closure> (a) (b (a) c))  ==> #f
+(#<closure> (a) (b (a) c))  ==> ((a) c)
+(#<closure> 101 (100 101 102))  ==> (101 102)
+(#<closure> a ((a 1) (b 2) (c 3)))  ==> (a 1)
+(#<closure> b ((a 1) (b 2) (c 3)))  ==> (b 2)
+(#<closure> d ((a 1) (b 2) (c 3)))  ==> #f
+(#<closure> (a) (((a)) ((b)) ((c))))  ==> #f
+(#<closure> (a) (((a)) ((b)) ((c))))  ==> ((a))
+(#<closure> 5 ((2 3) (5 7) (11 13)))  ==> (5 7)
+SECTION(6 4)
+(#<closure> foo)  ==> #t
+(#<closure> a)  ==> #t
+(#<closure> "bar")  ==> #f
+(#<closure> nil)  ==> #t
+(#<closure> ())  ==> #f
+(#<closure> #f)  ==> #f
+(standard-case #t)  ==> #t
+(standard-case #t)  ==> #t
+(#<closure> flying-fish)  ==> "flying-fish"
+(#<closure> martin)  ==> "martin"
+(#<closure> Malvina)  ==> "Malvina"
+(standard-case #t)  ==> #t
+(string-set! "cb")  ==> "cb"
+(#<closure> ab)  ==> "ab"
+(#<closure> "ab")  ==> ab
+(#<closure> mississippi mississippi)  ==> #t
+(string->symbol #f)  ==> #f
+(#<closure> "jollywog")  ==> jollywog
+SECTION(6 5 5)
+(#<closure> 3)  ==> #t
+(#<closure> 3)  ==> #t
+(#<closure> 3)  ==> #t
+(#<closure> 3)  ==> #t
+(#<closure> 3)  ==> #t
+(#<closure> 3)  ==> #t
+(#<closure> 3)  ==> #f
+(#<closure> 22 22 22)  ==> #t
+(#<closure> 22 22)  ==> #t
+(#<closure> 34 34 35)  ==> #f
+(#<closure> 34 35)  ==> #f
+(#<closure> 3 -6246)  ==> #t
+(#<closure> 9 9 -2424)  ==> #f
+(#<closure> 3 -4 -6246)  ==> #t
+(#<closure> 9 9)  ==> #t
+(#<closure> 8 9)  ==> #f
+(#<closure> -1 2 3 4 5 6 7 8)  ==> #t
+(#<closure> -1 2 3 4 4 5 6 7)  ==> #f
+(#<closure> -1 2 3 4 5 6 7 8)  ==> #t
+(#<closure> -1 2 3 4 4 5 6 7)  ==> #t
+(#<closure> 1 3 2)  ==> #f
+(#<closure> 1 3 2)  ==> #f
+(#<closure> 0)  ==> #t
+(#<closure> 1)  ==> #f
+(#<closure> -1)  ==> #f
+(#<closure> -100)  ==> #f
+(#<closure> 4)  ==> #t
+(#<closure> -4)  ==> #f
+(#<closure> 0)  ==> #f
+(#<closure> 4)  ==> #f
+(#<closure> -4)  ==> #t
+(#<closure> 0)  ==> #f
+(#<closure> 3)  ==> #t
+(#<closure> 2)  ==> #f
+(#<closure> -4)  ==> #f
+(#<closure> -1)  ==> #t
+(#<closure> 3)  ==> #f
+(#<closure> 2)  ==> #t
+(#<closure> -4)  ==> #t
+(#<closure> -1)  ==> #f
+(#<closure> 34 5 7 38 6)  ==> 38
+(#<closure> 3 5 5 330 4 -24)  ==> -24
+(#<closure> 3 4)  ==> 7
+(#<closure> 3)  ==> 3
+(#<closure>)  ==> 0
+(#<closure> 4)  ==> 4
+(#<closure>)  ==> 1
+(#<closure> 3 4)  ==> -1
+(#<closure> 3)  ==> -3
+(#<closure> -7)  ==> 7
+(#<closure> 7)  ==> 7
+(#<closure> 0)  ==> 0
+(#<closure> 35 7)  ==> 5
+(#<closure> -35 7)  ==> -5
+(#<closure> 35 -7)  ==> -5
+(#<closure> -35 -7)  ==> 5
+(#<closure> 13 4)  ==> 1
+(#<closure> 13 4)  ==> 1
+(#<closure> -13 4)  ==> 3
+(#<closure> -13 4)  ==> -1
+(#<closure> 13 -4)  ==> -3
+(#<closure> 13 -4)  ==> 1
+(#<closure> -13 -4)  ==> -1
+(#<closure> -13 -4)  ==> -1
+(#<closure> 238 9)  ==> #t
+(#<closure> -238 9)  ==> #t
+(#<closure> 238 -9)  ==> #t
+(#<closure> -238 -9)  ==> #t
+(#<closure> 0 4)  ==> 4
+(#<closure> -4 0)  ==> 4
+(#<closure> 32 -36)  ==> 4
+(#<closure>)  ==> 0
+(#<closure> 32 -36)  ==> 288
+(#<closure>)  ==> 1
+SECTION(6 5 6)
+(#<closure> 0)  ==> "0"
+(#<closure> 100)  ==> "100"
+(#<closure> 256 16)  ==> "100"
+(#<closure> "100")  ==> 100
+(#<closure> "100" 16)  ==> 256
+(#<closure> "")  ==> #f
+(#<closure> ".")  ==> #f
+(#<closure> "d")  ==> #f
+(#<closure> "D")  ==> #f
+(#<closure> "i")  ==> #f
+(#<closure> "I")  ==> #f
+(#<closure> "3i")  ==> #f
+(#<closure> "3I")  ==> #f
+(#<closure> "33i")  ==> #f
+(#<closure> "33I")  ==> #f
+(#<closure> "3.3i")  ==> #f
+(#<closure> "3.3I")  ==> #f
+(#<closure> "-")  ==> #f
+(#<closure> "+")  ==> #f
+SECTION(6 6)
+(#<closure> #\space #\space)  ==> #t
+(#<closure> #\space #\space)  ==> #t
+(#<closure> #\a)  ==> #t
+(#<closure> #\()  ==> #t
+(#<closure> #\space)  ==> #t
+(#<closure> #\newline)  ==> #t
+(#<closure> #\A #\B)  ==> #f
+(#<closure> #\a #\b)  ==> #f
+(#<closure> #\9 #\0)  ==> #f
+(#<closure> #\A #\A)  ==> #t
+(#<closure> #\A #\B)  ==> #t
+(#<closure> #\a #\b)  ==> #t
+(#<closure> #\9 #\0)  ==> #f
+(#<closure> #\A #\A)  ==> #f
+(#<closure> #\A #\B)  ==> #f
+(#<closure> #\a #\b)  ==> #f
+(#<closure> #\9 #\0)  ==> #t
+(#<closure> #\A #\A)  ==> #f
+(#<closure> #\A #\B)  ==> #t
+(#<closure> #\a #\b)  ==> #t
+(#<closure> #\9 #\0)  ==> #f
+(#<closure> #\A #\A)  ==> #t
+(#<closure> #\A #\B)  ==> #f
+(#<closure> #\a #\b)  ==> #f
+(#<closure> #\9 #\0)  ==> #t
+(#<closure> #\A #\A)  ==> #t
+(#<closure> #\A #\B)  ==> #f
+(#<closure> #\a #\B)  ==> #f
+(#<closure> #\A #\b)  ==> #f
+(#<closure> #\a #\b)  ==> #f
+(#<closure> #\9 #\0)  ==> #f
+(#<closure> #\A #\A)  ==> #t
+(#<closure> #\A #\a)  ==> #t
+(#<closure> #\A #\B)  ==> #t
+(#<closure> #\a #\B)  ==> #t
+(#<closure> #\A #\b)  ==> #t
+(#<closure> #\a #\b)  ==> #t
+(#<closure> #\9 #\0)  ==> #f
+(#<closure> #\A #\A)  ==> #f
+(#<closure> #\A #\a)  ==> #f
+(#<closure> #\A #\B)  ==> #f
+(#<closure> #\a #\B)  ==> #f
+(#<closure> #\A #\b)  ==> #f
+(#<closure> #\a #\b)  ==> #f
+(#<closure> #\9 #\0)  ==> #t
+(#<closure> #\A #\A)  ==> #f
+(#<closure> #\A #\a)  ==> #f
+(#<closure> #\A #\B)  ==> #t
+(#<closure> #\a #\B)  ==> #t
+(#<closure> #\A #\b)  ==> #t
+(#<closure> #\a #\b)  ==> #t
+(#<closure> #\9 #\0)  ==> #f
+(#<closure> #\A #\A)  ==> #t
+(#<closure> #\A #\a)  ==> #t
+(#<closure> #\A #\B)  ==> #f
+(#<closure> #\a #\B)  ==> #f
+(#<closure> #\A #\b)  ==> #f
+(#<closure> #\a #\b)  ==> #f
+(#<closure> #\9 #\0)  ==> #t
+(#<closure> #\A #\A)  ==> #t
+(#<closure> #\A #\a)  ==> #t
+(#<closure> #\a)  ==> #t
+(#<closure> #\A)  ==> #t
+(#<closure> #\z)  ==> #t
+(#<closure> #\Z)  ==> #t
+(#<closure> #\0)  ==> #f
+(#<closure> #\9)  ==> #f
+(#<closure> #\space)  ==> #f
+(#<closure> #\;)  ==> #f
+(#<closure> #\a)  ==> #f
+(#<closure> #\A)  ==> #f
+(#<closure> #\z)  ==> #f
+(#<closure> #\Z)  ==> #f
+(#<closure> #\0)  ==> #t
+(#<closure> #\9)  ==> #t
+(#<closure> #\space)  ==> #f
+(#<closure> #\;)  ==> #f
+(#<closure> #\a)  ==> #f
+(#<closure> #\A)  ==> #f
+(#<closure> #\z)  ==> #f
+(#<closure> #\Z)  ==> #f
+(#<closure> #\0)  ==> #f
+(#<closure> #\9)  ==> #f
+(#<closure> #\space)  ==> #t
+(#<closure> #\;)  ==> #f
+(#<closure> #\0)  ==> #f
+(#<closure> #\9)  ==> #f
+(#<closure> #\space)  ==> #f
+(#<closure> #\;)  ==> #f
+(#<closure> #\0)  ==> #f
+(#<closure> #\9)  ==> #f
+(#<closure> #\space)  ==> #f
+(#<closure> #\;)  ==> #f
+(#<closure> 46)  ==> #\.
+(#<closure> 65)  ==> #\A
+(#<closure> 97)  ==> #\a
+(#<closure> #\A)  ==> #\A
+(#<closure> #\a)  ==> #\A
+(#<closure> #\A)  ==> #\a
+(#<closure> #\a)  ==> #\a
+SECTION(6 7)
+(#<closure> "The word \"recursion\\\" has many meanings.")  ==> #t
+(#<closure> "")  ==> #t
+(string-set! "?**")  ==> "?**"
+(#<closure> #\a #\b #\c)  ==> "abc"
+(#<closure>)  ==> ""
+(#<closure> "abc")  ==> 3
+(#<closure> "abc" 0)  ==> #\a
+(#<closure> "abc" 2)  ==> #\c
+(#<closure> "")  ==> 0
+(#<closure> "ab" 0 0)  ==> ""
+(#<closure> "ab" 1 1)  ==> ""
+(#<closure> "ab" 2 2)  ==> ""
+(#<closure> "ab" 0 1)  ==> "a"
+(#<closure> "ab" 1 2)  ==> "b"
+(#<closure> "ab" 0 2)  ==> "ab"
+(#<closure> "foo" "bar")  ==> "foobar"
+(#<closure> "foo")  ==> "foo"
+(#<closure> "foo" "")  ==> "foo"
+(#<closure> "" "foo")  ==> "foo"
+(#<closure>)  ==> ""
+(#<closure> 0)  ==> ""
+(#<closure> "" "")  ==> #t
+(#<closure> "" "")  ==> #f
+(#<closure> "" "")  ==> #f
+(#<closure> "" "")  ==> #t
+(#<closure> "" "")  ==> #t
+(#<closure> "" "")  ==> #t
+(#<closure> "" "")  ==> #f
+(#<closure> "" "")  ==> #f
+(#<closure> "" "")  ==> #t
+(#<closure> "" "")  ==> #t
+(#<closure> "A" "B")  ==> #f
+(#<closure> "a" "b")  ==> #f
+(#<closure> "9" "0")  ==> #f
+(#<closure> "A" "A")  ==> #t
+(#<closure> "A" "B")  ==> #t
+(#<closure> "a" "b")  ==> #t
+(#<closure> "9" "0")  ==> #f
+(#<closure> "A" "A")  ==> #f
+(#<closure> "A" "B")  ==> #f
+(#<closure> "a" "b")  ==> #f
+(#<closure> "9" "0")  ==> #t
+(#<closure> "A" "A")  ==> #f
+(#<closure> "A" "B")  ==> #t
+(#<closure> "a" "b")  ==> #t
+(#<closure> "9" "0")  ==> #f
+(#<closure> "A" "A")  ==> #t
+(#<closure> "A" "B")  ==> #f
+(#<closure> "a" "b")  ==> #f
+(#<closure> "9" "0")  ==> #t
+(#<closure> "A" "A")  ==> #t
+(#<closure> "A" "B")  ==> #f
+(#<closure> "a" "B")  ==> #f
+(#<closure> "A" "b")  ==> #f
+(#<closure> "a" "b")  ==> #f
+(#<closure> "9" "0")  ==> #f
+(#<closure> "A" "A")  ==> #t
+(#<closure> "A" "a")  ==> #t
+(#<closure> "A" "B")  ==> #t
+(#<closure> "a" "B")  ==> #t
+(#<closure> "A" "b")  ==> #t
+(#<closure> "a" "b")  ==> #t
+(#<closure> "9" "0")  ==> #f
+(#<closure> "A" "A")  ==> #f
+(#<closure> "A" "a")  ==> #f
+(#<closure> "A" "B")  ==> #f
+(#<closure> "a" "B")  ==> #f
+(#<closure> "A" "b")  ==> #f
+(#<closure> "a" "b")  ==> #f
+(#<closure> "9" "0")  ==> #t
+(#<closure> "A" "A")  ==> #f
+(#<closure> "A" "a")  ==> #f
+(#<closure> "A" "B")  ==> #t
+(#<closure> "a" "B")  ==> #t
+(#<closure> "A" "b")  ==> #t
+(#<closure> "a" "b")  ==> #t
+(#<closure> "9" "0")  ==> #f
+(#<closure> "A" "A")  ==> #t
+(#<closure> "A" "a")  ==> #t
+(#<closure> "A" "B")  ==> #f
+(#<closure> "a" "B")  ==> #f
+(#<closure> "A" "b")  ==> #f
+(#<closure> "a" "b")  ==> #f
+(#<closure> "9" "0")  ==> #t
+(#<closure> "A" "A")  ==> #t
+(#<closure> "A" "a")  ==> #t
+SECTION(6 8)
+(#<closure> #(0 (2 2 2 2) "Anna"))  ==> #t
+(#<closure> #())  ==> #t
+(#<closure> a b c)  ==> #(a b c)
+(#<closure>)  ==> #()
+(#<closure> #(0 (2 2 2 2) "Anna"))  ==> 3
+(#<closure> #())  ==> 0
+(#<closure> #(1 1 2 3 5 8 13 21) 5)  ==> 8
+(vector-set #(0 ("Sue" "Sue") "Anna"))  ==> #(0 ("Sue" "Sue") "Anna")
+(#<closure> 2 hi)  ==> #(hi hi)
+(#<closure> 0)  ==> #()
+(#<closure> 0 a)  ==> #()
+SECTION(6 9)
+(#<closure> #<closure>)  ==> #t
+(#<closure> car)  ==> #f
+(#<closure> #<closure>)  ==> #t
+(#<closure> (lambda (x) (* x x)))  ==> #f
+(#<closure> #<closure>)  ==> #t
+(#<closure> #<closure> (3 4))  ==> 7
+(#<closure> #<closure> (3 4))  ==> 7
+(#<closure> #<closure> 10 (3 4))  ==> 17
+(#<closure> #<closure> ())  ==> ()
+(#<closure> 12 75)  ==> 30
+(#<closure> #<closure> ((a b) (d e) (g h)))  ==> (b e h)
+(#<closure> #<closure> (1 2 3) (4 5 6))  ==> (5 7 9)
+(for-each #(0 1 4 9 16))  ==> #(0 1 4 9 16)
+(#<closure> #<closure>)  ==> -3
+(#<closure> (1 2 3 4))  ==> 4
+(#<closure> (a b . c))  ==> #f
+(#<closure> #<closure> ())  ==> ()
+SECTION(6 10 1)
+(#<closure> #<record>)  ==> #t
+(#<closure> #<record>)  ==> #t
+(#<closure> "r4rstest.scm" #<closure>)  ==> #t
+(#<closure> #<record>)  ==> #t
+SECTION(6 10 2)
+(#<closure> #<record>)  ==> #\;
+(#<closure> #<record>)  ==> #\;
+(#<closure> #<record>)  ==> (define cur-section (quote ()))
+(#<closure> #<record>)  ==> #\(
+(#<closure> #<record>)  ==> (define errs (quote ()))
+SECTION(6 10 3)
+(#<closure> "tmp1" #<closure>)  ==> #t
+(#<closure> #<record>)  ==> (define foo (quote (#t #f #\a () 9739 -3 . #((test) "te \" \" st" "" test #() b c))))
+(#<closure> #<record>)  ==> #t
+(#<closure> #<record>)  ==> #t
+(input-port? #t)  ==> #t
+(#<closure> #<record>)  ==> #\;
+(#<closure> #<record>)  ==> (#t #f a () 9739 -3 . #((test) te " " st test #() b c))
+(#<closure> #<record>)  ==> (define foo (quote (#t #f #\a () 9739 -3 . #((test) "te \" \" st" "" test #() b c))))
+(#<closure> #<record>)  ==> #t
+(#<closure> #<record>)  ==> (define foo (quote (#t #f #\a () 9739 -3 . #((test) "te \" \" st" "" test #() b c))))
+(#<closure> #<record>)  ==> #t
+(#<closure> #<record>)  ==> #t
+(input-port? #t)  ==> #t
+(#<closure> #<record>)  ==> #\;
+(#<closure> #<record>)  ==> (#t #f a () 9739 -3 . #((test) te " " st test #() b c))
+(#<closure> #<record>)  ==> (define foo (quote (#t #f #\a () 9739 -3 . #((test) "te \" \" st" "" test #() b c))))
+
+Passed all tests
+
+;testing inexact numbers; 
+SECTION(6 5 5)
+(#<closure> 3.9)  ==> #t
+(inexact? #t)  ==> #t
+(max 4.0)  ==> 4.0
+(exact->inexact 4.0)  ==> 4.0
+(#<closure> -4.5)  ==> -4.0
+(#<closure> -3.5)  ==> -4.0
+(#<closure> -3.9)  ==> -4.0
+(#<closure> 0.0)  ==> 0.0
+(#<closure> 0.25)  ==> 0.0
+(#<closure> 0.8)  ==> 1.0
+(#<closure> 3.5)  ==> 4.0
+(#<closure> 4.5)  ==> 4.0
+(#<closure> "tmp3" #<closure>)  ==> #t
+(#<closure> #<record>)  ==> (define foo (quote (0.25 -3.25)))
+(#<closure> #<record>)  ==> #t
+(#<closure> #<record>)  ==> #t
+(input-port? #t)  ==> #t
+(#<closure> #<record>)  ==> #\;
+(#<closure> #<record>)  ==> (0.25 -3.25)
+(#<closure> #<record>)  ==> (define foo (quote (0.25 -3.25)))
+(pentium-fdiv-bug #t)  ==> #t
+
+Passed all tests
+
+;testing bignums; 
+SECTION(6 5 5)
+(#<closure> 33333333333333333333 3)  ==> 0
+(#<closure> 33333333333333333333 -3)  ==> 0
+(#<closure> 33333333333333333333 3)  ==> 0
+(#<closure> 33333333333333333333 -3)  ==> 0
+(#<closure> 33333333333333333332 3)  ==> 2
+(#<closure> 33333333333333333332 -3)  ==> -1
+(#<closure> 33333333333333333332 3)  ==> 2
+(#<closure> 33333333333333333332 -3)  ==> 2
+(#<closure> -33333333333333333332 3)  ==> 1
+(#<closure> -33333333333333333332 -3)  ==> -2
+(#<closure> -33333333333333333332 3)  ==> -2
+(#<closure> -33333333333333333332 -3)  ==> -2
+(#<closure> 3 33333333333333333333)  ==> 3
+(#<closure> -3 33333333333333333333)  ==> 33333333333333333330
+(#<closure> 3 33333333333333333333)  ==> 3
+(#<closure> -3 33333333333333333333)  ==> -3
+(#<closure> 3 -33333333333333333333)  ==> -33333333333333333330
+(#<closure> -3 -33333333333333333333)  ==> -3
+(#<closure> 3 -33333333333333333333)  ==> 3
+(#<closure> -3 -33333333333333333333)  ==> -3
+(#<closure> -2177452800 86400)  ==> 0
+(#<closure> 2177452800 -86400)  ==> 0
+(#<closure> 2177452800 86400)  ==> 0
+(#<closure> -2177452800 -86400)  ==> 0
+(remainder #t)  ==> #t
+(remainder #t)  ==> #t
+SECTION(6 5 6)
+(#<closure> "281474976710655325431")  ==> 281474976710655325431
+(#<closure> 281474976710655325431)  ==> "281474976710655325431"
+
+Passed all tests
+
+To fully test continuations, Scheme 4, and DELAY/FORCE do:
+(test-cont) (test-sc4) (test-delay)
+
+;testing continuations; 
+SECTION(6 9)
+(#<closure> (a (b (c))) ((a) b c))  ==> #t
+(#<closure> (a (b (c))) ((a) b c d))  ==> #f
+
+Passed all tests
+
+;testing DELAY and FORCE; 
+SECTION(6 9)
+(delay 3)  ==> 3
+(delay (3 3))  ==> (3 3)
+(delay 2)  ==> 2
+(#<closure> #<record>)  ==> 6
+(#<closure> #<record>)  ==> 6
+(force 3)  ==> 3
+
+Passed all tests

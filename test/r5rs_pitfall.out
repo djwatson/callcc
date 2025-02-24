@@ -1,0 +1,20 @@
+Passed: 21
+Passed: 31
+Passed: 32
+Passed: 33
+Passed: 34
+Passed: 41
+Passed: 42
+Passed: 43
+Passed: 51
+Passed: 52
+Passed: 53
+Passed: 61
+Passed: 71
+Passed: 72
+Passed: 73
+Passed: 74
+Passed: 81
+Passed: 82
+Passed: 83
+Map is call/cc safe, but probably not tail recursive or inefficient.

@@ -32,7 +32,7 @@ TESTS = $(addsuffix .test, $(basename $(wildcard test/*.scm)))
 .PHONY: test %.test
 
 %.test : %.scm
-	bash cmp.sh $<
+	cd test; bash cmp.sh ../$<
 
 test: $(TESTS)
 
