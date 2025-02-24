@@ -1,6 +1,8 @@
 
 # known bugs:
   * ugh join still broken in ches
+  * EQV fast needs check for number?
+  * is_ptr gc_log check needs to check *all* pointer types, cons, vec, etc.
 
 # plan
   * improve eqv? perf
