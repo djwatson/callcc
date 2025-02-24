@@ -58,7 +58,11 @@
 	       1
 	       ))))
 
-    (define hash-by-identity hash)
+    (define (hash-by-identity x . maybe-bound)
+      (let ((hash (sys:FOREIGN_CALL "SCM_EQ_HASH" x)))
+	(if (pair? maybe-bound)
+	    (modulo hash (car maybe-bound))
+	    hash)))
 
     (define (vector-hash v bound)
       (let ((hashvalue 571)

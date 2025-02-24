@@ -62,17 +62,18 @@
 ;; if possible: The ASM label is known in advance (assuming the function
 ;; is only defined once)
 
-(define global-fun-labels (make-hash-table equal?))
+(define global-fun-labels (make-hash-table eq?))
+(define global-fun-names (make-hash-table equal?))
 (define (fun-to-label lam var)
   (if (hash-table-exists? global-fun-labels lam)
       (hash-table-ref/default global-fun-labels lam #f)
       (begin
-	(if (hash-table-exists? global-fun-labels (second lam))
+	(if (hash-table-exists? global-fun-names (second lam))
 	    (begin
 	      (hash-table-set! global-fun-labels lam var)
 	      var)
 	    (begin
-	      (hash-table-set! global-fun-labels (second lam) #t)
+	      (hash-table-set! global-fun-names (second lam) #t)
 	      (hash-table-set! global-fun-labels lam (second lam))
 	      (second lam))))))
 ;; (define (fun-to-label lam var)
