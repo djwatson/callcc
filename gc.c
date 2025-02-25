@@ -59,7 +59,7 @@ typedef struct freelist_s {
 
 extern int64_t symbol_table;
 extern uint64_t* complex_constants[];
-extern int64_t complex_constants_len;
+extern uint64_t complex_constants_len;
 extern  int64_t shadow_stack[100];
 
 
@@ -115,7 +115,7 @@ static uint64_t sz_to_page_class(uint64_t sz, bool check) {
 
 bool find_next_bit(uint64_t const* bits, uint64_t maxbit, uint64_t bit, bool invert, uint64_t* result) {
   auto word = bit / 64;
-  auto b = bit % 64;
+  int64_t b = bit % 64;
   /* printf("find_next_bit word %li b %li\n", word, b); */
 
   if (bit >= maxbit) {
@@ -251,8 +251,10 @@ void gc_init(int argc_in, char**argv_in) {
 void gc_add_root(uint64_t *rootp) { kv_push(roots, rootp); }
 
 void gc_pop_root(uint64_t const *rootp) {
+  #ifndef NDEBUG
   auto old_rootp = kv_pop(roots);
   assert(old_rootp == rootp);
+  #endif
 }
 
 typedef struct range {
@@ -322,9 +324,9 @@ static uint64_t collect_big = 0;
 static bool next_force_full = false;
 extern void* cur_link;
 __attribute__((noinline, preserve_none)) static void rcimmix_collect() {
-  struct timespec start;
-  struct timespec end;
-  clock_gettime(CLOCK_MONOTONIC, &start);
+  /* struct timespec start; */
+  /* struct timespec end; */
+  /* clock_gettime(CLOCK_MONOTONIC, &start); */
   bool collect_full = next_force_full;
 
   /* collect_big += next_collect; */
@@ -442,7 +444,7 @@ __attribute__((noinline, preserve_none)) static void rcimmix_collect() {
 
   // Sweep empty blocks.
   uint64_t freed_bytes = 0;
-  uint64_t total_bytes = 0;
+  /* uint64_t total_bytes = 0; */
   itr = live_slabs.next;
   while(!list_is_head(itr, &live_slabs)) {
     auto next_itr = itr->next;
@@ -463,7 +465,7 @@ __attribute__((noinline, preserve_none)) static void rcimmix_collect() {
 	}
       }
     }
-    total_bytes += slab->end - slab->start;
+    /* total_bytes += slab->end - slab->start; */
     itr = next_itr;
   }
   for (uint64_t i = 0; i < size_classes; i++) {
@@ -471,7 +473,7 @@ __attribute__((noinline, preserve_none)) static void rcimmix_collect() {
     freelist[i].end_ptr = default_slab_size;
     freelist[i].slab = nullptr;
   }
-  uint64_t live_bytes = total_bytes - freed_bytes;
+  /* uint64_t live_bytes = total_bytes - freed_bytes; */
 
   // TODO: ideally we would have a running statistic
   // how many bytes we *expect* to be freed by a full collect vs.
@@ -489,12 +491,12 @@ __attribute__((noinline, preserve_none)) static void rcimmix_collect() {
 
   kv_destroy(markstack);
 
-  clock_gettime(CLOCK_MONOTONIC, &end);
-  auto rem_bytes = total_bytes - freed_bytes;
-  double time_taken =
-      ((double)end.tv_sec - (double)start.tv_sec) * 1000.0; // sec to ms
-  time_taken +=
-      ((double)end.tv_nsec - (double)start.tv_nsec) / 1000000.0; // ns to ms
+  /* clock_gettime(CLOCK_MONOTONIC, &end); */
+  /* auto rem_bytes = total_bytes - freed_bytes; */
+  /* double time_taken = */
+  /*     ((double)end.tv_sec - (double)start.tv_sec) * 1000.0; // sec to ms */
+  /* time_taken += */
+  /*     ((double)end.tv_nsec - (double)start.tv_nsec) / 1000000.0; // ns to ms */
   /* printf( */
   /* 	 "COLLECT %.3f ms, full %i, %li total %li, freed %li, free%% %f, next_collect %li, totsize %li rembytes %li, frag %% %f\n", */
   /* 	 time_taken, collect_full, totsize, total_bytes, freed_bytes, 100.0 * (double)freed_bytes / (double)total_bytes, next_collect, */
@@ -514,10 +516,6 @@ static slab_info *alloc_slab(uint64_t sz_class) {
   if (page_class < page_classes && kv_size(pages_free[page_class])) {
     slab_info* free = kv_pop(pages_free[page_class]);
     if (free) {
-      if (sz > (free->end - free->start)) {
-	printf("Bad sizing\n");
-	exit(0);
-      }
       assert(sz <= (free->end - free->start));
       #ifdef USE_MPROTECT
       mprotect(free->start, free->end - free->start, PROT_READ|PROT_WRITE);
@@ -607,8 +605,10 @@ bool gc_is_small(uint64_t sz) {
 // Assumes a is a small allocation.
 void gc_log_fast(uint64_t a) {
 #ifdef GENGC
+  #ifndef NDEBUG
   slab_info* slab;
   assert(alloc_table_lookup(&atable, (void*)a, (void**)&slab));
+  #endif
   uint64_t* logbits = (uint64_t*)(a & ~(default_slab_size-1));
 
   uint64_t addr = a & (default_slab_size-1);

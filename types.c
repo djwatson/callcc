@@ -124,73 +124,73 @@ typedef struct closure_s {
 } closure_s;
 
 // This one is not PTR, but anything!
-void *to_raw_ptr(gc_obj obj) { return (void *)(obj.value & ~TAG_MASK); }
-string_s *to_string(gc_obj obj) { return (string_s *)(obj.value - PTR_TAG); }
-symbol *to_symbol(gc_obj obj) { return (symbol *)(obj.value - PTR_TAG); }
-int64_t to_fixnum(gc_obj obj) { return obj.value >> 3; }
-bignum_s *to_bignum(gc_obj obj) { return (bignum_s *)(obj.value - PTR_TAG); }
-ratnum_s *to_ratnum(gc_obj obj) { return (ratnum_s *)(obj.value - PTR_TAG); }
-compnum_s *to_compnum(gc_obj obj) { return (compnum_s *)(obj.value - PTR_TAG); }
-cons_s *to_cons(gc_obj obj) { return (cons_s *)(obj.value - CONS_TAG); }
-vector_s *to_vector(gc_obj obj) { return (vector_s *)(obj.value - VECTOR_TAG); }
-record_s *to_record(gc_obj obj) { return (record_s *)(obj.value - PTR_TAG); }
-closure_s *to_closure(gc_obj obj) { return (closure_s *)(obj.value - PTR_TAG); }
-uint32_t to_char(gc_obj obj) { return (uint32_t)(obj.value >> 8); }
+static void *to_raw_ptr(gc_obj obj) { return (void *)(obj.value & ~TAG_MASK); }
+static string_s *to_string(gc_obj obj) { return (string_s *)(obj.value - PTR_TAG); }
+static symbol *to_symbol(gc_obj obj) { return (symbol *)(obj.value - PTR_TAG); }
+static int64_t to_fixnum(gc_obj obj) { return obj.value >> 3; }
+static bignum_s *to_bignum(gc_obj obj) { return (bignum_s *)(obj.value - PTR_TAG); }
+static ratnum_s *to_ratnum(gc_obj obj) { return (ratnum_s *)(obj.value - PTR_TAG); }
+static compnum_s *to_compnum(gc_obj obj) { return (compnum_s *)(obj.value - PTR_TAG); }
+static cons_s *to_cons(gc_obj obj) { return (cons_s *)(obj.value - CONS_TAG); }
+static vector_s *to_vector(gc_obj obj) { return (vector_s *)(obj.value - VECTOR_TAG); }
+static record_s *to_record(gc_obj obj) { return (record_s *)(obj.value - PTR_TAG); }
+static closure_s *to_closure(gc_obj obj) { return (closure_s *)(obj.value - PTR_TAG); }
+static uint32_t to_char(gc_obj obj) { return (uint32_t)(obj.value >> 8); }
 
-uint8_t get_tag(gc_obj obj) { return obj.value & TAG_MASK; }
-uint8_t get_imm_tag(gc_obj obj) { return obj.value & IMMEDIATE_MASK; }
-uint32_t get_ptr_tag(gc_obj obj) {
+static uint8_t get_tag(gc_obj obj) { return obj.value & TAG_MASK; }
+static uint8_t get_imm_tag(gc_obj obj) { return obj.value & IMMEDIATE_MASK; }
+static uint32_t get_ptr_tag(gc_obj obj) {
   return ((uint64_t *)(obj.value - PTR_TAG))[0];
 }
-bool is_char(gc_obj obj) { return get_imm_tag(obj) == CHAR_TAG; }
-bool is_cons(gc_obj obj) { return get_tag(obj) == CONS_TAG; }
-bool is_ptr(gc_obj obj) { return get_tag(obj) == PTR_TAG; }
-bool is_number(gc_obj obj) { return (get_tag(obj) == PTR_TAG) &&
+/* static bool is_char(gc_obj obj) { return get_imm_tag(obj) == CHAR_TAG; } */
+static bool is_cons(gc_obj obj) { return get_tag(obj) == CONS_TAG; }
+static bool is_ptr(gc_obj obj) { return get_tag(obj) == PTR_TAG; }
+static bool is_number(gc_obj obj) { return (get_tag(obj) == PTR_TAG) &&
     ((uint8_t)get_ptr_tag(obj) == NUMBER_TAG); }
-bool is_closure(gc_obj obj) {
+static bool is_closure(gc_obj obj) {
   return is_ptr(obj) && get_ptr_tag(obj) == CLOSURE_TAG;
 }
-bool is_literal(gc_obj obj) { return get_tag(obj) == LITERAL_TAG; }
-bool is_string(gc_obj obj) {
-  return is_ptr(obj) && get_ptr_tag(obj) == STRING_TAG;
-}
-bool is_record(gc_obj obj) {
-  return is_ptr(obj) && get_ptr_tag(obj) == RECORD_TAG;
-}
-bool is_undefined(gc_obj obj) { return get_imm_tag(obj) == UNDEFINED_TAG; }
-bool is_vector(gc_obj obj) { return get_tag(obj) == VECTOR_TAG; }
-bool is_symbol(gc_obj obj) { return get_tag(obj) == SYMBOL_TAG; }
-bool is_fixnum(gc_obj obj) { return get_tag(obj) == FIXNUM_TAG; }
-bool is_bignum(gc_obj obj) { return is_ptr(obj) && get_ptr_tag(obj) == BIGNUM_TAG; }
-bool is_ratnum(gc_obj obj) { return is_ptr(obj) && get_ptr_tag(obj) == RATNUM_TAG; }
-bool is_compnum(gc_obj obj) { return is_ptr(obj) && get_ptr_tag(obj) == COMPNUM_TAG; }
-bool is_heap_object(gc_obj obj) { return !is_fixnum(obj) && !is_literal(obj); }
-gc_obj tag_fixnum(int64_t num) {
+/* static bool is_literal(gc_obj obj) { return get_tag(obj) == LITERAL_TAG; } */
+/* static bool is_string(gc_obj obj) { */
+/*   return is_ptr(obj) && get_ptr_tag(obj) == STRING_TAG; */
+/* } */
+/* static bool is_record(gc_obj obj) { */
+/*   return is_ptr(obj) && get_ptr_tag(obj) == RECORD_TAG; */
+/* } */
+/* static bool is_undefined(gc_obj obj) { return get_imm_tag(obj) == UNDEFINED_TAG; } */
+static bool is_vector(gc_obj obj) { return get_tag(obj) == VECTOR_TAG; }
+/* static bool is_symbol(gc_obj obj) { return get_tag(obj) == SYMBOL_TAG; } */
+static bool is_fixnum(gc_obj obj) { return get_tag(obj) == FIXNUM_TAG; }
+static bool is_bignum(gc_obj obj) { return is_ptr(obj) && get_ptr_tag(obj) == BIGNUM_TAG; }
+static bool is_ratnum(gc_obj obj) { return is_ptr(obj) && get_ptr_tag(obj) == RATNUM_TAG; }
+static bool is_compnum(gc_obj obj) { return is_ptr(obj) && get_ptr_tag(obj) == COMPNUM_TAG; }
+/* static bool is_heap_object(gc_obj obj) { return !is_fixnum(obj) && !is_literal(obj); } */
+static gc_obj tag_fixnum(int64_t num) {
   assert(((num << 3) >> 3) == num);
   return (gc_obj){.value = num << 3};
 }
-gc_obj tag_string(string_s *s) {
+static gc_obj tag_string(string_s *s) {
   return (gc_obj){.value = ((int64_t)s + PTR_TAG)};
 }
-gc_obj tag_cons(cons_s *s) {
+static gc_obj tag_cons(cons_s *s) {
   return (gc_obj){.value = ((int64_t)s + CONS_TAG)};
 }
-gc_obj tag_vector(vector_s *s) {
+static gc_obj tag_vector(vector_s *s) {
   return (gc_obj){.value = ((int64_t)s + VECTOR_TAG)};
 }
-gc_obj tag_cont(closure_s *s) {
+/* static gc_obj tag_cont(closure_s *s) { */
+/*   return (gc_obj){.value = ((int64_t)s + PTR_TAG)}; */
+/* } */
+static gc_obj tag_closure(closure_s *s) {
   return (gc_obj){.value = ((int64_t)s + PTR_TAG)};
 }
-gc_obj tag_closure(closure_s *s) {
-  return (gc_obj){.value = ((int64_t)s + PTR_TAG)};
-}
-gc_obj tag_char(uint32_t ch) {
+static gc_obj tag_char(uint32_t ch) {
   return (gc_obj){.value = (((int64_t)ch << 8) + CHAR_TAG)};
 }
-gc_obj tag_symbol(symbol *s) {
+static gc_obj tag_symbol(symbol *s) {
   return (gc_obj){.value = ((int64_t)s + PTR_TAG)};
 }
-gc_obj tag_ptr(void *s) { return (gc_obj){.value = ((int64_t)s + PTR_TAG)}; }
+static gc_obj tag_ptr(void *s) { return (gc_obj){.value = ((int64_t)s + PTR_TAG)}; }
 
 #define TAG_SET2 ((1 << 5) | (1 << 4) | (1 << 1))
 static bool has_tag_5_or_4_or_1(int64_t n) {
@@ -241,7 +241,7 @@ gc_obj SCM_IS_COMPNUM(gc_obj obj) {
   return FALSE_REP;
 }
 
-bool double_to_gc(double d, gc_obj *res) {
+static bool double_to_gc(double d, gc_obj *res) {
   uint64_t di;
   memcpy(&di, &d, sizeof(d));
   di = __builtin_rotateleft64(di, 4);
@@ -253,7 +253,7 @@ bool double_to_gc(double d, gc_obj *res) {
   return false;
 }
 
-gc_obj double_to_gc_slow(double d) {
+static gc_obj double_to_gc_slow(double d) {
   uint64_t di;
   memcpy(&di, &d, sizeof(d));
   di = __builtin_rotateleft64(di, 4);
@@ -267,7 +267,7 @@ gc_obj double_to_gc_slow(double d) {
   return tag_ptr(f);
 }
 
-double to_double(gc_obj obj) {
+static double to_double(gc_obj obj) {
   if (is_ptr(obj)) {
     flonum_s *f = to_raw_ptr(obj);
     return f->x;
@@ -280,7 +280,7 @@ double to_double(gc_obj obj) {
   return res;
 }
 
-double to_double_fast(gc_obj obj) {
+static double to_double_fast(gc_obj obj) {
   uint64_t r = obj.value - 1;
   r = __builtin_rotateright64(r, 4);
   double res;
@@ -417,7 +417,7 @@ gc_obj SCM_DISPLAY(gc_obj obj, gc_obj scmfd) {
   case VECTOR_TAG: {
     auto v = to_vector(obj);
     dprintf(fd, "#(");
-    for (uint64_t i = 0; i < to_fixnum(v->len); i++) {
+    for (int64_t i = 0; i < to_fixnum(v->len); i++) {
       if (i != 0) {
         dprintf(fd, " ");
       }
@@ -626,19 +626,19 @@ gc_obj SCM_IMAG_PART(gc_obj comp) {
 INLINE gc_obj SCM_ADD(gc_obj a, gc_obj b);
 INLINE gc_obj SCM_SUB(gc_obj a, gc_obj b);
 INLINE gc_obj SCM_MUL(gc_obj a, gc_obj b);
-gc_obj compnum_add(gc_obj a, gc_obj b) {
+static gc_obj compnum_add(gc_obj a, gc_obj b) {
   auto ca = to_compnum(get_compnum(a));
   auto cb = to_compnum(get_compnum(b));
   return SCM_MAKE_RECTANGULAR(SCM_ADD(ca->real, cb->real),
 			      SCM_ADD(ca->imag, cb->imag));
 }
-gc_obj compnum_sub(gc_obj a, gc_obj b) {
+static gc_obj compnum_sub(gc_obj a, gc_obj b) {
   auto ca = to_compnum(get_compnum(a));
   auto cb = to_compnum(get_compnum(b));
   return SCM_MAKE_RECTANGULAR(SCM_SUB(ca->real, cb->real),
 			      SCM_SUB(ca->imag, cb->imag));
 }
-gc_obj compnum_mul(gc_obj a, gc_obj b) {
+static gc_obj compnum_mul(gc_obj a, gc_obj b) {
   auto ca = to_compnum(get_compnum(a)); //a b
   auto cb = to_compnum(get_compnum(b)); //c d
   // ac - bd, ad + bc
@@ -794,27 +794,29 @@ INLINE gc_obj SCM_DIV(gc_obj a, gc_obj b) {
   }
 }
 
-#define MATH_COMPARE_OP(OPNAME, OP, COMPCMP)					\
+#define MATH_COMPARE_OP(OPNAME, OP, COMPCMP)                                   \
   NOINLINE __attribute__((preserve_most)) gc_obj SCM_##OPNAME##_SLOW(          \
       gc_obj a, gc_obj b) {                                                    \
-    bool res;								\
-    if (is_compnum(a)||is_compnum(b)) {\
-      res = COMPCMP(a, b);						\
-    } else if (is_flonum(a)||is_flonum(b)) {				\
-      res = OP(to_double(SCM_INEXACT(a)), to_double(SCM_INEXACT(b)));	\
-    } else if (is_ratnum(a) || is_ratnum(b)) {				\
-      mpq_t ba, bb;						\
-      get_ratnum(a, &ba);						\
-      get_ratnum(b, &bb);						\
-      res = OP(mpq_cmp(ba, bb), 0);				\
+    bool res;                                                                  \
+    if (is_compnum(a) || is_compnum(b)) {                                      \
+      res = COMPCMP(a, b);                                                     \
+    } else if (is_flonum(a) || is_flonum(b)) {                                 \
+      res = OP(to_double(SCM_INEXACT(a)), to_double(SCM_INEXACT(b)));          \
+    } else if (is_ratnum(a) || is_ratnum(b)) {                                 \
+      mpq_t ba, bb;                                                            \
+      get_ratnum(a, &ba);                                                      \
+      get_ratnum(b, &bb);                                                      \
+      res = OP(mpq_cmp(ba, bb), 0);                                            \
     } else if (is_bignum(a) || is_bignum(b)) {                                 \
-      mpz_t ba, bb;                                                       \
+      mpz_t ba, bb;                                                            \
       get_bignum(a, &ba);                                                      \
       get_bignum(b, &bb);                                                      \
-      res = OP(mpz_cmp(ba, bb), 0);					\
+      res = OP(mpz_cmp(ba, bb), 0);                                            \
     } else if (is_fixnum(a) && is_fixnum(b)) {                                 \
-      res = OP(to_fixnum(a), to_fixnum(b));				\
-    }									\
+      res = OP(to_fixnum(a), to_fixnum(b));                                    \
+    } else {                                                                   \
+    abort();								\
+}						\
     if (res) {\
       return TRUE_REP;							\
     } else {\
@@ -1190,7 +1192,7 @@ SCM_CALLCC(gc_obj cont) {
 
 /////////////////////// CONSARGS for varargs functions
 
-static const uint64_t reg_arg_cnt = 6;
+static const int64_t reg_arg_cnt = 6;
 /* #if defined(__x86_64__) */
 /* static const uint64_t reg_arg_cnt = 6; */
 /* #elif defined(__aarch64__) */
@@ -1647,7 +1649,7 @@ gc_obj SCM_GET_ENV_VARS() {
       long len = split - *p;
       gc_obj var = SCM_MAKE_STRING(tag_fixnum(len), FALSE_REP);
       string_s *s = to_string(var);
-      for(uint64_t i = 0; i < len; i++) {
+      for(int64_t i = 0; i < len; i++) {
 	s->str[i] = (*p)[i];
       }
 
