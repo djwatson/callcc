@@ -7,6 +7,7 @@ SRCS = alloc_table.c gc.c types.c list.c callcc.S
 OBJECTS = $(patsubst %, %.o, $(basename $(SRCS)))
 SCM_SRCS = lib/runtime2.scm lib/eval.scm lib/read.scm lib/equal.scm lib/hashtable.scm lib/str2num.scm lib/bc.callcc.scm lib/bc.scm lib/expand.scm lib/fix-letrec.scm lib/library-manager.scm lib/match.scm lib/memory_layout.scm lib/passes.scm lib/qq.scm lib/sua.scm lib/util.scm lib/gen-libraries.scm callcc.scm
 SRFI_SRCS = lib/srfi2/srfi/*.scm
+PREFIX ?= /usr
 
 all: callcc
 
@@ -37,3 +38,30 @@ TESTS = $(addsuffix .test, $(basename $(wildcard test/*.scm))) $(addsuffix .test
 
 test: $(TESTS)
 
+install: callcc
+	install -d ${PREFIX}/bin
+	install callcc ${PREFIX}/bin/
+	install -d ${PREFIX}/bin/lib
+	install libcallcc.a ${PREFIX}/bin/lib
+	install lib/runtime2.scm ${PREFIX}/bin/lib
+	install lib/eval.scm ${PREFIX}/bin/lib
+	install lib/memory_layout.scm ${PREFIX}/bin/lib
+	install lib/str2num.scm ${PREFIX}/bin/lib
+	install lib/read.scm ${PREFIX}/bin/lib
+	install lib/hashtable.scm ${PREFIX}/bin/lib
+	install lib/equal.scm ${PREFIX}/bin/lib
+	install lib/expand.* ${PREFIX}/bin/lib
+	install lib/library-manager.* ${PREFIX}/bin/lib
+	install lib/format.* ${PREFIX}/bin/lib
+	install lib/util.* ${PREFIX}/bin/lib
+	install lib/match.* ${PREFIX}/bin/lib
+	install lib/stdlib.scm ${PREFIX}/bin/lib
+	install libcallcc.a ${PREFIX}/bin/
+	install -d ${PREFIX}/bin/lib/headers/flow
+	install lib/headers/flow/* ${PREFIX}/bin/lib/headers/flow
+	install -d ${PREFIX}/bin/lib/headers/scheme
+	install lib/headers/scheme/* ${PREFIX}/bin/lib/headers/scheme
+	install -d ${PREFIX}/bin/lib/srfi
+	install lib/srfi2/srfi/* ${PREFIX}/bin/lib/srfi
+	install -d ${PREFIX}/bin/lib/third-party
+	install lib/third-party/* ${PREFIX}/bin/lib/third-party
