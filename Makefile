@@ -5,7 +5,7 @@ CFLAGS = -flto -O3 -g  -std=gnu23 -Wall
 LIBS = -lm -lgmp -lutf8proc
 SRCS = alloc_table.c gc.c types.c list.c callcc.S
 OBJECTS = $(patsubst %, %.o, $(basename $(SRCS)))
-SCM_SRCS = lib/runtime2.scm lib/eval.scm lib/read.scm lib/equal.scm lib/hashtable.scm lib/str2num.scm lib/bc.callcc.scm lib/bc.scm lib/expand.scm lib/fix-letrec.scm lib/library-manager.scm lib/match.scm lib/memory_layout.scm lib/passes.scm lib/qq.scm lib/sua.scm lib/util.scm lib/gen-libraries.scm
+SCM_SRCS = lib/runtime2.scm lib/eval.scm lib/read.scm lib/equal.scm lib/hashtable.scm lib/str2num.scm lib/bc.callcc.scm lib/bc.scm lib/expand.scm lib/fix-letrec.scm lib/library-manager.scm lib/match.scm lib/memory_layout.scm lib/passes.scm lib/qq.scm lib/sua.scm lib/util.scm lib/gen-libraries.scm callcc.scm
 SRFI_SRCS = lib/srfi2/srfi/*.scm
 
 all: callcc

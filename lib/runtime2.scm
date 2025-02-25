@@ -258,10 +258,14 @@
 
 ;; TODO: use bitops
 (define (expt num exp)
-  (let loop ((ret 1) (num num) (exp exp))
-    (if (= exp 0)
-	ret
-	(loop (if (odd? exp) (* ret num) ret) (* num num) (quotient exp 2)))))
+  (if (> exp 0)
+      (let loop ((ret 1) (num num) (exp exp))
+	(if (= exp 0)
+	    ret
+	    (loop (if (odd? exp) (* ret num) ret) (* num num) (quotient exp 2))))
+      (let loop ((n 1) (cnt exp))
+	  (if (= cnt 0) n
+	      (loop (/ n num) (+ cnt 1))))))
 
 (define (square x) (* x x))
 
