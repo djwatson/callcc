@@ -7,7 +7,7 @@ void init_list_head(list_head *list) {
   list->next = list;
 }
 
-void __list_add(list_head *list, list_head * prev, list_head *next) {
+void __list_add(list_head *list, list_head *prev, list_head *next) {
   assert(list->prev == list);
   assert(list->next == list);
 
@@ -17,7 +17,7 @@ void __list_add(list_head *list, list_head * prev, list_head *next) {
   prev->next = list;
 }
 
-void list_add(list_head *list, list_head*after) {
+void list_add(list_head *list, list_head *after) {
   return __list_add(list, after, after->next);
 }
 
@@ -30,12 +30,10 @@ void __list_del(list_head *prev, list_head *next) {
   prev->next = next;
 }
 
-void list_del(list_head * list) {
+void list_del(list_head *list) {
   __list_del(list->prev, list->next);
   list->prev = list;
   list->next = list;
 }
 
-bool list_empty(list_head *list) {
-  return list->next == list;
-}
+bool list_empty(list_head *list) { return list->next == list; }

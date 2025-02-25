@@ -38,6 +38,9 @@ TESTS = $(addsuffix .test, $(basename $(wildcard test/*.scm))) $(addsuffix .test
 
 test: $(TESTS)
 
+format:
+	clang-format -i *.c
+
 install: callcc
 	install -d ${PREFIX}/bin
 	install callcc ${PREFIX}/bin/

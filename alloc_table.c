@@ -18,7 +18,7 @@ static void set(alloc_table *table, void *val, uint64_t ps) {
   (*l2)[(ps >> shift) & ind_mask] = val;
 }
 
-bool alloc_table_lookup(alloc_table *table, void *p, void**slab) {
+bool alloc_table_lookup(alloc_table *table, void *p, void **slab) {
   uint64_t ps = (uint64_t)p;
   bool below = ps < table->min;
   bool above = ps > table->max;
@@ -39,7 +39,8 @@ bool alloc_table_lookup(alloc_table *table, void *p, void**slab) {
   return true;
 }
 
-void alloc_table_set_range(alloc_table *table, void *val, void *p, uint64_t range) {
+void alloc_table_set_range(alloc_table *table, void *val, void *p,
+                           uint64_t range) {
   uint64_t ps = (uint64_t)p;
 
   assert((range & ind_mask) == 0);
