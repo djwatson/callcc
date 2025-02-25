@@ -10,8 +10,8 @@ SRFI_SRCS = lib/srfi2/srfi/*.scm
 
 all: callcc
 
-callcc: lib/bc.callcc.ll libcallcc.a
-	${CC} ${CFLAGS} -o $@ lib/bc.callcc.ll libcallcc.a ${LIBS}
+callcc: callcc.scm.ll libcallcc.a
+	${CC} ${CFLAGS} -o $@ callcc.scm.ll libcallcc.a ${LIBS}
 
 libcallcc.a: ${OBJECTS}
 	ar rcs $@ $^
@@ -19,8 +19,8 @@ libcallcc.a: ${OBJECTS}
 lib/headers:
 	cd lib; mkdir -p headers/flow; mkdir -p headers/scheme; gosh -I. gen-libraries.scm
 
-lib/bc.callcc.ll: ${SCM_SRCS} lib/headers ${SRFI_SRCS}
-	cd lib; gosh -I. bc.gauche.scm bc.callcc.scm > bc.callcc.ll
+callcc.scm.ll: ${SCM_SRCS} lib/headers ${SRFI_SRCS}
+	gosh -Ilib callcc.scm --exe callcc.scm -I lib/headers -Ilib
 
 clean:
 	rm -rf callcc lib/headers lib/bc.callcc.cc *.o libcallcc.a

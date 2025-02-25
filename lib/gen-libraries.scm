@@ -518,6 +518,9 @@
     (%make-promise int) ;; lazy promise
     (make-ident int) ;; syntax expansion, hygienic macros
     (add-feature int) ;; (feature) identifiers.
+
+    ;; Callcc specific
+    (system)
     )
   )
 

@@ -1675,3 +1675,14 @@ gc_obj SCM_CURRENT_SECOND() {
   double f = ts.tv_sec + (double)ts.tv_nsec / 1000000000.0 + offset;
   return double_to_gc_slow(f);
 }
+
+gc_obj SCM_SYSTEM(gc_obj strn) {
+  auto str = to_string(strn);
+  auto len = to_fixnum(str->len);
+  auto align_len = (len + 1 + 7) & ~7;
+  char* tmp = rcimmix_alloc(align_len);
+  tmp[len] = '\0';
+  strncpy(tmp, str->str, len);
+  int res = system(tmp);
+  return tag_fixnum(res);
+}

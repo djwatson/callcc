@@ -91,7 +91,8 @@
   (let ((output (string-append exe-file ".ll")))
     (display (format "compiling ~a to ~a\n" exe-file output-file))
     (with-output-to-file output (lambda ()
-				  (compile exe-file #f)))))
+				  (compile exe-file #f)))
+    (link output output-file)))
 
 ;; Set output file as input file minus extension.
 (when (and exe-file (not output-file))

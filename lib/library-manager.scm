@@ -12,10 +12,10 @@
 			      (string-append default-install-path "/headers")
 			      default-install-path))
 
-(define (make-libman)
-  (%make-libman '() (make-parameter ".") (make-hash-table eq?)))
+(define (make-libman path)
+  (%make-libman '() (make-parameter path) (make-hash-table eq?)))
 
-(define runtime-man (make-libman))
+(define runtime-man (make-libman "."))
 
 (define (get-installed-libraries man)
   (libman-libraries man))

@@ -1677,3 +1677,6 @@
 (define feature-flags '(r7rs exact-closed exact-complex ieee-float
 	 full-unicode ratios callcc))
 (define (features) feature-flags)
+
+(define (system . args)
+  (sys:FOREIGN_CALL "SCM_SYSTEM" (apply string-append args)))

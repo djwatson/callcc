@@ -68,10 +68,10 @@
 	    (begin
 	      (hash-table-set! global-fun-labels lam var)
 	      var)
-	    (begin
+	    (let ((label (string-append "S_" (second lam))))
 	      (hash-table-set! global-fun-names (second lam) #t)
-	      (hash-table-set! global-fun-labels lam (second lam))
-	      (second lam))))))
+	      (hash-table-set! global-fun-labels lam label)
+	      label)))))
 ;; (define (fun-to-label lam var)
 ;;   var)
 (define (emit-function fun nlambda var env)
@@ -581,6 +581,8 @@ declare i64 @SCM_EXIT(i64)
 declare i64 @SCM_GET_ENV_VARS()
 declare i64 @SCM_CURRENT_JIFFY()
 declare i64 @SCM_CURRENT_SECOND()
+declare i64 @SCM_SYSTEM(i64)
+
 
 declare void @gc_init ()
 @argcnt = dso_local global i64 0
@@ -598,12 +600,20 @@ attributes #0 = { returns_twice}
 
 "))
 
+(define (get-compile-path)
+  (let ((slash (memq #\/ (reverse (string->list (car (command-line)))))))
+    (if slash (list->string (reverse slash))
+	"./")))
+
 (define (compile file verbose)
   (set! functions '())
-  (let* ((libman (make-libman))
-	 (unused (set! library-search-paths (cons "./lib/srfi2" library-search-paths)))
-	 (runtime-input (with-input-from-file "./lib/runtime2.scm" read-file))
-	 (eval-input (with-input-from-file "./lib/eval.scm" read-file))
+  (let* ((path (get-compile-path))
+	 (libman (make-libman path))
+	 (unused (set! library-search-paths (cons (string-append path "lib/srfi2") library-search-paths)))
+	 (unused (set! library-search-paths (cons (string-append path "lib/headers") library-search-paths)))
+	 (unused (set! library-search-paths (cons (string-append path "lib") library-search-paths)))
+	 (runtime-input (with-input-from-file (string-append path "lib/runtime2.scm") read-file))
+	 (eval-input (with-input-from-file (string-append path "lib/eval.scm") read-file))
 
 	 (pre-input (with-input-from-file file read-file))
 
@@ -679,3 +689,6 @@ attributes #0 = { returns_twice}
 	   (display "}\n"))))
   (for line (reverse! debug-strings)
        (display line) (newline)))
+
+(define (get-link-command output output-file)
+  (format "clang -flto -O3 -g -o ~a ~a ~alibcallcc.a -lm -lgmp -lutf8proc" output-file output (get-compile-path)))
