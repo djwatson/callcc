@@ -1,4 +1,5 @@
 # known bugs:
+  * compile error if multiple callcc running at same time????
 
 # plan
   * mkdir bin/install

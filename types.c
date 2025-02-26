@@ -92,7 +92,8 @@ typedef struct compnum_s {
 typedef struct string_s {
   uint64_t type;
   gc_obj len;
-  char str[];
+  gc_obj bytes;
+  char *strdata;
 } string_s;
 
 typedef struct symbol {
@@ -156,7 +157,7 @@ static uint8_t get_imm_tag(gc_obj obj) { return obj.value & IMMEDIATE_MASK; }
 static uint32_t get_ptr_tag(gc_obj obj) {
   return ((uint64_t *)(obj.value - PTR_TAG))[0];
 }
-/* static bool is_char(gc_obj obj) { return get_imm_tag(obj) == CHAR_TAG; } */
+static bool is_char(gc_obj obj) { return get_imm_tag(obj) == CHAR_TAG; }
 static bool is_cons(gc_obj obj) { return get_tag(obj) == CONS_TAG; }
 static bool is_ptr(gc_obj obj) { return get_tag(obj) == PTR_TAG; }
 static bool is_number(gc_obj obj) {
@@ -166,9 +167,9 @@ static bool is_closure(gc_obj obj) {
   return is_ptr(obj) && get_ptr_tag(obj) == CLOSURE_TAG;
 }
 /* static bool is_literal(gc_obj obj) { return get_tag(obj) == LITERAL_TAG; } */
-/* static bool is_string(gc_obj obj) { */
-/*   return is_ptr(obj) && get_ptr_tag(obj) == STRING_TAG; */
-/* } */
+static bool is_string(gc_obj obj) {
+  return is_ptr(obj) && get_ptr_tag(obj) == STRING_TAG;
+}
 /* static bool is_record(gc_obj obj) { */
 /*   return is_ptr(obj) && get_ptr_tag(obj) == RECORD_TAG; */
 /* } */
@@ -343,13 +344,13 @@ gc_obj SCM_DISPLAY(gc_obj obj, gc_obj scmfd) {
     switch (ptr_tag) {
     case STRING_TAG: {
       auto str = to_string(obj);
-      dprintf(fd, "%.*s", (int)to_fixnum(str->len), str->str);
+      dprintf(fd, "%.*s", (int)to_fixnum(str->len), str->strdata);
       break;
     }
     case SYMBOL_TAG: {
       auto sym = to_symbol(obj);
       auto str = to_string(sym->name);
-      dprintf(fd, "%.*s", (int)to_fixnum(str->len), str->str);
+      dprintf(fd, "%.*s", (int)to_fixnum(str->len), str->strdata);
       break;
     }
     case RECORD_TAG: {
@@ -463,7 +464,7 @@ gc_obj SCM_DISPLAY(gc_obj obj, gc_obj scmfd) {
 NOINLINE gc_obj SCM_LOAD_GLOBAL_FAIL(gc_obj a) {
   auto str = to_string(to_symbol(a)->name);
   printf("Attempting to load undefined sym: %.*s\n", (int)to_fixnum(str->len),
-         str->str);
+         str->strdata);
   abort();
 }
 INLINE gc_obj SCM_LOAD_GLOBAL(gc_obj a) {
@@ -1321,11 +1322,13 @@ INLINE gc_obj SCM_EQV(gc_obj a, gc_obj b) {
 INLINE gc_obj SCM_MAKE_STRING(gc_obj len, gc_obj fill) {
   // Align.
   auto strlen = (to_fixnum(len) + 7) & ~7;
-  string_s *str = rcimmix_alloc(sizeof(string_s) + strlen);
+  string_s *str = rcimmix_alloc(sizeof(string_s));
+  str->strdata = rcimmix_alloc(strlen);
   str->type = STRING_TAG;
   str->len = len;
+  str->bytes = len;
   if (fill.value != FALSE_REP.value) {
-    memset(str->str, to_char(fill), to_fixnum(len));
+    memset(str->strdata, to_char(fill), to_fixnum(len));
   }
   return tag_string(str);
 }
@@ -1337,11 +1340,61 @@ INLINE gc_obj SCM_INTEGER_CHAR(gc_obj i) { return tag_char(to_fixnum(i)); }
 INLINE gc_obj SCM_SYMBOL_STRING(gc_obj sym) { return to_symbol(sym)->name; }
 
 INLINE gc_obj SCM_STRING_REF(gc_obj str, gc_obj pos) {
-  return tag_char(to_string(str)->str[to_fixnum(pos)]);
+#ifndef UNSAFE
+  if (unlikely(!is_string(str))) {
+    abort();
+  }
+  if (unlikely(!is_fixnum(pos))) {
+    abort();
+  }
+#endif
+  auto s = to_string(str);
+  uint64_t i = to_fixnum(pos);
+  #ifndef UNSAFE
+  if (unlikely(i >= (uint64_t)to_fixnum(s->len))) {
+    abort();
+  }
+#endif
+  if (unlikely(s->len.value != s->bytes.value)) {
+    abort();
+  } 
+  return tag_char(s->strdata[i]);
 }
 
-INLINE gc_obj SCM_STRING_SET(gc_obj str, gc_obj pos, gc_obj ch) {
-  to_string(str)->str[to_fixnum(pos)] = to_char(ch);
+gc_obj SCM_STRING_SET_FAST(gc_obj str, gc_obj pos, gc_obj ch) {
+  to_string(str)->strdata[to_fixnum(pos)] = to_char(ch);
+  return UNDEFINED;
+}
+gc_obj SCM_STRING_SET(gc_obj str, gc_obj pos, gc_obj ch) {
+  #ifndef UNSAVE
+  if (unlikely(!is_string(str))) {
+    abort();
+  }
+  if (unlikely(!is_fixnum(pos))) {
+    abort();
+  }
+  if (unlikely(!is_char(ch))) {
+    abort();
+  }
+  #endif
+  auto s = to_string(str);
+  uint64_t i = to_fixnum(pos);
+  uint32_t c = to_char(ch);
+  #ifndef UNSAFE
+  if (unlikely(i >= (uint64_t)to_fixnum(s->len))) {
+    abort();
+  }
+  if (c >= 256) {
+    abort();
+  }
+  #endif
+  if (s->len.value != s->bytes.value) {
+    auto old_data = s->strdata;
+    auto strlen = (to_fixnum(s->len) + 7) & ~7;
+    s->strdata = rcimmix_alloc(strlen);
+    memcpy(s->strdata, old_data, to_fixnum(s->len));
+  }
+  s->strdata[i] = c;
   return UNDEFINED;
 }
 
@@ -1490,8 +1543,7 @@ static uint64_t stringhash(char *str, uint64_t len) {
 
 INLINE gc_obj SCM_STRING_HASH(gc_obj h) {
   auto str = to_string(h);
-  auto hash = stringhash(str->str, to_fixnum(str->len));
-  // auto hash = XXH3_64bits(str->str, to_fixnum(str->len));
+  auto hash = stringhash(str->strdata, to_fixnum(str->len));
   return tag_fixnum((int)hash);
 }
 INLINE gc_obj SCM_STRING_CPY(gc_obj tostr, gc_obj tostart, gc_obj fromstr,
@@ -1501,7 +1553,7 @@ INLINE gc_obj SCM_STRING_CPY(gc_obj tostr, gc_obj tostart, gc_obj fromstr,
   auto start = to_fixnum(tostart);
   auto to = to_string(tostr);
   auto from = to_string(fromstr);
-  memcpy(&to->str[start], &from->str[from_pos], len);
+  memcpy(&to->strdata[start], &from->strdata[from_pos], len);
   return UNDEFINED;
 }
 INLINE gc_obj SCM_AND(gc_obj num, gc_obj mask) {
@@ -1516,7 +1568,7 @@ INLINE gc_obj SCM_AND(gc_obj num, gc_obj mask) {
 INLINE gc_obj SCM_OPEN_FD(gc_obj filename, gc_obj input) {
   auto str = to_string(filename);
   char name[256];
-  memcpy(name, str->str, to_fixnum(str->len));
+  memcpy(name, str->strdata, to_fixnum(str->len));
   assert(to_fixnum(str->len) < 255);
   name[to_fixnum(str->len)] = '\0';
   auto readonly = input.value == TRUE_REP.value;
@@ -1527,7 +1579,7 @@ INLINE gc_obj SCM_OPEN_FD(gc_obj filename, gc_obj input) {
 INLINE gc_obj SCM_READ_FD(gc_obj scmfd, gc_obj scmbuf) {
   auto buf = to_string(scmbuf);
   int fd = (int)to_fixnum(scmfd);
-  auto res = read(fd, buf->str, to_fixnum(buf->len));
+  auto res = read(fd, buf->strdata, to_fixnum(buf->len));
   if (res < 0) {
     printf("SCM_READ_FD error: %li\n", res);
     exit(-1);
@@ -1539,7 +1591,7 @@ INLINE gc_obj SCM_WRITE_FD(gc_obj scmfd, gc_obj scmlen, gc_obj scmbuf) {
   int fd = (int)to_fixnum(scmfd);
   auto len = to_fixnum(scmlen);
   auto buf = to_string(scmbuf);
-  auto res = write(fd, buf->str, len);
+  auto res = write(fd, buf->strdata, len);
   if (res != len) {
     printf("Could not write %li bytes to fd %i\n", len, fd);
     exit(-1);
@@ -1563,7 +1615,7 @@ INLINE gc_obj SCM_CLOSE_FD(gc_obj fd) {
 INLINE gc_obj SCM_FILE_EXISTS(gc_obj scmname) {
   auto str = to_string(scmname);
   char name[256];
-  memcpy(name, str->str, to_fixnum(str->len));
+  memcpy(name, str->strdata, to_fixnum(str->len));
   assert(to_fixnum(str->len) < 255);
   name[to_fixnum(str->len)] = '\0';
   auto res = access(name, F_OK);
@@ -1576,7 +1628,7 @@ INLINE gc_obj SCM_FILE_EXISTS(gc_obj scmname) {
 INLINE gc_obj SCM_DELETE_FILE(gc_obj scmname) {
   auto str = to_string(scmname);
   char name[256];
-  memcpy(name, str->str, to_fixnum(str->len));
+  memcpy(name, str->strdata, to_fixnum(str->len));
   assert(to_fixnum(str->len) < 255);
   name[to_fixnum(str->len)] = '\0';
   return tag_fixnum(unlink(name));
@@ -1588,9 +1640,11 @@ gc_obj SCM_BIGNUM_STR(gc_obj b) {
   auto len = mpz_sizeinbase(bignum->x, 10) + 2;
   // Align.
   len = (len + 7) & ~7;
-  string_s *str = rcimmix_alloc(sizeof(string_s) + len);
-  mpz_get_str(str->str, 10, bignum->x);
-  str->len = tag_fixnum(strlen(str->str));
+  string_s *str = rcimmix_alloc(sizeof(string_s));
+  str->strdata = rcimmix_alloc(len);
+  mpz_get_str(str->strdata, 10, bignum->x);
+  str->len = tag_fixnum(strlen(str->strdata));
+  str->bytes = tag_fixnum(strlen(str->strdata));
   str->type = STRING_TAG;
   return tag_string(str);
 }
@@ -1602,9 +1656,11 @@ gc_obj SCM_RATNUM_STR(gc_obj b) {
              mpz_sizeinbase(mpq_denref(ratnum->x), 10) + 3;
   // Align.
   len = (len + 7) & ~7;
-  string_s *str = rcimmix_alloc(sizeof(string_s) + len);
-  mpq_get_str(str->str, 10, ratnum->x);
-  str->len = tag_fixnum(strlen(str->str));
+  string_s *str = rcimmix_alloc(sizeof(string_s));
+  str->strdata =rcimmix_alloc(len);
+  mpq_get_str(str->strdata, 10, ratnum->x);
+  str->len = tag_fixnum(strlen(str->strdata));
+  str->bytes = tag_fixnum(strlen(str->strdata));
   str->type = STRING_TAG;
   return tag_string(str);
 }
@@ -1617,17 +1673,19 @@ gc_obj SCM_BIGNUM_SQRT(gc_obj b) {
 }
 
 gc_obj SCM_FLONUM_STR(gc_obj b) {
-  string_s *str = rcimmix_alloc(sizeof(string_s) + 40);
+  string_s *str = rcimmix_alloc(sizeof(string_s));
+  str->strdata = rcimmix_alloc(40);
   str->type = STRING_TAG;
   double d = to_double(b);
-  snprintf(str->str, 40 - 3, "%g", d);
-  if (strpbrk(str->str, ".eE") == nullptr) {
-    size_t len = strlen(str->str);
-    str->str[len] = '.';
-    str->str[len + 1] = '0';
-    str->str[len + 2] = '\0';
+  snprintf(str->strdata, 40 - 3, "%g", d);
+  if (strpbrk(str->strdata, ".eE") == nullptr) {
+    size_t len = strlen(str->strdata);
+    str->strdata[len] = '.';
+    str->strdata[len + 1] = '0';
+    str->strdata[len + 2] = '\0';
   }
-  str->len = tag_fixnum(strlen(str->str));
+  str->len = tag_fixnum(strlen(str->strdata));
+  str->bytes = tag_fixnum(strlen(str->strdata));
 
   return tag_string(str);
 }
@@ -1650,7 +1708,7 @@ static gc_obj from_c_str(char *str) {
   auto len = strlen(str);
   gc_obj res = SCM_MAKE_STRING(tag_fixnum(len), FALSE_REP);
 
-  memcpy(to_string(res)->str, str, len);
+  memcpy(to_string(res)->strdata, str, len);
   return res;
 }
 
@@ -1674,7 +1732,7 @@ gc_obj SCM_GET_ENV_VARS() {
       gc_obj var = SCM_MAKE_STRING(tag_fixnum(len), FALSE_REP);
       string_s *s = to_string(var);
       for (int64_t i = 0; i < len; i++) {
-        s->str[i] = (*p)[i];
+        s->strdata[i] = (*p)[i];
       }
 
       gc_obj val = from_c_str(split + 1);
@@ -1708,7 +1766,7 @@ gc_obj SCM_SYSTEM(gc_obj strn) {
   auto align_len = (len + 1 + 7) & ~7;
   char *tmp = rcimmix_alloc(align_len);
   tmp[len] = '\0';
-  strncpy(tmp, str->str, len);
+  strncpy(tmp, str->strdata, len);
   int res = system(tmp);
   return tag_fixnum(res);
 }

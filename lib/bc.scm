@@ -448,10 +448,12 @@
    ((null? c) nil-tag)
    ((string? c)
     (let ((id (next-id)))
-      (push! consts (format "@str~a = private unnamed_addr constant {i64, i64, [~a x i8]} {i64 ~a, i64 ~a, [~a x i8] c\"~a\"}, align 8\n"
-			    id (string-length c) string-tag (* 8 (string-length c)) (string-length c) (fix-string-format c) ))
-      (format "add (i64 ~a, i64 ptrtoint ({i64, i64, [~a x i8]}* @str~a to i64))"
-	      ptr-tag (string-length c) id)))
+      (push! consts (format "@strdata~a = private unnamed_addr constant [~a x i8] c\"~a\""
+			    id (string-length c) (fix-string-format c)))
+      (push! consts (format "@str~a = private unnamed_addr constant {i64, i64, i64, ptr} {i64 ~a, i64 ~a, i64 ~a, ptr @strdata~a}, align 8\n"
+			    id  string-tag (* 8 (string-length c)) (* 8 (string-length c))  id ))
+      (format "add (i64 ~a, i64 ptrtoint ({i64, i64, ptr}* @str~a to i64))"
+	      ptr-tag  id)))
    ((and (pair? c) (eq? '$label (car c)))
     (abort 'const-label)
     (let ((fun (list-ref functions (cdr c))))
@@ -540,6 +542,7 @@ declare i64 @SCM_INTEGER_CHAR(i64)
 declare i64 @SCM_SYMBOL_STRING(i64)
 declare i64 @SCM_MAKE_SYMBOL(i64)
 declare i64 @SCM_STRING_SET(i64,i64,i64)
+declare i64 @SCM_STRING_SET_FAST(i64,i64,i64)
 declare i64 @SCM_STRING_REF(i64,i64)
 declare i64 @SCM_EXACT(i64)
 declare i64 @SCM_INEXACT(i64)

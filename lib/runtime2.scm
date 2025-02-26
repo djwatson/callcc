@@ -1589,7 +1589,7 @@
    ((ch port)
     (when (>= (port-pos port) (port-len port))
       ((port-fillflush port) port))
-    (string-set! (port-buf port) (port-pos port) ch)
+    (sys:FOREIGN_CALL "SCM_STRING_SET_FAST" (port-buf port) (port-pos port) ch)
     (port-pos-set! port (+ 1 (port-pos port)))
     (when (eq? #\newline ch)
       ((port-fillflush port) port)))))
