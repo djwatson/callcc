@@ -402,21 +402,6 @@
   (and (number? c) (exact? c) (integer? c)  (real? c)
        (< (abs c) #x1fffffffffffffff)))
 
-(define (fix-string-format str) ;; some extra work since we have no char-type.
-  (define (str-ref-int str pos) (char->integer (string-ref str pos)))
-  (define (esc-char hex1 hex2 rest)
-    (cons (integer->char 92) 
-          (cons (integer->char hex1) (cons (integer->char hex2) rest))))
-  (define (fix-str-format str pos end)
-    (cond ((= pos end) '())
-          ((eq? (str-ref-int str pos) 34) 
-           (esc-char 50 50 (fix-str-format str (+ pos 1) end)))
-          ((eq? (str-ref-int str pos) 92)
-           (esc-char 53 67 (fix-str-format str (+ pos 1) end)))
-          (else (cons (string-ref str pos) 
-                      (fix-str-format str (+ pos 1) end)))))
-  (list->string (fix-str-format str 0 (string-length str))))
-
 (define (add-const c)
   (cond
    ((symbol? c)
@@ -447,11 +432,14 @@
     (if c true-rep false-rep))
    ((null? c) nil-tag)
    ((string? c)
-    (let ((id (next-id)))
-      (push! consts (format "@strdata~a = private unnamed_addr constant [~a x i8] c\"~a\""
-			    id (string-length c) (fix-string-format c)))
+    (let* ((id (next-id))
+	  (bv (string->utf8 c))
+	  (bytes (bytevector-length bv))
+	  (len (string-length c)))
+      (push! consts (format "@strdata~a = private unnamed_addr constant [~a x i8] [~a]"
+			    id bytes (join ", " (omap num (bytevector->list bv) (format "i8 ~a" num)))))
       (push! consts (format "@str~a = private unnamed_addr constant {i64, i64, i64, ptr} {i64 ~a, i64 ~a, i64 ~a, ptr @strdata~a}, align 8\n"
-			    id  string-tag (* 8 (string-length c)) (* 8 (string-length c))  id ))
+			    id  string-tag (* 8 len) (* 8 bytes)  id ))
       (format "add (i64 ~a, i64 ptrtoint ({i64, i64, ptr}* @str~a to i64))"
 	      ptr-tag  id)))
    ((and (pair? c) (eq? '$label (car c)))

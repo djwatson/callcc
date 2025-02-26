@@ -78,3 +78,7 @@
       (set! n (+ n 1))
       (string->symbol
        (string-append "GENSYM-" (symbol->string a) "-" (number->string n))))))
+
+(define (bytevector->list bv)
+  (do ((i 0 (+ i 1)) (lst '() (cons (bytevector-u8-ref bv i) lst)))
+      ((= i (bytevector-length bv)) (reverse lst))))
