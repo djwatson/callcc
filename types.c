@@ -31,7 +31,7 @@
   X(RECORD, 0xa)                                                               \
   X(CLOSURE, 0x12)                                                             \
   X(SYMBOL, 0x1a)                                                              \
-  X(CONT, 0x22)                                                                \
+  X(BYTEVECTOR, 0x22)							       \
   X(NUMBER, 0x2a)                                                              \
   X(FLONUM, 0x2a)                                                              \
   X(BIGNUM, 0x12a)                                                             \
@@ -110,6 +110,12 @@ typedef struct vector_s {
   gc_obj v[];
 } vector_s;
 
+typedef struct bytevector_s {
+  uint64_t type;
+  gc_obj len;
+  uint8_t v[];
+} bytevector_s;
+
 typedef struct record_s {
   uint64_t type;
   gc_obj v[];
@@ -151,6 +157,9 @@ static record_s *to_record(gc_obj obj) {
 }
 static closure_s *to_closure(gc_obj obj) {
   return (closure_s *)(obj.value - PTR_TAG);
+}
+static bytevector_s *to_bytevector(gc_obj obj) {
+  return (bytevector_s *)(obj.value - PTR_TAG);
 }
 static uint32_t to_char(gc_obj obj) { return (uint32_t)(obj.value >> 8); }
 
@@ -204,9 +213,9 @@ static gc_obj tag_cons(cons_s *s) {
 static gc_obj tag_vector(vector_s *s) {
   return (gc_obj){.value = ((int64_t)s + VECTOR_TAG)};
 }
-/* static gc_obj tag_cont(closure_s *s) { */
-/*   return (gc_obj){.value = ((int64_t)s + PTR_TAG)}; */
-/* } */
+static gc_obj tag_bytevector(bytevector_s *s) {
+  return (gc_obj){.value = ((int64_t)s + BYTEVECTOR_TAG)};
+}
 static gc_obj tag_closure(closure_s *s) {
   return (gc_obj){.value = ((int64_t)s + PTR_TAG)};
 }
@@ -363,10 +372,6 @@ gc_obj SCM_DISPLAY(gc_obj obj, gc_obj scmfd) {
       dprintf(fd, "#<closure>");
       break;
     }
-    case CONT_TAG: {
-      dprintf(fd, "#<cont>");
-      break;
-    }
     case FLONUM_TAG: {
       display_double(obj, fd);
       break;
@@ -389,6 +394,18 @@ gc_obj SCM_DISPLAY(gc_obj obj, gc_obj scmfd) {
       dprintf(fd, "+");
       SCM_DISPLAY(c->imag, scmfd);
       dprintf(fd, "i");
+      break;
+    }
+    case BYTEVECTOR_TAG: {
+      dprintf(fd, "#u8(");
+      auto bv = to_bytevector(obj);
+      for(int64_t i = 0; i < to_fixnum(bv->len); i++) {
+	if (i != 0) {
+	  dprintf(fd, " ");
+	}
+	dprintf(fd, "%i", bv->v[i]);
+      }
+      dprintf(fd, ")");
       break;
     }
     default:
@@ -1604,7 +1621,7 @@ gc_obj SCM_STRING_CPY(gc_obj tostr, gc_obj tostart, gc_obj fromstr,
   if (from->bytes.value != from->len.value ||
       to->bytes.value != to->len.value) {
     // UTF8.  Re-calculate fromstart/fromend ... slowly.
-    uint64_t pos = 0;
+    int64_t pos = 0;
     uint64_t bytepos = 0;
     int32_t codepoint;
     while(pos < to_fixnum(fromend)) {
@@ -1883,11 +1900,60 @@ gc_obj SCM_SYSTEM(gc_obj strn) {
 gc_obj SCM_STRING_UTF8(gc_obj str) {
   auto s = to_string(str);
   auto bytes_aligned = (to_fixnum(s->bytes) + 7) & ~7;
-  string_s* utf8 = rcimmix_alloc(sizeof(string_s));
-  utf8->type = STRING_TAG;
-  utf8->strdata = rcimmix_alloc(bytes_aligned);
+  bytevector_s* utf8 = rcimmix_alloc(sizeof(bytevector_s) + bytes_aligned);
+  utf8->type = BYTEVECTOR_TAG;
   utf8->len = s->bytes;
-  utf8->bytes = s->bytes;
-  memcpy(utf8->strdata, s->strdata, to_fixnum(s->bytes));
-  return tag_string(utf8);
+  memcpy(utf8->v, s->strdata, to_fixnum(s->bytes));
+  return tag_bytevector(utf8);
+}
+
+static uint32_t count_utf8(uint8_t* data, uint32_t bytes) {
+  uint32_t bytepos = 0;
+  int32_t codepoint;
+  uint32_t chars = 0;
+  while(bytepos < bytes) {
+    auto res = utf8proc_iterate(&data[bytepos], bytes, &codepoint);
+    if (res < 0) {
+      abort();
+    }
+    chars++;
+    bytepos += res;
+  }
+  if (bytepos != bytes) {
+    abort();
+  }
+  return chars;
+}
+
+gc_obj SCM_UTF8_STRING(gc_obj scm_bv) {
+  auto bv = to_bytevector(scm_bv);
+  auto bytes_aligned = (to_fixnum(bv->len) + 7) & ~7;
+  string_s* str = rcimmix_alloc(sizeof(string_s));
+  str->type = STRING_TAG;
+  str->bytes = bv->len;
+  str->strdata = rcimmix_alloc(bytes_aligned);
+  memcpy(str->strdata, bv->v, to_fixnum(bv->len));
+  str->len = tag_fixnum(count_utf8(bv->v, to_fixnum(bv->len)));
+  return tag_string(str);
+}
+
+gc_obj SCM_BYTEVECTOR_REF(gc_obj scm_bv, gc_obj idx) {
+  return tag_fixnum(to_bytevector(scm_bv)->v[to_fixnum(idx)]);
+}
+gc_obj SCM_BYTEVECTOR_SET(gc_obj bv, gc_obj idx, gc_obj val) {
+  to_bytevector(bv)->v[to_fixnum(idx)] = to_fixnum(val);
+  return UNDEFINED;
+}
+gc_obj SCM_BYTEVECTOR_LENGTH(gc_obj scm_bv) {
+  auto bv = to_bytevector(scm_bv);
+  return bv->len;
+}
+gc_obj SCM_MAKE_BYTEVECTOR(gc_obj scm_len, gc_obj init) {
+  auto len = to_fixnum(scm_len);
+  auto len_aligned = (len + 7) & ~7;
+  bytevector_s* bv = rcimmix_alloc(sizeof(bytevector_s) + len_aligned);
+  bv->type = BYTEVECTOR_TAG;
+  bv->len = scm_len;
+  memset(bv->v, (uint8_t)to_fixnum(init), len);
+  return tag_bytevector(bv);
 }

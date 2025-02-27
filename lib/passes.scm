@@ -199,6 +199,7 @@ TODO: boxes could be passed down through funcs
 		 (symbol? . ,symbol-tag)
 		 (procedure? . ,closure-tag)
 		 (vector? . ,vector-tag)
+		 (bytevector? . ,bytevector-tag)
 		 (string? . ,string-tag)
 		 (fixnum? . ,fixnum-tag)))
 (define-pass integrate-r5rs

@@ -9,12 +9,13 @@
 	* read syntax
 	  * read/write shared structure
 	* numeric syntax
+	
 	* exceptions
 	* environments/eval
   * install - fix dirs
 
 	 
-# full r7rs
+# full r7rs / safety / tests
   * unicode
   * r7rs test
   * argtype stress test
@@ -23,34 +24,30 @@
   * port tests
   * unicode-tests
   * copyish tests
+  * gset check
   
-# benchmarks:
+# CLEANUP
+
+* figure out strategy for intrinsics????
+* cleanup runtime - move as much to scm as possible
+
+# benchmarks / perf improvements:
   * Needs inliner to remove alloc: graphs
+    * simple called-once: Do it based on libraries?
   * faster with float type: fft fibfp mbrot pnpoly simplex sumfp
   * faster with list/int typecheck removal: quicksort primes puzzle array1
   * faster with single-shot continuations: ctak fibc
+  * storage use analysis: unboxing flonums, longjmp/setjmp call/cc, and typecheck removal.
+    * call/cc can just be a simple escape analysis? global though
   
   * stack size check: earley, divrec
-
-# OTHER
-
-* storage use analysis: unboxing flonums, longjmp/setjmp call/cc, and typecheck removal.
-   * call/cc can just be a simple escape analysis? global though
-
-* auto-listify globals: consargs stub in compiler called a lot: 
-  * vector. Hand-coded in chez
-  
-* figure out strategy for intrinsics????
-* cleanup runtime
-* inliner?? graphs is slow without
-  * can be simple called-once??? check graphs
-
-* gc fd's.
-* gset check
-
-* recheck GC get stack top
+  * auto-listify globals: consargs stub in compiler called a lot: 
+    * vector. Hand-coded in chez
 
 # GC stuff:
+* recheck GC get stack top
+
+* gc fd's.
 * cleanup vector sizing: just use another header for large similar to small logbits?
   * large could always use markbits, but it doesn't show up in any tests currently.
 * And do same thing for static symbols?

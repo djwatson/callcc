@@ -470,6 +470,16 @@
 			    id a b))
       (format "add (i64 ~a, i64 ptrtoint ({i64, i64}* @cons~a to i64))"
 	      cons-tag id)))
+   ((bytevector? c)
+    (let* ((vals (omap val (bytevector->list c) (format "i8 ~a" val)))
+	   (len (bytevector-length c))
+	   (val-str (join ", "  vals))
+	   (id (next-id)))
+      (push! consts (format "@bvec~a = private unnamed_addr constant {i64, i64, [~a x i8]} {i64 ~a, i64 ~a, [~a x i8] [~a]}, align 8\n"
+			    id len bytevector-tag (* 8 len) len val-str ))
+      (format "add (i64 ~a, i64 ptrtoint (ptr @bvec~a to i64))"
+	      ptr-tag id))
+    )
    (else (display (format "WARNING: Unknown Const: ~a\n" c) (current-error-port))
 	 0)))
 
@@ -574,6 +584,11 @@ declare i64 @SCM_CURRENT_JIFFY()
 declare i64 @SCM_CURRENT_SECOND()
 declare i64 @SCM_SYSTEM(i64)
 declare i64 @SCM_STRING_UTF8(i64)
+declare i64 @SCM_UTF8_STRING(i64)
+declare i64 @SCM_BYTEVECTOR_LENGTH(i64)
+declare i64 @SCM_BYTEVECTOR_REF(i64, i64)
+declare i64 @SCM_BYTEVECTOR_SET(i64, i64, i64)
+declare i64 @SCM_MAKE_BYTEVECTOR(i64, i64)
 
 
 declare void @gc_init ()
