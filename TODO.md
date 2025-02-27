@@ -2,17 +2,16 @@
   * compile error if multiple callcc running at same time????
 
 # plan
-  * mkdir bin/install
-  * system(), get full compile working with driver
-  * run full benchmarks before unicode testing.
   * get r7rs-tests working
-    * unicode
 	* bytevectors
+    * unicode in/out
 	* input/output
 	* read syntax
+	  * read/write shared structure
 	* numeric syntax
 	* exceptions
 	* environments/eval
+  * install - fix dirs
 
 	 
 # full r7rs
@@ -41,9 +40,6 @@
 * auto-listify globals: consargs stub in compiler called a lot: 
   * vector. Hand-coded in chez
   
-* cpstak:
-  * argcnt needs a register, ugh.  Too slow otherwise.
-
 * figure out strategy for intrinsics????
 * cleanup runtime
 * inliner?? graphs is slow without
@@ -63,10 +59,13 @@
 
 
 
-
+----------------------------------------
 
 
 # PROBABLY NEVER:	 
+
+* cpstak:
+  * argcnt needs a register somehow?
 
 * fast globals, a.la chez
 

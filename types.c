@@ -235,7 +235,7 @@ static bool is_flonum(gc_obj obj) {
   return is_flonum_fast(obj) || (is_ptr(obj) && get_ptr_tag(obj) == FLONUM_TAG);
 }
 
-INLINE gc_obj SCM_IS_FLONUM_SLOW(gc_obj obj) {
+gc_obj SCM_IS_FLONUM_SLOW(gc_obj obj) {
   if (is_flonum(obj)) {
     return TRUE_REP;
   }
@@ -561,13 +561,10 @@ gc_obj SCM_MAKE_RECTANGULAR(gc_obj real, gc_obj imag) {
   return tag_ptr(r);
 }
 
-INLINE gc_obj SCM_EXACT(gc_obj flo) {
+gc_obj SCM_EXACT(gc_obj flo) {
   if (is_compnum(flo)) {
     auto c = to_compnum(flo);
     return SCM_MAKE_RECTANGULAR(SCM_EXACT(c->real), SCM_EXACT(c->imag));
-  }
-  if (is_compnum(flo)) {
-    abort();
   }
   if (!is_flonum(flo)) {
     return flo;
@@ -1323,7 +1320,7 @@ INLINE gc_obj SCM_EQV(gc_obj a, gc_obj b) {
   return FALSE_REP;
 }
 
-INLINE gc_obj SCM_MAKE_STRING(gc_obj len, gc_obj fill) {
+gc_obj SCM_MAKE_STRING(gc_obj len, gc_obj fill) {
   // Align.
   auto strlen = (to_fixnum(len) + 7) & ~7;
   string_s *str = rcimmix_alloc(sizeof(string_s));
@@ -1485,42 +1482,42 @@ extern gc_obj symbol_table;
 INLINE gc_obj SCM_GET_SYM_TABLE() { return symbol_table; }
 
 ///////math
-INLINE gc_obj SCM_SIN(gc_obj f) {
+gc_obj SCM_SIN(gc_obj f) {
   double d = to_double(f);
   return double_to_gc_slow(sin(d));
 }
 
-INLINE gc_obj SCM_COS(gc_obj f) {
+gc_obj SCM_COS(gc_obj f) {
   double d = to_double(f);
   return double_to_gc_slow(cos(d));
 }
 
-INLINE gc_obj SCM_ASIN(gc_obj f) {
+gc_obj SCM_ASIN(gc_obj f) {
   double d = to_double(f);
   return double_to_gc_slow(asin(d));
 }
 
-INLINE gc_obj SCM_ACOS(gc_obj f) {
+gc_obj SCM_ACOS(gc_obj f) {
   double d = to_double(f);
   return double_to_gc_slow(acos(d));
 }
 
-INLINE gc_obj SCM_TAN(gc_obj f) {
+gc_obj SCM_TAN(gc_obj f) {
   double d = to_double(f);
   return double_to_gc_slow(tan(d));
 }
 
-INLINE gc_obj SCM_ATAN(gc_obj f) {
+gc_obj SCM_ATAN(gc_obj f) {
   double d = to_double(f);
   return double_to_gc_slow(atan(d));
 }
 
-INLINE gc_obj SCM_SQRT(gc_obj f) {
+gc_obj SCM_SQRT(gc_obj f) {
   double d = to_double(f);
   return double_to_gc_slow(sqrt(d));
 }
 
-INLINE gc_obj SCM_ROUND(gc_obj f) {
+gc_obj SCM_ROUND(gc_obj f) {
   auto x = to_double(f);
   double rounded = round(x);
   if (fabs(x - rounded) == 0.5) {
@@ -1531,22 +1528,22 @@ INLINE gc_obj SCM_ROUND(gc_obj f) {
   return double_to_gc_slow(rounded);
 }
 
-INLINE gc_obj SCM_FLOOR(gc_obj f) {
+gc_obj SCM_FLOOR(gc_obj f) {
   double d = to_double(f);
   return double_to_gc_slow(floor(d));
 }
 
-INLINE gc_obj SCM_CEILING(gc_obj f) {
+gc_obj SCM_CEILING(gc_obj f) {
   double d = to_double(f);
   return double_to_gc_slow(ceil(d));
 }
 
-INLINE gc_obj SCM_EXP(gc_obj f) {
+gc_obj SCM_EXP(gc_obj f) {
   double d = to_double(f);
   return double_to_gc_slow(exp(d));
 }
 
-INLINE gc_obj SCM_LOG(gc_obj f) {
+gc_obj SCM_LOG(gc_obj f) {
   double d = to_double(f);
   return double_to_gc_slow(log(d));
 }
@@ -1672,7 +1669,7 @@ INLINE gc_obj SCM_AND(gc_obj num, gc_obj mask) {
 #include <fcntl.h>
 #include <unistd.h>
 
-INLINE gc_obj SCM_OPEN_FD(gc_obj filename, gc_obj input) {
+gc_obj SCM_OPEN_FD(gc_obj filename, gc_obj input) {
   auto str = to_string(filename);
   char name[256];
   memcpy(name, str->strdata, to_fixnum(str->bytes));
@@ -1684,7 +1681,7 @@ INLINE gc_obj SCM_OPEN_FD(gc_obj filename, gc_obj input) {
 }
 
 // TODO: update for utf8
-INLINE gc_obj SCM_READ_FD(gc_obj scmfd, gc_obj scmbuf) {
+gc_obj SCM_READ_FD(gc_obj scmfd, gc_obj scmbuf) {
   auto buf = to_string(scmbuf);
   int fd = (int)to_fixnum(scmfd);
   auto res = read(fd, buf->strdata, to_fixnum(buf->bytes));
@@ -1696,7 +1693,7 @@ INLINE gc_obj SCM_READ_FD(gc_obj scmfd, gc_obj scmbuf) {
 }
 
 // TODO: update for utf8
-INLINE gc_obj SCM_WRITE_FD(gc_obj scmfd, gc_obj scmlen, gc_obj scmbuf) {
+gc_obj SCM_WRITE_FD(gc_obj scmfd, gc_obj scmlen, gc_obj scmbuf) {
   int fd = (int)to_fixnum(scmfd);
   auto len = to_fixnum(scmlen);
   auto buf = to_string(scmbuf);
@@ -1710,7 +1707,7 @@ INLINE gc_obj SCM_WRITE_FD(gc_obj scmfd, gc_obj scmlen, gc_obj scmbuf) {
 
 #include <errno.h>
 
-INLINE gc_obj SCM_CLOSE_FD(gc_obj fd) {
+gc_obj SCM_CLOSE_FD(gc_obj fd) {
   auto res = close((int)to_fixnum(fd));
   if (res != 0) {
     printf("Error closing fd %li, res %i, errno %i\n", to_fixnum(fd), res,
@@ -1721,7 +1718,7 @@ INLINE gc_obj SCM_CLOSE_FD(gc_obj fd) {
   return tag_fixnum(res);
 }
 
-INLINE gc_obj SCM_FILE_EXISTS(gc_obj scmname) {
+gc_obj SCM_FILE_EXISTS(gc_obj scmname) {
   auto str = to_string(scmname);
   char name[256];
   memcpy(name, str->strdata, to_fixnum(str->bytes));
@@ -1734,7 +1731,7 @@ INLINE gc_obj SCM_FILE_EXISTS(gc_obj scmname) {
   return FALSE_REP;
 }
 
-INLINE gc_obj SCM_DELETE_FILE(gc_obj scmname) {
+gc_obj SCM_DELETE_FILE(gc_obj scmname) {
   auto str = to_string(scmname);
   char name[256];
   memcpy(name, str->strdata, to_fixnum(str->bytes));
