@@ -1684,3 +1684,9 @@
 
 (define (system . args)
   (sys:FOREIGN_CALL "SCM_SYSTEM" (apply string-append args)))
+
+;; utf8
+(define (string->utf8 str)
+  (sys:FOREIGN_CALL "SCM_STRING_UTF8" str))
+(define (bytevector-u8-ref bv i) (char->integer (string-ref bv i)))
+(define (bytevector-length bv) (string-length bv))

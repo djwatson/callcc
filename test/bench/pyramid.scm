@@ -1,4 +1,8 @@
 ;;---------------------------------------------------------------------------
+(import (scheme r5rs))
+(define (println x) (display x) (newline))
+(define pp println)
+(define print println)
 ;;
 ;;  Copyright (c) 2015, Baptiste Saleil. All rights reserved.
 ;;
@@ -29,7 +33,6 @@
 
 ;;; Pyramid
 
-(define (println x) (display x) (newline))
 (define (print-pyramid base)
 
   (define (str-triangles n)
@@ -37,12 +40,10 @@
     (define (fill-str-triangles str pos)
     (if (>= pos (string-length str))
       str
-      (begin (string-set! str (+ pos 0) (integer->char 226))
-             (string-set! str (+ pos 1) (integer->char 150))
-             (string-set! str (+ pos 2) (integer->char 179))
-             (fill-str-triangles str (+ pos 3)))))
+      (begin (string-set! str pos #\△)
+             (fill-str-triangles str (+ 1 pos)))))
 
-    (let ((str (make-string (* n 3))))
+    (let ((str (make-string n)))
       (fill-str-triangles str 0)))
 
   (define (line n)

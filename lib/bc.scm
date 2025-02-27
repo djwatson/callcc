@@ -573,6 +573,7 @@ declare i64 @SCM_GET_ENV_VARS()
 declare i64 @SCM_CURRENT_JIFFY()
 declare i64 @SCM_CURRENT_SECOND()
 declare i64 @SCM_SYSTEM(i64)
+declare i64 @SCM_STRING_UTF8(i64)
 
 
 declare void @gc_init ()

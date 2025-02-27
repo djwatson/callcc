@@ -1342,6 +1342,8 @@ INLINE gc_obj SCM_MAKE_STRING(gc_obj len, gc_obj fill) {
 	memcpy(&str->strdata[i], buf, bytecnt);
       }
     }
+  } else {
+    memset(str->strdata, 0, bytecnt * to_fixnum(len));
   }
   return tag_string(str);
 }
@@ -1412,6 +1414,7 @@ gc_obj SCM_STRING_SET(gc_obj str, gc_obj pos, gc_obj scm_ch) {
   if (unlikely(s->len.value != s->bytes.value || c >= 128)) {
     uint8_t buf[4];
     auto bytecnt = utf8proc_encode_char(c, buf);
+    assert(bytecnt != 0);
     
     int32_t codepoint;
     uint32_t bytepos = 0;
@@ -1431,10 +1434,10 @@ gc_obj SCM_STRING_SET(gc_obj str, gc_obj pos, gc_obj scm_ch) {
       auto new_bytes = to_fixnum(s->bytes) + bytecnt - res;
       auto new_bytes_aligned = (new_bytes + 7) & ~7;
       s->strdata = rcimmix_alloc(new_bytes_aligned);
-      s->bytes = tag_fixnum(new_bytes);
       memcpy(s->strdata, old_data, bytepos);
       memcpy(&s->strdata[bytepos], buf, bytecnt);
-      memcpy(&s->strdata[bytepos + bytecnt], buf + res, to_fixnum(s->bytes) - bytepos - res);
+      memcpy(&s->strdata[bytepos + bytecnt], &old_data[bytepos + res], to_fixnum(s->bytes) - bytepos - res);
+      s->bytes = tag_fixnum(new_bytes);
       return UNDEFINED;
     }
     memcpy(&s->strdata[bytepos], buf, bytecnt);
@@ -1592,14 +1595,71 @@ INLINE gc_obj SCM_STRING_HASH(gc_obj h) {
   auto hash = stringhash(str->strdata, to_fixnum(str->bytes));
   return tag_fixnum((int)hash);
 }
-// TODO: Fixme for utf8
-INLINE gc_obj SCM_STRING_CPY(gc_obj tostr, gc_obj tostart, gc_obj fromstr,
+
+gc_obj SCM_STRING_CPY(gc_obj tostr, gc_obj tostart, gc_obj fromstr,
                              gc_obj fromstart, gc_obj fromend) {
-  auto from_pos = to_fixnum(fromstart);
-  auto len = to_fixnum(fromend) - from_pos;
-  auto start = to_fixnum(tostart);
   auto to = to_string(tostr);
   auto from = to_string(fromstr);
+  
+  auto from_pos = to_fixnum(fromstart);
+  auto len = to_fixnum(fromend) - from_pos;
+  // If either string  is non-ascii, run slowpath.
+  if (from->bytes.value != from->len.value ||
+      to->bytes.value != to->len.value) {
+    // UTF8.  Re-calculate fromstart/fromend ... slowly.
+    uint64_t pos = 0;
+    uint64_t bytepos = 0;
+    int32_t codepoint;
+    while(pos < to_fixnum(fromend)) {
+      if (pos == to_fixnum(fromstart)) {
+	from_pos = bytepos;
+      }
+      auto res = utf8proc_iterate((const unsigned char*)&from->strdata[bytepos], to_fixnum(from->bytes), &codepoint);
+      if (res < 0) {
+	abort();
+      }
+      pos++;
+      bytepos += res;
+    }
+    len = bytepos - from_pos;
+    // Conservatively allocate a large new string
+    auto new_bytes = to_fixnum(to->bytes) + len;
+    auto new_bytes_aligned = (new_bytes + 7) & ~7;
+    auto new_strdata = rcimmix_alloc(new_bytes_aligned);
+    // Now iterate dst string, copying to new.
+    pos = 0;
+    bytepos = 0;
+    while(pos < to_fixnum(tostart)) {
+      auto res = utf8proc_iterate((const unsigned char*)&to->strdata[bytepos], to_fixnum(to->bytes), &codepoint);
+      if (res < 0) {
+	abort();
+      }
+      pos ++;
+      bytepos+= res;
+    }
+    // Ok, we are at the start.  Copy in old start
+    memcpy(new_strdata, to->strdata, bytepos);
+    // Copy in new data.
+    memcpy(&new_strdata[bytepos], &from->strdata[from_pos], len);
+    auto newend = bytepos + len;
+    // Advance past dst
+    auto len_in_chars = to_fixnum(fromend) - to_fixnum(fromstart);
+    while(pos < (to_fixnum(tostart) + len_in_chars)) {
+      auto res = utf8proc_iterate((const unsigned char*)&to->strdata[bytepos], to_fixnum(to->bytes), &codepoint);
+      if (res < 0) {
+	abort();
+      }
+      pos ++;
+      bytepos+= res;
+    }
+    // Now copy in the tail.
+    memcpy(&new_strdata[newend], &to->strdata[bytepos], to_fixnum(to->bytes) - bytepos);
+    to->strdata = new_strdata;
+    to->bytes = tag_fixnum(newend + to_fixnum(to->bytes) - bytepos);
+    
+    return UNDEFINED;
+  }
+  auto start = to_fixnum(tostart);
   memcpy(&to->strdata[start], &from->strdata[from_pos], len);
   return UNDEFINED;
 }
@@ -1821,4 +1881,16 @@ gc_obj SCM_SYSTEM(gc_obj strn) {
   strncpy(tmp, str->strdata, len);
   int res = system(tmp);
   return tag_fixnum(res);
+}
+
+gc_obj SCM_STRING_UTF8(gc_obj str) {
+  auto s = to_string(str);
+  auto bytes_aligned = (to_fixnum(s->bytes) + 7) & ~7;
+  string_s* utf8 = rcimmix_alloc(sizeof(string_s));
+  utf8->type = STRING_TAG;
+  utf8->strdata = rcimmix_alloc(bytes_aligned);
+  utf8->len = s->bytes;
+  utf8->bytes = s->bytes;
+  memcpy(utf8->strdata, s->strdata, to_fixnum(s->bytes));
+  return tag_string(utf8);
 }
