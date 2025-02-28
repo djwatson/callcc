@@ -542,8 +542,11 @@ INLINE void *SCM_LOAD_CLOSURE_PTR(gc_obj a) {
 
 static gc_obj tag_bignum(mpz_t a) {
   // Simplify to fixnum if possible.
-  if (mpz_fits_sint_p(a)) {
-    return tag_fixnum(mpz_get_si(a));
+  if (mpz_fits_slong_p(a)) {
+    auto sn = mpz_get_si(a);
+    if (((sn << 3) >> 3) == sn) {
+      return tag_fixnum(sn);
+    }
   }
   bignum_s *res = rcimmix_alloc(sizeof(bignum_s));
   res->type = BIGNUM_TAG;

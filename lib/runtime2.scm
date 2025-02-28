@@ -48,10 +48,34 @@
   (if (negative? x)
       (make-rectangular 0.0 (sqrt (abs x)))
       (sys:FOREIGN_CALL "SCM_SQRT" (inexact x))))
-(define (floor f)
-  (sys:FOREIGN_CALL "SCM_FLOOR" (inexact f)))
-(define (ceiling f)
-  (sys:FOREIGN_CALL "SCM_CEILING" (inexact f)))
+(define (floor-quotient a b)
+  (let ((q (/ a b))
+	(qq (quotient a b)))
+    ;; TODO don't use / and quotient both
+    (if (and (< q 0) (not (integer? q)))
+        (- qq 1)
+        qq)))
+(define (floor x)
+  (cond
+   ((flonum? x) (sys:FOREIGN_CALL "SCM_FLOOR" x))
+   ((ratnum? x) (floor-quotient (numerator x) (denominator x)))
+   (else x)))
+;; (define (floor f)
+;;   (sys:FOREIGN_CALL "SCM_FLOOR" (inexact f)))
+(define (floor x)
+  (cond
+   ((flonum? x) (sys:FOREIGN_CALL "SCM_FLOOR" x))
+   ((ratnum? x) (floor-quotient (numerator x) (denominator x)))
+   (else x)))
+(define (ceiling x)
+  (cond
+   ((flonum? x) (sys:FOREIGN_CALL "SCM_CEILING" x))
+   ((ratnum? x)
+    (let-values (((q r) (floor/ (numerator x) (denominator x))))
+      (if (zero? r)
+	  q
+	  (+ q 1))))
+   (else x)))
 
 ;; complex
 (define (make-polar r angle)
@@ -66,7 +90,7 @@
       (ceiling x)
       (floor x)))
 (define (floor/ a b)
-  (let* ((div (floor (/ a b)))
+  (let* ((div (floor-quotient a b))
 	 (rem (- a (* b div))))
     (values div rem)))
 (define (truncate/ a b)
@@ -258,14 +282,18 @@
 
 ;; TODO: use bitops
 (define (expt num exp)
-  (if (> exp 0)
-      (let loop ((ret 1) (num num) (exp exp))
-	(if (= exp 0)
-	    ret
-	    (loop (if (odd? exp) (* ret num) ret) (* num num) (quotient exp 2))))
-      (let loop ((n 1) (cnt exp))
+  (let* ((fl (or (inexact? num) (inexact? exp)))
+	 (num (if fl (inexact num) num))
+	 (exp (if fl (inexact exp) exp))
+	 (start (if fl 1.0 1)))
+    (if (> exp 0)
+	(let loop ((ret start) (num num) (exp exp))
+	  (if (= exp 0)
+	      ret
+	      (loop (if (odd? exp) (* ret num) ret) (* num num) (quotient exp 2))))
+	(let loop ((n start) (cnt exp))
 	  (if (= cnt 0) n
-	      (loop (/ n num) (+ cnt 1))))))
+	      (loop (/ n num) (+ cnt 1)))))))
 
 (define (square x) (* x x))
 
@@ -1417,8 +1445,17 @@
 	(set-cdr! there '())
 	(set! *here* there) (before))))
 
-(define (round d)
-  (sys:FOREIGN_CALL "SCM_ROUND" (inexact d)))
+(define (round x)
+  (cond
+   ((flonum? x) (sys:FOREIGN_CALL "SCM_ROUND" x))
+   ((ratnum? x)
+    (let-values (((q r) (floor/ (numerator x) (denominator x))))
+      (let ((half (/ (denominator x) 2)))
+	(cond
+	 ((> r half) (+ q 1))
+	 ((= r half) (if (odd? q) (+ q 1) q))
+	 (else q)))))
+   (else x)))
 
 ;;;;;;;;;;;;;;;;;;; number->string
 (define number->string
