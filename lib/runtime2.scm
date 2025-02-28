@@ -1126,47 +1126,22 @@
     (rest
      (comparer (lambda (a b) (char-ci<=? a b)) rest))))
 (define (char-alphabetic? c)
-  (let ((n (char->integer c)))
-    (cond ((< n #x41) #f)		; A
-	  ((> n #x7a) #f)		; z
-	  ((> n #x60))		; a-1
-	  ((< n #x5b))		; Z+1
-	  (else #f))))
+  (sys:FOREIGN_CALL "SCM_CHAR_ALPHABETIC" c))
 (define (char-numeric? c)
-  (let ((n (char->integer c)))
-    (cond ((< n #x30) #f)		; 0
-	  ((> n #x39) #f)		; 9
-	  (else #t))))
+  (sys:FOREIGN_CALL "SCM_CHAR_NUMERIC" c))
 (define (char-upper-case? c)
-  (let ((n (char->integer c)))
-    (cond ((< n #x41) #f)		; A
-	  ((> n #x5a) #f)		; Z
-	  (else #t))))
-
+  (sys:FOREIGN_CALL "SCM_CHAR_UPPERCASE" c))
 (define (char-lower-case? c)
-  (let ((n (char->integer c)))
-    (cond ((< n #x61) #f)		; a
-	  ((> n #x7a) #f)		; z
-	  (else #t))))
-
-(define (char-downcase c) 
-  (let ((n (char->integer c)))
-    (if (or (< n #x41)		; A
-	    (> n #x5a))		; Z
-	(integer->char n)
-	(integer->char (+ n 32)))))
-(define char-foldcase char-downcase)
-
-(define (char-upcase c)
-  (let ((n (char->integer c)))
-    (if (or (< n #x61)			; a
-	    (> n #x7a))			; z
-	(integer->char n)
-	(integer->char (- n 32)))))
-
+  (sys:FOREIGN_CALL "SCM_CHAR_LOWERCASE" c))
 (define (char-whitespace? c)
-  (let ((n (char->integer c)))
-    (or (eq? n 32) (eq? n 9) (eq? n 12) (eq? n 10) (eq? n 13))))
+  (sys:FOREIGN_CALL "SCM_CHAR_WHITESPACE" c))
+
+(define (char-downcase c)
+  (sys:FOREIGN_CALL "SCM_DOWNCASE" c))
+(define (char-foldcase c) (sys:FOREIGN_CALL "SCM_FOLDCASE" c))
+(define (char-upcase c) (sys:FOREIGN_CALL "SCM_UPCASE" c))
+
+
 (define (digit-value ch)
   (unless (char? ch) (error "not a char: "c))
   (let ((n (char->integer ch)))

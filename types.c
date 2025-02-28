@@ -1960,3 +1960,70 @@ gc_obj SCM_MAKE_BYTEVECTOR(gc_obj scm_len, gc_obj init) {
   memset(bv->v, (uint8_t)to_fixnum(init), len);
   return tag_bytevector(bv);
 }
+
+//////// unicode char
+
+gc_obj SCM_CHAR_ALPHABETIC(gc_obj ch) {
+  utf8proc_category_t category = utf8proc_category(to_char(ch));
+    if (category == UTF8PROC_CATEGORY_LU ||  // Uppercase letter
+            category == UTF8PROC_CATEGORY_LL ||  // Lowercase letter
+            category == UTF8PROC_CATEGORY_LT ||  // Titlecase letter
+            category == UTF8PROC_CATEGORY_LM ||  // Modifier letter
+	category == UTF8PROC_CATEGORY_LO){   // Other letter
+    return TRUE_REP;
+  }
+  return FALSE_REP;
+}
+
+gc_obj SCM_CHAR_UPPERCASE(gc_obj ch) {
+  if (utf8proc_isupper(to_char(ch))) {
+    return TRUE_REP;
+  }
+  return FALSE_REP;
+}
+
+gc_obj SCM_CHAR_LOWERCASE(gc_obj ch) {
+  if (utf8proc_islower(to_char(ch))) {
+    return TRUE_REP;
+  }
+  return FALSE_REP;
+}
+
+gc_obj SCM_CHAR_NUMERIC(gc_obj ch) {
+  utf8proc_category_t category = utf8proc_category(to_char(ch));
+  if (category == UTF8PROC_CATEGORY_ND||
+      category == UTF8PROC_CATEGORY_NL ||
+      category == UTF8PROC_CATEGORY_NO) {
+    return TRUE_REP;
+  }
+  return FALSE_REP;
+}
+
+gc_obj SCM_CHAR_WHITESPACE(gc_obj scm_ch) {
+  auto ch = to_char(scm_ch);
+  utf8proc_category_t category = utf8proc_category(ch);
+  if (category == UTF8PROC_CATEGORY_ZS||
+      category == UTF8PROC_CATEGORY_ZL ||
+      category == UTF8PROC_CATEGORY_ZP ||
+       ch == 0x0009 ||  // Tab
+       ch == 0x000A ||  // Line feed
+            ch == 0x000B ||  // Vertical tab
+            ch == 0x000C ||  // Form feed
+            ch == 0x000D ||  // Carriage return
+            ch == 0x0085 ||  // Next line (NEL)
+            ch == 0x2028 ||  // Line separator
+      ch == 0x2029) {   // Paragraph separator
+    return TRUE_REP;
+  }
+  return FALSE_REP;
+}
+
+gc_obj SCM_UPCASE(gc_obj ch) {
+  return tag_char(utf8proc_toupper(to_char(ch)));
+}
+gc_obj SCM_DOWNCASE(gc_obj ch) {
+  return tag_char(utf8proc_tolower(to_char(ch)));
+}
+gc_obj SCM_FOLDCASE(gc_obj ch) {
+  return tag_char(utf8proc_tolower(utf8proc_toupper(to_char(ch))));
+}
