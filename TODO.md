@@ -3,7 +3,6 @@
 
 # plan
   * get r7rs-tests working
-	* bytevectors
     * unicode in/out
 	* input/output
 	* read syntax

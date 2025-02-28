@@ -214,7 +214,7 @@ static gc_obj tag_vector(vector_s *s) {
   return (gc_obj){.value = ((int64_t)s + VECTOR_TAG)};
 }
 static gc_obj tag_bytevector(bytevector_s *s) {
-  return (gc_obj){.value = ((int64_t)s + BYTEVECTOR_TAG)};
+  return (gc_obj){.value = ((int64_t)s + PTR_TAG)};
 }
 static gc_obj tag_closure(closure_s *s) {
   return (gc_obj){.value = ((int64_t)s + PTR_TAG)};
