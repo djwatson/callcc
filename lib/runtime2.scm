@@ -60,8 +60,6 @@
    ((flonum? x) (sys:FOREIGN_CALL "SCM_FLOOR" x))
    ((ratnum? x) (floor-quotient (numerator x) (denominator x)))
    (else x)))
-;; (define (floor f)
-;;   (sys:FOREIGN_CALL "SCM_FLOOR" (inexact f)))
 (define (floor x)
   (cond
    ((flonum? x) (sys:FOREIGN_CALL "SCM_FLOOR" x))
@@ -634,18 +632,6 @@
     (if (null? a)
 	b
 	(cons (car a) (loop (cdr a) b)))))
-;; (define (append2 a b)
-;;   (if (null? a)
-;;       b
-;;       (let ((cell (cons (car a) '())))
-;; 	(let loop ((a (cdr a)) (b b) (head cell) (tail cell))
-;; 	  (if (null? a)
-;; 	      (begin
-;; 		(set-cdr! tail b)
-;; 		head)
-;; 	      (let ((cell (cons (car a) '())))
-;; 		(set-cdr! tail cell)
-;; 		(loop (cdr a) b head cell)))))))
 
 (define append
   (case-lambda
@@ -1588,8 +1574,9 @@
 (include "lib/str2num.scm")
 
 ;;;;;;;;;;;;; IO
-(define-record-type port (make-port input fold-case fd pos len buf fillflush) port?
+(define-record-type port (make-port input textual fold-case fd pos len buf fillflush) port?
 		    (input input-port?)
+		    (textual textual-port?)
 		    (fold-case port-fold-case port-fold-case-set!)
 		    (fd port-fd port-fd-set!)
 		    (pos port-pos port-pos-set!)
@@ -1619,6 +1606,13 @@
       (string-copy! new-buf 0 buf 0 (port-pos port))
       (port-buf-set! port new-buf))))
 
+(define (port-bytevector-flush port)
+  (when (= (port-pos port) (bytevector-length (port-buf port)))
+    (let* ((buf (port-buf port))
+	   (new-buf (make-bytevector (* 2 (bytevector-length buf)))))
+      (bytevector-copy! new-buf 0 buf 0 (port-pos port))
+      (port-buf-set! port new-buf))))
+
 (define flush-output-port
   (case-lambda
    (() (flush-output-port (current-output-port)))
@@ -1626,25 +1620,34 @@
 
 (define port-buffer-size 512)
 
-(define *current-input-port* (make-port #t #f 0 0 0 (make-string port-buffer-size) port-fd-fill))
+(define *current-input-port* (make-port #t #t #f 0 0 0 (make-string port-buffer-size) port-fd-fill))
 (define (current-input-port) *current-input-port*)
-(define *current-output-port* (make-port #f #f 1 0 port-buffer-size (make-string port-buffer-size) port-fd-flush))
+(define *current-output-port* (make-port #f #t #f 1 0 port-buffer-size (make-string port-buffer-size) port-fd-flush))
 (define (current-output-port) *current-output-port*)
-(define *current-error-port* (make-port #t #f 2 0 0 (make-string port-buffer-size) port-fd-flush))
+(define *current-error-port* (make-port #f #t #f 2 0 0 (make-string port-buffer-size) port-fd-flush))
 (define (current-error-port) *current-error-port*)
 
+(define (binary-port? port) (not (textual-port? port)))
 (define (open-input-file file)
   (let ((fd (sys:FOREIGN_CALL "SCM_OPEN_FD" file #t)))
     (when (< fd 0) (error "open-input-file error:" file))
-    (make-port #t #f fd 0 0 (make-string port-buffer-size) port-fd-fill)))
+    (make-port #t #t #f fd 0 0 (make-string port-buffer-size) port-fd-fill)))
 (define (open-output-file file)
   (let ((fd (sys:FOREIGN_CALL "SCM_OPEN_FD" file #f)))
     (when (< fd 0) (error "open-output-file error:" file))
-    (make-port #f #f fd 0 port-buffer-size (make-string port-buffer-size) port-fd-flush)))
+    (make-port #f #t #f fd 0 port-buffer-size (make-string port-buffer-size) port-fd-flush)))
+(define (open-input-string str)
+  (make-port #t #t #f #f 0 (string-length str) str (lambda (port) #f)))
 (define (open-output-string)
-  (make-port #f #f #f 0 port-buffer-size (make-string port-buffer-size) port-string-flush))
+  (make-port #f #t #f #f 0 port-buffer-size (make-string port-buffer-size) port-string-flush))
 (define (get-output-string port)
   (substring (port-buf port) 0 (port-pos port)))
+(define (get-output-bytevector port)
+  (bytevector-copy (port-buf port) 0 (port-pos port)))
+(define (open-input-bytevector bv)
+  (make-port #t #f #f #f 0 (bytevector-length bv) bv (lambda (port) #f)))
+(define (open-output-bytevector)
+  (make-port #f #f #f #f 0 port-buffer-size (make-bytevector port-buffer-size) port-bytevector-flush))
 (define (with-output-to-file name thunk)
   (let ((file (open-output-file name))
 	(old-port *current-output-port*))
@@ -1664,6 +1667,15 @@
     (unless (= 0 (sys:FOREIGN_CALL "SCM_CLOSE_FD" (port-fd p)))
       (error "Close port: error closing fd " (port-fd p))))
   (port-fd-set! p #f))
+(define (input-port-open? port)
+  (cond
+   ((port-fd port) #t)
+   ((< (port-pos port) (port-len port)))
+   (else #f)))
+(define (output-port-open? port)
+  (if (or (port-fd port)
+	  (eq? (port-fillflush port) port-string-flush)
+	  (eq? (port-fillflush port) port-bytevector-flush)) #t #f))
 
 (define (call-with-input-file file l)
   (let* ((p (open-input-file file))
@@ -1677,7 +1689,7 @@
     (close-output-port p)
     res))
 
-(define-record-type eof-object (make-eof-object) eof-object?)
+(define-record-type base-eof-object (eof-object) eof-object?)
 
 (define peek-char
   (case-lambda
@@ -1689,7 +1701,7 @@
 	  ((port-fillflush port) port)
 	  (if (< (port-pos port) (port-len port))
 	      (peek-char port)
-	      (make-eof-object)))))))
+	      (eof-object)))))))
 
 (define read-char
   (case-lambda
@@ -1703,7 +1715,69 @@
 	  ((port-fillflush port) port)
 	  (if (< (port-pos port) (port-len port))
 	      (read-char port)
-	      (make-eof-object)))))))
+	      (eof-object)))))))
+
+(define read-u8
+  (case-lambda
+   (() (read-u8 (current-input-port)))
+   ((port)
+    (if (< (port-pos port) (port-len port))
+	(let ((res (bytevector-u8-ref (port-buf port) (port-pos port))))
+	  (port-pos-set! port (+ 1 (port-pos port)))
+	  res)
+	(begin
+	  ((port-fillflush port) port)
+	  (if (< (port-pos port) (port-len port))
+	      (read-u8 port)
+	      (eof-object)))))))
+
+(define char-ready?
+  (case-lambda
+   (() (char-ready? (current-input-port)))
+   ((port) (< (port-pos port) (port-len port)))))
+
+(define u8-ready?
+  (case-lambda
+   (() (u8-ready? (current-input-port)))
+   ((port) (< (port-pos port) (port-len port)))))
+
+(define read-string
+  (case-lambda
+   ((k) (read-string k (current-input-port)))
+   ((k port)
+    (let ((p (open-output-string)))
+      (unless (fixnum? k) (error "read-string not a fixnum" k))
+      (let loop ((k k))
+	(if (= k 0)
+	    (get-output-string p)
+	    (let ((c (read-char port)))
+	      (if (eof-object? c)
+		  (let ((res (get-output-string p)))
+		    (if (= 0 (string-length res))
+			c
+			res))
+		  (begin
+		    (write-char c p)
+		    (loop (- k 1)))))))))))
+
+(define read-bytevector
+  (case-lambda
+    ((k) (read-bytevector k (current-input-port)))
+    ((k port)
+     (let ((p (open-output-bytevector)))
+       (unless (fixnum? k) (error "read-bytevector not a fixnum" k))
+       (let loop ((k k))
+	 (if (= k 0)
+	     (get-output-bytevector p)
+	     (let ((c (read-u8 port)))
+	       (if (eof-object? c)
+		   (let ((res (get-output-bytevector p)))
+		     (if (= 0 (bytevector-length res))
+			 c
+			 res))
+		   (begin
+		     (write-u8 c p)
+		     (loop (- k 1)))))))))))
 
 (include "lib/read.scm")
 
@@ -1717,6 +1791,56 @@
     (port-pos-set! port (+ 1 (port-pos port)))
     (when (eq? #\newline ch)
       ((port-fillflush port) port)))))
+
+(define write-u8
+  (case-lambda
+   ((ch) (write-u8 ch (current-output-port)))
+   ((ch port)
+    (when (>= (port-pos port) (port-len port))
+      ((port-fillflush port) port))
+    (bytevector-u8-set! (port-buf port) (port-pos port) ch)
+    ;;(sys:FOREIGN_CALL "SCM_STRING_SET_FAST" (port-buf port) (port-pos port) ch)
+    (port-pos-set! port (+ 1 (port-pos port))))))
+
+(define read-bytevector!
+  (case-lambda
+    ((bv) (read-bytevector! bv (current-input-port) 0 (bytevector-length bv)))
+    ((bv port) (read-bytevector! bv port 0 (bytevector-length bv)))
+    ((bv port start) (read-bytevector! bv port start (bytevector-length bv)))
+    ((bv port start end)
+     (unless (and (fixnum? start)
+		  (fixnum? end)) (error "bad start read-bytevector!" start))
+     (unless (or (< -1 start (bytevector-length bv))
+		 (= start end)) (error "bad start len read-bytevector!" start))
+     (unless (<= 0 end (bytevector-length bv)) (error "bad end read-bytevector!" end))
+     (when (> start end) (error "bad end start read-bytevector!" end))
+     (let loop ((pos start) (read 0))
+       (if (= pos end)
+	   read
+	   (let ((c (read-u8 port)))
+	     (if (eof-object? c)
+		 (if (= 0 read)
+		     c
+		     read)
+		 (begin
+		   (bytevector-u8-set! bv pos c)
+		   (loop (+ pos 1) (+ read 1))))))))))
+
+(define write-bytevector
+  (case-lambda
+    ((bv) (write-bytevector bv (current-output-port) 0 (bytevector-length bv)))
+    ((bv port) (write-bytevector bv port 0 (bytevector-length bv)))
+    ((bv port start) (write-bytevector bv port start (bytevector-length bv)))
+    ((bv port start end)
+     (unless (and (fixnum? start)
+		  (fixnum? end)) (error "bad start write-bytevector" start))
+     (unless (or (< -1 start (bytevector-length bv))
+		 (= start end)) (error "bad start len write-bytevector" start))
+     (unless (<= 0 end (bytevector-length bv)) (error "bad end write-bytevector" end))
+     (when (> start end) (error "bad end start write-bytevector" end))
+     (do ((i start (+ i 1)))
+	 ((= end i))
+       (write-u8 (bytevector-u8-ref bv i) port)))))
 
 (define (file-exists? name)
   (sys:FOREIGN_CALL "SCM_FILE_EXISTS" name))

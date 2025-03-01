@@ -3,11 +3,9 @@
 
 # plan
   * get r7rs-tests working
-    * unicode in/out
-	* input/output
+    * unicode in/out - utf8->string buffering (and reverse but that's easy).
 	* read syntax
 	  * read/write shared structure
-	* numeric syntax
 	
 	* exceptions
 	* environments/eval
@@ -15,13 +13,11 @@
 
 	 
 # full r7rs / safety / tests
-  * unicode
   * r7rs test
   * argtype stress test
   * division tests
   * macro tests
   * port tests
-  * unicode-tests
   * copyish tests
   * gset check
   
