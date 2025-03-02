@@ -368,13 +368,13 @@
     (unless (eq? *here* winds)
       (reroot! winds))
     res))
-(define call/cc call-with-current-continuation)
+(define (call/cc x) (call-with-current-continuation x))
 
 (define (car a)
-					;(unless (pair? a) (error "Trying to car not a pair" a))
+  ;;(unless (pair? a) (error "Trying to car not a pair" a))
   (sys:FOREIGN_CALL "SCM_CAR" a))
 (define (cdr a)
-  ;(unless (pair? a) (error "Trying to cdr not a pair" a))
+  ;;(unless (pair? a) (error "Trying to cdr not a pair" a))
   (sys:FOREIGN_CALL "SCM_CDR" a))
 (define (cddr a)
   (cdr (cdr a)))
@@ -1722,7 +1722,7 @@
 (define (binary-port? port) (not (textual-port? port)))
 (define (open-input-file file)
   (let ((fd (sys:FOREIGN_CALL "SCM_OPEN_FD" file #t)))
-    (when (< fd 0) (error "open-input-file error:" file))
+    (when (< fd 0) (raise-continuable (make-error-object 'file "No such file:" (list file))))
     (make-port #t #t #f fd 0 0 (make-string port-buffer-size) port-fd-fill)))
 (define (open-output-file file)
   (let ((fd (sys:FOREIGN_CALL "SCM_OPEN_FD" file #f)))
@@ -2135,3 +2135,46 @@
 	 (or (= pos (bytevector-length a))
 	     (and (eq? (bytevector-u8-ref a pos) (bytevector-u8-ref b pos))
 		  (loop (+ pos 1)))))))
+
+;;;;;;;; Exceptions
+;; Exceptions
+
+(define (with-exception-handler handler thunk)
+  (parameterize ((*exception-handlers* (cons handler (*exception-handlers*))))
+    (thunk)))
+
+(define (raise-continuable obj)
+  (let ((handlers (*exception-handlers*)))
+    (parameterize ((*exception-handlers* (cdr handlers)))
+      ((car handlers) obj))))
+
+(define-record-type error-object (make-error-object type msg irritants) error-object?
+		    (type error-object-type)
+		    (msg error-object-message)
+		    (irritants error-object-irritants))
+
+(define (raise obj)
+  (let ((handlers (*exception-handlers*)))
+    (parameterize ((*exception-handlers* (cdr handlers)))
+      ((car handlers) obj)
+      (raise (make-error-object 'default-error "Continuing from non-continuable handler" '())))))
+
+(define (error msg . rest)
+  (raise (make-error-object 'default-error msg rest)))
+
+(define (file-error? e)
+  (eq? 'file (error-object-type e)))
+
+(define (read-error? e)
+  (eq? 'read (error-object-type e)))
+
+(define (default-exception-handler e)
+  (display "ERROR:")
+  (write (error-object-type e)) (newline)
+  (display (error-object-message e))
+  (for-each write (error-object-irritants e))
+  (newline)
+  (sys:FOREIGN_CALL "SCM_EXIT" -1))
+
+(define *exception-handlers* (make-parameter `(,default-exception-handler)))
+

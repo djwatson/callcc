@@ -753,7 +753,7 @@ TODO: boxes could be passed down through funcs
    (if (hash-table-exists? assigned var)
        (display (format "Global assigned:~a\n" var) (current-error-port))
        (begin
-	 (display (format "Record global ~a\n" var) (current-error-port))
+	 ;;(display (format "Record global ~a\n" var) (current-error-port))
 	 (hash-table-set! global-defs var label)
 	 (hash-table-set! global-labels label lam)))
    sexp))
