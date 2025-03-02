@@ -51,12 +51,21 @@
 				   bound))
 	      ((null? obj) 0)
 	      ((not obj) 0)
+	      ((bytevector? obj) (bytevector-hash obj bound))
 	      ((boolean? obj ) 0)
 	      ((procedure? obj) (error "hash: procedures cannot be hashed" obj))
 	      (else
 	       (error "Unknown object in hash:" obj)
 	       1
 	       ))))
+
+    (define (bytevector-hash v bound)
+  (let ((hashvalue 571)
+	(len (bytevector-length v)))
+    (do ((index 0 (+ index 1)))
+	((>= index len) (modulo hashvalue bound))
+      (set! hashvalue (modulo (+ (* 257 hashvalue) (hash (bytevector-u8-ref v index)))
+					   *default-bound*)))))
 
     (define (hash-by-identity x . maybe-bound)
       (let ((hash (sys:FOREIGN_CALL "SCM_EQ_HASH" x)))

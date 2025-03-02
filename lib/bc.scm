@@ -705,5 +705,5 @@ attributes #0 = { returns_twice}
   (for line (reverse! debug-strings)
        (display line) (newline)))
 
-(define (get-link-command output output-file)
-  (format "clang -flto -O3 -g -o ~a ~a ~alibcallcc.a -lm -lgmp -lutf8proc" output-file output (get-compile-path)))
+(define (get-link-command output output-file opts)
+  (format "clang ~a -g -o ~a ~a ~alibcallcc.a -lm -lgmp -lutf8proc" opts output-file output (get-compile-path)))

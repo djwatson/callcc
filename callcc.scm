@@ -17,6 +17,7 @@
 (define exe-file #f)
 (define script-file #f)
 (define output-file #f)
+(define cc-opts "")
 
 (define (print-version)
   (display "callcc v0.1 (c) 2025 Dave Watson ")
@@ -34,6 +35,7 @@
   (display "  -I <directory>             prepend directory to list of library paths to search\n")
   (display "  -A <directory>             append directory to list of library paths to search\n")
   (display "  -D <identifier>            declare identifier as supported feature in (features) and cond-expand\n")
+  (display "  --cc <opts>                CC optimizations (consider -O3 -flto, or -g)")
   (display "  -h, --help                 print this help and exit\n")
   (display "  --exe <filename>           compile file to an executable\n")
   (display "  -s, --script <filename>    run the script as if by (begin (load \"filename\")(exit)) \n")
@@ -57,6 +59,8 @@
   (set! script-file a))
 (define (set-output-file o n a s)
   (set! output-file a))
+(define (set-cc-opts o n a s)
+  (set! cc-opts a))
 
 (args-fold (cdr (command-line))
 	   (list
@@ -66,6 +70,7 @@
 	    (option '(#\A) #t #f append-directory)
 	    (option '(#\D) #t #f add-feature-flag)
 	    (option '("exe") #t #f set-exe-file)
+	    (option '("cc") #t #f set-cc-opts)
 	    (option '(#\s "script") #t #f set-script-file)
 	    (option '(#\o) #t #f set-output-file))
 	   (lambda (o n a s) (error "Unrecognized option:" n))
@@ -92,7 +97,7 @@
     (display (format "compiling ~a to ~a\n" exe-file output-file))
     (with-output-to-file output (lambda ()
 				  (compile exe-file #f)))
-    (link output output-file)))
+    (link output output-file cc-opts)))
 
 ;; Set output file as input file minus extension.
 (when (and exe-file (not output-file))

@@ -1,21 +1,22 @@
 # known bugs:
-  * compile error if multiple callcc running at same time????
+  * some bug that randomly shows up
 
 # plan
   * get r7rs-tests working
-    * unicode in/out - utf8->string buffering (and reverse but that's easy).
-	* read syntax
-	  * read/write shared structure
-	
-	* exceptions
 	* environments/eval
+  * regain lost perf
+    * bv2string - bytevector copy, utf8proc_iterate, strcmp, bytevector_set
+	* cat, dynamic, read1, slatex, sum1, tail, wc - read
+	* parsing, -- ??
+	* fixup writing w-out going through write-char if possible?
+	* equal - hash table junk
+	* maybe just pgo: conform??, cpstak??, gcbench, lattice, pnpoly, puzzle, quicksort, ray, scheme, sum, takl
   * install - fix dirs
 
 	 
 # full r7rs / safety / tests
   * r7rs test
   * argtype stress test
-  * division tests
   * macro tests
   * port tests
   * copyish tests
