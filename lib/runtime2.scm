@@ -1688,7 +1688,7 @@
 				   (port-buf port))))
 (define (port-fd-flush port)
   (unless (port-fd port) (error "ERROR port flush"))
-  (sys:FOREIGN_CALL "SCM_WRITE_FD" (port-fd port) (port-pos port) (port-buf port))
+  (sys:FOREIGN_CALL "SCM_WRITE_FD" (port-fd port) (string->utf8 (port-buf port) 0 (port-pos port)))
   (port-pos-set! port 0))
 
 (define (port-string-flush port)
@@ -1879,7 +1879,7 @@
    ((ch port)
     (when (>= (port-pos port) (port-len port))
       ((port-fillflush port) port))
-    (sys:FOREIGN_CALL "SCM_STRING_SET_FAST" (port-buf port) (port-pos port) ch)
+    (sys:FOREIGN_CALL "SCM_STRING_SET" (port-buf port) (port-pos port) ch)
     (port-pos-set! port (+ 1 (port-pos port)))
     (when (eq? #\newline ch)
       ((port-fillflush port) port)))))

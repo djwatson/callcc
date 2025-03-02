@@ -1700,24 +1700,72 @@ gc_obj SCM_OPEN_FD(gc_obj filename, gc_obj input) {
       open(name, readonly ? O_RDONLY : O_WRONLY | O_CREAT | O_TRUNC, 0777));
 }
 
-// TODO: update for utf8
+static uint64_t utf8_count_bytes(unsigned char* buf, uint64_t len) {
+  uint64_t bytes = 0;
+  int32_t codepoint_res;
+  for(uint64_t codepoint = 0; codepoint < len; codepoint++) {
+    auto res = utf8proc_iterate(&buf[bytes], (long)(len*4), &codepoint_res);
+    bytes += res;
+  }
+  return bytes;
+}
+
+static uint32_t count_utf8(uint8_t* data, uint32_t bytes, bool abort_on_invalid) {
+  uint32_t bytepos = 0;
+  int32_t codepoint;
+  uint32_t chars = 0;
+  while(bytepos < bytes) {
+    auto res = utf8proc_iterate(&data[bytepos], bytes, &codepoint);
+    if (res < 0) {
+      if(abort_on_invalid) {
+	abort();
+      } else {
+	return chars;
+      }
+    }
+    chars++;
+    bytepos += res;
+  }
+  if (bytepos != bytes && abort_on_invalid) {
+    abort();
+  }
+  return chars;
+}
+
 gc_obj SCM_READ_FD(gc_obj scmfd, gc_obj scmbuf) {
   auto buf = to_string(scmbuf);
+  
+  // The buffer is unique: The codepoint count may not match
+  // the byte count: Extra bytes are unfinished unicode codepoints.
+  uint64_t remaining = 0;
+  if(buf->bytes.value != buf->len.value) {
+    auto bytecnt = utf8_count_bytes(buf->strdata, to_fixnum(buf->len));
+    remaining = to_fixnum(buf->bytes) - bytecnt;
+    memcpy(buf->strdata, &buf->strdata[bytecnt], remaining);
+  }
+  
   int fd = (int)to_fixnum(scmfd);
-  auto res = read(fd, buf->strdata, to_fixnum(buf->bytes));
+  auto res = read(fd, &buf->strdata[remaining], to_fixnum(buf->bytes) - remaining);
+  if (res == 0) {
+    assert(remaining == 0);
+    return tag_fixnum(0);
+  }
   if (res < 0) {
     printf("SCM_READ_FD error: %li\n", res);
     exit(-1);
   }
-  return tag_fixnum(res);
+  buf->bytes = tag_fixnum(res + remaining);
+  auto len = count_utf8(buf->strdata, to_fixnum(buf->bytes), false);
+  buf->len = tag_fixnum(len);
+  
+  return buf->len;
 }
 
-// TODO: update for utf8
-gc_obj SCM_WRITE_FD(gc_obj scmfd, gc_obj scmlen, gc_obj scmbuf) {
+gc_obj SCM_WRITE_FD(gc_obj scmfd, gc_obj scmbuf) {
   int fd = (int)to_fixnum(scmfd);
-  auto len = to_fixnum(scmlen);
-  auto buf = to_string(scmbuf);
-  auto res = write(fd, buf->strdata, len);
+  auto buf = to_bytevector(scmbuf);
+  auto len = to_fixnum(buf->len);
+  auto res = write(fd, buf->v, len);
   if (res != len) {
     printf("Could not write %li bytes to fd %i\n", len, fd);
     exit(-1);
@@ -1910,24 +1958,6 @@ gc_obj SCM_STRING_UTF8(gc_obj str) {
   return tag_bytevector(utf8);
 }
 
-static uint32_t count_utf8(uint8_t* data, uint32_t bytes) {
-  uint32_t bytepos = 0;
-  int32_t codepoint;
-  uint32_t chars = 0;
-  while(bytepos < bytes) {
-    auto res = utf8proc_iterate(&data[bytepos], bytes, &codepoint);
-    if (res < 0) {
-      abort();
-    }
-    chars++;
-    bytepos += res;
-  }
-  if (bytepos != bytes) {
-    abort();
-  }
-  return chars;
-}
-
 gc_obj SCM_UTF8_STRING(gc_obj scm_bv) {
   auto bv = to_bytevector(scm_bv);
   auto bytes_aligned = (to_fixnum(bv->len) + 7) & ~7;
@@ -1936,7 +1966,7 @@ gc_obj SCM_UTF8_STRING(gc_obj scm_bv) {
   str->bytes = bv->len;
   str->strdata = rcimmix_alloc(bytes_aligned);
   memcpy(str->strdata, bv->v, to_fixnum(bv->len));
-  str->len = tag_fixnum(count_utf8(bv->v, to_fixnum(bv->len)));
+  str->len = tag_fixnum(count_utf8(bv->v, to_fixnum(bv->len), true));
   return tag_string(str);
 }
 
