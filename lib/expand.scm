@@ -14,7 +14,8 @@ TODO: also maybe go back to pre-resolving idents? only internal
 (define (expand-eval e)
   (define env (cond-expand ((or chicken chez) (interaction-environment))
 			   (else (environment '(scheme base) '(util) '(expand)))))
-  (eval e env))
+  (cond-expand (callcc (eval `(no-expand . ,e) env))
+	       (else (eval e env))))
 
 (define cur-namespace (make-parameter ""))
 (define base-ellipsis (make-parameter '(...  .  #f)))
