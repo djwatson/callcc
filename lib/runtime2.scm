@@ -236,12 +236,14 @@
 
 
 (define (error msg . args)
-  (display "Error:" (current-error-port))
-  (display msg (current-error-port))
-  (display " " (current-error-port))
-  (display args (current-error-port))
-  (newline (current-error-port))
-  (0))
+  (raise (make-error-object 'default-error msg args))
+  ;; (display "Error:" (current-error-port))
+  ;; (display msg (current-error-port))
+  ;; (display " " (current-error-port))
+  ;; (display args (current-error-port))
+  ;; (newline (current-error-port))
+  ;;(0)
+  )
 (define apply
   (case-lambda
     ((fun args)

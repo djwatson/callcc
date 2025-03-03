@@ -482,10 +482,18 @@ gc_obj SCM_DISPLAY(gc_obj obj, gc_obj scmfd) {
 
 ////////////// MATH
 
+void S_error(gc_obj closure, gc_obj msg, gc_obj arg);
+static gc_obj from_c_str(char *str);
+
+extern int64_t argcnt;
+extern int64_t wanted_argcnt;
+
 NOINLINE gc_obj SCM_LOAD_GLOBAL_FAIL(gc_obj a) {
   auto str = to_string(to_symbol(a)->name);
   printf("Attempting to load undefined sym: %.*s\n", (int)to_fixnum(str->bytes),
          str->strdata);
+  argcnt = 3;
+  S_error(UNDEFINED, from_c_str("Attempting to load undefined sym:"), a);
   abort();
 }
 INLINE gc_obj SCM_LOAD_GLOBAL(gc_obj a) {
@@ -1178,8 +1186,6 @@ static void need_more_frames(gc_obj res) {
 #error "Arch not supported for CALLCC"
 #endif
 
-extern int64_t argcnt;
-extern int64_t wanted_argcnt;
 
 void ccresthunk_oneshot();
 

@@ -51,56 +51,64 @@ scheme)
  (expand-program '((import (scheme base) (scheme repl) (scheme write) (scheme read) )) "PROG-" runtime-man env)
 (define (base-eval e env)
   (match e
-      ((lambda ,largs ,lbody)
-       (lambda args
-	 (if (pair? largs)
-             (let loop ((env env) (args args) (params largs))
-	       (if (pair? params)
-                   (loop
-                    (cons (cons (car params) (car args)) env)
-                    (cdr args)
-                    (cdr params))
-                   (base-eval
-		    lbody
-                    (if (null? params)
-			env
-			(cons (cons params args) env)))))
-             (let ((env (cons (cons largs args) env)))
-	       (base-eval lbody env)))))
-      ((if ,test ,true ,false)
-       (if (base-eval test env)
-           (base-eval true env)
-           (base-eval false env)))
-      ((letrec* ((,vars ,inits) ___) ,body)
-       (let* ((values (map (lambda (var) (cons var #f)) vars))
-	      (new-env (append values env)))
-	 (let loop ((vars vars) (inits inits) (values values))
-	   (if (pair? vars)
-	       (begin (set-cdr! (car values) (base-eval (car inits) new-env))
-		      (loop (cdr vars) (cdr inits) (cdr values)))))
-	 (base-eval body new-env)))
-      ((begin ,exprs ___ ,expr)
-       (for expr exprs
-	    (base-eval expr env))
-       (base-eval expr env))
-      ((quote ,a)
-       a)
-      ((,args ___)
-       (let ((args (map (lambda (arg) (base-eval arg env)) args)))
-	 (apply (car args) (cdr args))))
-      (,sym
-       (guard (symbol? sym))
-       (cond
-	((assq e env) => cdr)
-	(else (sys:FOREIGN_CALL "SCM_LOAD_GLOBAL" sym))))
-      (,self-eval
-       self-eval)))
+    ((lambda ,largs ,lbody)
+     (lambda args
+       (if (pair? largs)
+           (let loop ((env env) (args args) (params largs))
+	     (if (pair? params)
+                 (loop
+                  (cons (cons (car params) (car args)) env)
+                  (cdr args)
+                  (cdr params))
+                 (base-eval
+		  lbody
+                  (if (null? params)
+		      env
+		      (cons (cons params args) env)))))
+           (let ((env (cons (cons largs args) env)))
+	     (base-eval lbody env)))))
+    ((if ,test ,true ,false)
+     (if (base-eval test env)
+         (base-eval true env)
+         (base-eval false env)))
+    ((letrec* ((,vars ,inits) ___) ,body)
+     (let* ((values (map (lambda (var) (cons var #f)) vars))
+	    (new-env (append values env)))
+       (let loop ((vars vars) (inits inits) (values values))
+	 (if (pair? vars)
+	     (begin (set-cdr! (car values) (base-eval (car inits) new-env))
+		    (loop (cdr vars) (cdr inits) (cdr values)))))
+       (base-eval body new-env)))
+    ((begin ,exprs ___ ,expr)
+     (for expr exprs
+	  (base-eval expr env))
+     (base-eval expr env))
+    ((quote ,a)
+     a)
+    ((define ,sym ,val)
+     (sys:FOREIGN_CALL "SCM_SET_GLOBAL" sym val)
+     val)
+    ((set! ,sym ,val)
+     (cond
+      ((assq sym env) => (lambda (x) (set-cdr! x val)))
+      (else (sys:FOREIGN_CALL "SCM_SET_GLOBAL" sym val))))
+    ((,args ___)
+     (let ((args (map (lambda (arg) (base-eval arg env)) args)))
+       (apply (car args) (cdr args))))
+    (,sym
+     (guard (symbol? sym))
+     (cond
+      ((assq e env) => cdr)
+      (else (sys:FOREIGN_CALL "SCM_LOAD_GLOBAL" sym))))
+    (,self-eval
+     self-eval)))
 (define (eval prog env2)
   (define expand (not (and (pair? prog) (eq? 'no-expand (car prog)))))
   (define e (if expand (let ((v (expand-program (list prog) "PROG-" runtime-man env)))
 			 v) (list (cdr prog))))
   (define res '())
-  ;(display "My eval: ") (display e) (newline)
+  ;; (when expand
+  ;;   (display "My eval: ") (display e) (newline))
   (for expr e
        (set! res (base-eval expr '())))
   res)

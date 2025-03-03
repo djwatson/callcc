@@ -685,7 +685,8 @@ attributes #0 = { returns_twice}
 		  (format "!~a = !DILocation(line:1, scope: !~a)" debug-loc-id debug-id))
 	   
 	   (display (format "define ~a i64 @\"~a\"(~a) #0 !dbg !~a {\n" 
-			    (if (equal? (fun-name func) "main")
+			    (if (or (equal? (fun-name func) "main")
+				    (equal? (fun-name func) "S_error"))
 				"" "internal")
 			    (fun-name func)
 			    (reg-args-to-param-list reg-args)
