@@ -1,16 +1,4 @@
-;; Two evaluators that can run the output of the expander.
-#|
 
-Used for syntax-case / syntax-rules expansion.  It's pretty bad.
-
-It currently relies on constants not needing to be
-serialized (identifiers + envs are records, which don't serialize in
-scheme)
-
- |#
-
-
-; (import (scheme base) (scheme r5rs) (srfi 1) (scheme process-context) (expand) (library-manager) (util))
 (import (scheme base)
 	(prefix (flow sys) sys:)
 	(scheme case-lambda)
@@ -48,7 +36,29 @@ scheme)
 (set! library-search-paths (cons (string-append path "lib/srfi2") library-search-paths))
 (set! library-search-paths (cons (string-append path "lib/headers") library-search-paths))
 (set! library-search-paths (cons (string-append path "lib") library-search-paths))
- (expand-program '((import (scheme base) (scheme repl) (scheme write) (scheme read) )) "PROG-" runtime-man env)
+ (expand-program '((import (scheme base)
+			   (scheme repl)
+			   (scheme write)
+			   (scheme read)
+			   (scheme file)
+			   (scheme case-lambda)
+			   (scheme char)
+			   (scheme complex)
+			   (scheme cxr)
+			   (scheme eval)
+			   (scheme inexact)
+			   (scheme lazy)
+			   (scheme load)
+			   (scheme process-context)
+			   (scheme r5rs)
+			   (scheme time))) "PROG-" runtime-man env)
+
+;; A simple ast-walking interpreter.  It is very slow.
+;; It directly parses what comes out of the expander.
+
+;; It could be improved by:
+;; a) running it through some of the optimization passes (closure conversion, etc)
+;; b) Pre-compile, compiling-with-closures. 
 (define (base-eval e env)
   (match e
     ((lambda ,largs ,lbody)
