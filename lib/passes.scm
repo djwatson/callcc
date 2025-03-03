@@ -751,7 +751,7 @@ TODO: boxes could be passed down through funcs
 					  (begin ,closure2))))
    (guard (and (eq? label label2) (eq? closure closure2)))
    (if (hash-table-exists? assigned var)
-       (display (format "Global assigned:~a\n" var) (current-error-port))
+       1;(display (format "Global assigned:~a\n" var) (current-error-port))
        (begin
 	 ;;(display (format "Record global ~a\n" var) (current-error-port))
 	 (hash-table-set! global-defs var label)
@@ -763,7 +763,7 @@ TODO: boxes could be passed down through funcs
    (if (hash-table-exists? global-defs global)
        `(label-call ,(hash-table-ref global-defs global) #f ,args ___)
        (begin
-	 (display (format "Global not found:~a\n" global) (current-error-port))
+	 ;(display (format "Global not found:~a\n" global) (current-error-port))
 	 `(call (lookup ,global) ,args ___)))))
 
 (define (debug-print x)
