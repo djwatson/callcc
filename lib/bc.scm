@@ -643,6 +643,7 @@ attributes #0 = { returns_twice}
 	 (prog (expand-program input "PROG-" libman))
 	 (lowered (r7-pass `(begin  	,@runtime
 					,@evals
+					,@(serialize-libraries libman)
 					,@prog
 					0 ;; return value.
 					) #f))

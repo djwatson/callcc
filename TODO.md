@@ -1,23 +1,29 @@
 # known bugs:
-  * some bug that randomly shows up
 
 # plan
+  * Options: -fno-eval, -fno-eval-macros
   * get r7rs-tests working
 	* environments/eval
+	   * fix 'environment', boot order, check paths work
+	   * check if necessary to rename intrinsics? Works in other eval somehow
+  * Get all abort() to S_error() instead in types.c
   * regain lost perf
     * bv2string - bytevector copy, utf8proc_iterate, strcmp, bytevector_set
 	* cat, dynamic, read1, slatex, sum1, tail, wc - read
 	* parsing, -- ??
 	* fixup writing w-out going through write-char if possible?
-	* equal - hash table junk
+	* equal - hash table junk - move to case-lambda, check eqhash and strhash are working.
+               resize and use and instead of modulo.
 	* maybe just pgo: conform??, cpstak??, gcbench, lattice, pnpoly, puzzle, quicksort, ray, scheme, sum, takl
   * install - fix dirs
 
 	 
 # full r7rs / safety / tests
-  * r7rs test
+  * r7rs test - symbol names, file-error
+  
+  Mostly error paths:
   * argtype stress test
-  * macro tests
+  * macro tests - work!
   * port tests
   * copyish tests
   * gset check

@@ -482,9 +482,9 @@ TODO: boxes could be passed down through funcs
 (define (update-direct-calls sexp)
   (let update ((sexp sexp) (bindings '()))
     (define-pass check
-      ((call ,x ,(check vars) ___)
+      ((call ,x ,vars ___)
        (guard (memq x bindings))
-       `(label-call ,x ,@vars))
+       `(label-call ,x ,@(map check vars)))
       ((fix ,args ,lambdas ___ ,body)
        (define new-bindings (append args bindings))
        `(fix ,args ,@(omap lambda lambdas (update lambda new-bindings))
