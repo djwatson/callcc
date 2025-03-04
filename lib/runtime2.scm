@@ -2171,12 +2171,13 @@
   (eq? 'read (error-object-type e)))
 
 (define (default-exception-handler e)
-  (display "ERROR:")
-  (write (error-object-type e)) (newline)
-  (display (error-object-message e))
-  (for-each write (error-object-irritants e))
-  (newline)
-  (sys:FOREIGN_CALL "SCM_EXIT" -1))
+  (let ((eport (current-error-port)))
+    (display "ERROR:" eport)
+    (write (error-object-type e) eport) (newline eport)
+    (display (error-object-message e) eport)
+    (for-each (lambda (x) (write eport)) (error-object-irritants e))
+    (newline eport)
+    (sys:FOREIGN_CALL "SCM_EXIT" -1)))
 
 (define *exception-handlers* (make-parameter `(,default-exception-handler)))
 

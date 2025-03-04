@@ -18,6 +18,7 @@
 (define script-file #f)
 (define output-file #f)
 (define cc-opts "")
+(define include-eval #t)
 
 (define (print-version)
   (display "callcc v0.1 (c) 2025 Dave Watson ")
@@ -35,11 +36,12 @@
   (display "  -I <directory>             prepend directory to list of library paths to search\n")
   (display "  -A <directory>             append directory to list of library paths to search\n")
   (display "  -D <identifier>            declare identifier as supported feature in (features) and cond-expand\n")
-  (display "  --cc <opts>                CC optimizations (consider -O3 -flto, or -g)")
+  (display "  --cc <opts>                CC optimizations (consider -O3 -flto, or -g)\n")
   (display "  -h, --help                 print this help and exit\n")
   (display "  --exe <filename>           compile file to an executable\n")
   (display "  -s, --script <filename>    run the script as if by (begin (load \"filename\")(exit)) \n")
-  (display "  -o, <filename>              in conjunction with --exe, set the output filename\n")
+  (display "  -fno-eval                  don't include eval support in generated executable\n")
+  (display "  -o, <filename>             in conjunction with --exe, set the output filename\n")
   (display "  --                         pass through remaining args\n")
   (newline)
   (display "If neither --exe nor -s is specified, enters a read/eval/print loop (REPL)\n")
@@ -61,6 +63,11 @@
   (set! output-file a))
 (define (set-cc-opts o n a s)
   (set! cc-opts a))
+(define (compile-option o n a s)
+  (let ((val (string->symbol a)))
+    (case val
+      ((no-eval) (set! include-eval #f))
+      (else (error "Unknown compiler option: -f" val)))))
 
 (args-fold (cdr (command-line))
 	   (list
@@ -71,6 +78,7 @@
 	    (option '(#\D) #t #f add-feature-flag)
 	    (option '("exe") #t #f set-exe-file)
 	    (option '("cc") #t #f set-cc-opts)
+	    (option '(#\f) #t #f  compile-option)
 	    (option '(#\s "script") #t #f set-script-file)
 	    (option '(#\o) #t #f set-output-file))
 	   (lambda (o n a s) (error "Unrecognized option:" n))
@@ -96,7 +104,7 @@
   (let ((output (string-append exe-file ".ll")))
     (display (format "compiling ~a to ~a\n" exe-file output-file))
     (with-output-to-file output (lambda ()
-				  (compile exe-file #f)))
+				  (compile exe-file #f include-eval)))
     (link output output-file cc-opts)))
 
 ;; Set output file as input file minus extension.

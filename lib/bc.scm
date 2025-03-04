@@ -47,12 +47,6 @@
 		    (dest loop-var-dest)
 		    (phis loop-var-phis loop-var-phis-set!))
 
-(define (abort str)
-  (display "TODO:")
-  (display str)
-  (newline)
-  (exit))
-
 ;; TODO: parameterize
 ;; This is so we don't have GENSYM'd names emitted for functions
 ;; if possible: The ASM label is known in advance (assuming the function
@@ -620,7 +614,7 @@ attributes #0 = { returns_twice}
     (if slash (list->string (reverse slash))
 	"./")))
 
-(define (compile file verbose)
+(define (compile file verbose include-eval)
   (set! functions '())
   (let* ((path (get-compile-path))
 	 (libman (make-libman path))
@@ -639,14 +633,14 @@ attributes #0 = { returns_twice}
 	    (,else `((import  (scheme base) (scheme r5rs) (scheme time) (scheme file) (scheme inexact) (scheme complex)) ,@pre-input))))
 	 (unused (expander-init libman))
 	 (runtime (expand-program runtime-input "" libman))
-	 (evals (expand-program eval-input "" libman))
+	 (evals (if include-eval (expand-program eval-input "" libman) '()))
 	 (prog (expand-program input "PROG-" libman))
+	 (eval-and-macros (if include-eval (append evals (serialize-libraries libman)) '()))
 	 (lowered (r7-pass `(begin  	,@runtime
-					,@evals
-					,@(serialize-libraries libman)
+					,@eval-and-macros
 					,@prog
-					0 ;; return value.
-					) #f))
+					0 ;; default return value.
+					)))
 	 (main-fun (make-fun "main")))
     (fun-args-set! main-fun '("%argc" "%argv"))
     (when verbose

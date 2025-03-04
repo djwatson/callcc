@@ -779,7 +779,7 @@ TODO: boxes could be passed down through funcs
       x))
 
 (include "sua.scm")
-(define (r7-pass x pic)
+(define (r7-pass x)
   (-> x
       deep-copy
       parse-expanded

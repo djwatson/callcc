@@ -1,7 +1,6 @@
 # known bugs:
 
 # plan
-  * Options: -fno-eval, -fno-eval-macros
   * get r7rs-tests working
 	* environments/eval
 	   * fix 'environment', boot order, check paths work
