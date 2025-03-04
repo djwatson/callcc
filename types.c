@@ -1268,7 +1268,6 @@ INLINE void SCM_WRITE_SHADOW_STACK(gc_obj pos, gc_obj obj) {
     }
     shadow_stack = realloc(shadow_stack, shadow_stack_size * sizeof(gc_obj));
     assert(shadow_stack);
-    printf("Resize shadow stack %li\n", shadow_stack_size);
   }
   assert(to_fixnum(pos) < shadow_stack_size);
   shadow_stack[to_fixnum(pos)] = obj;
