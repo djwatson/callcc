@@ -1254,8 +1254,31 @@ static const int64_t reg_arg_cnt = 6;
 /* #endif */
 
 // TODO: gc shadow_stack
-static constexpr uint64_t shadow_stack_size = 10000;
-gc_obj shadow_stack[shadow_stack_size];
+uint64_t shadow_stack_size = 0;
+gc_obj *shadow_stack = nullptr;
+///// Shadow stack
+
+// TODO: Could split in fast/slowpath: only apply doesn't statically know
+// the shadow stack size.
+INLINE void SCM_WRITE_SHADOW_STACK(gc_obj pos, gc_obj obj) {
+  while (unlikely(to_fixnum(pos) >= shadow_stack_size)) {
+    shadow_stack_size *= 2;
+    if (shadow_stack_size == 0) {
+      shadow_stack_size = 64;
+    }
+    shadow_stack = realloc(shadow_stack, shadow_stack_size * sizeof(gc_obj));
+    assert(shadow_stack);
+    printf("Resize shadow stack %li\n", shadow_stack_size);
+  }
+  assert(to_fixnum(pos) < shadow_stack_size);
+  shadow_stack[to_fixnum(pos)] = obj;
+}
+
+INLINE gc_obj SCM_READ_SHADOW_STACK(uint64_t pos) {
+  assert(pos < shadow_stack_size);
+  return shadow_stack[pos];
+}
+
 gc_obj consargs_stub(gc_obj a0, gc_obj a1, gc_obj a2, gc_obj a3, gc_obj a4,
                      gc_obj a5) {
   auto cnt = argcnt - wanted_argcnt;
@@ -1305,10 +1328,11 @@ gc_obj consargs_stub(gc_obj a0, gc_obj a1, gc_obj a2, gc_obj a3, gc_obj a4,
   while (cur > reg_arg_cnt) {
     if (cur <= wanted_argcnt) {
       *tail = res;
-      shadow_stack[cur - reg_arg_cnt] = head;
+      SCM_WRITE_SHADOW_STACK(tag_fixnum(cur - reg_arg_cnt), head);
+      //shadow_stack[cur - reg_arg_cnt] = head;
       return head;
     }
-    res = SCM_CONS(shadow_stack[cur - reg_arg_cnt - 1], res);
+    res = SCM_CONS(SCM_READ_SHADOW_STACK(cur - reg_arg_cnt - 1), res);
     cur--;
   }
   *tail = res;
@@ -1575,18 +1599,6 @@ gc_obj SCM_EXP(gc_obj f) {
 gc_obj SCM_LOG(gc_obj f) {
   double d = to_double(f);
   return double_to_gc_slow(log(d));
-}
-
-///// Shadow stack
-
-INLINE void SCM_WRITE_SHADOW_STACK(gc_obj pos, gc_obj obj) {
-  assert(to_fixnum(pos) < shadow_stack_size);
-  shadow_stack[to_fixnum(pos)] = obj;
-}
-
-INLINE gc_obj SCM_READ_SHADOW_STACK(uint64_t pos) {
-  assert(pos < shadow_stack_size);
-  return shadow_stack[pos];
 }
 
 static uint64_t hashmix(uint64_t key) {

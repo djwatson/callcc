@@ -19,7 +19,7 @@
 
 	 
 # full r7rs / safety / tests
-  * r7rs test - symbol names, file-error
+  * r7rs test - symbol names, file-error, asin, acos, denominator, inexact, eofports
   
   Mostly error paths:
   * argtype stress test

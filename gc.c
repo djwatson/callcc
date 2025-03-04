@@ -60,7 +60,8 @@ typedef struct freelist_s {
 extern int64_t symbol_table;
 extern uint64_t *complex_constants[];
 extern uint64_t complex_constants_len;
-extern int64_t shadow_stack[100];
+extern uint64_t shadow_stack_size;
+extern int64_t* shadow_stack;
 
 static uintptr_t align(uintptr_t val, uintptr_t alignment) {
   return (val + alignment - 1) & ~(alignment - 1);
@@ -434,7 +435,7 @@ __attribute__((noinline, preserve_none)) static void rcimmix_collect() {
   }
   // TODO: fix shadow stack size
   kv_push(markstack, ((range){(uint64_t *)&shadow_stack[0],
-                              (uint64_t *)&shadow_stack[100]}));
+                              (uint64_t *)&shadow_stack[shadow_stack_size]}));
 
   kv_push(markstack,
           ((range){(uint64_t *)&cur_link, (uint64_t *)(&cur_link + 8)}));
