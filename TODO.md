@@ -7,6 +7,9 @@
 	   * check if necessary to rename intrinsics? Works in other eval somehow
   * Get all abort() to S_error() instead in types.c
   * regain lost perf
+    * use utf32 representation of strings.  Ugh.  Mutable strings suck.
+	* better control of inlining, read-char should be inlined & fast.
+	* custom utf8proc_iterate, so it inlines correctly?
     * bv2string - bytevector copy, utf8proc_iterate, strcmp, bytevector_set
 	* cat, dynamic, read1, slatex, sum1, tail, wc - read
 	* parsing, -- ??
