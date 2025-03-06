@@ -7,11 +7,11 @@
 	   * check if necessary to rename intrinsics? Works in other eval somehow
   * Get all abort() to S_error() instead in types.c
   * regain lost perf
-	* better control of inlining, read-char should be inlined & fast.
-	* OK with pgo: dynamic, sum1, wc , bv2string
+	* better control of inlining, read-char/peek-char should be inlined & fast.
+	* OK with pgo: dynamic, sum1, wc , bv2string, cat, tail, slatex
 	
-    * bv2string - strcmp
-	* cat, read1, slatex, tail - read
+    * bv2string,read1,slatex - strcmp
+	* read1 - hash table ref, utf89proc_get_property, category, equal? somehow, etc etc, general reading of strings (delimited)
 	* parsing, -- ??
 	* fixup writing w-out going through write-char if possible?
 	* equal - hash table junk - move to case-lambda, check eqhash and strhash are working.

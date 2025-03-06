@@ -1881,7 +1881,10 @@
    ((ch port)
     (when (>= (port-pos port) (port-len port))
       ((port-fillflush port) port))
-    (sys:FOREIGN_CALL "SCM_STRING_SET" (port-buf port) (port-pos port) ch)
+    (if (< (char->integer ch) 128)
+	;; TODO merge in backend? 
+	(sys:FOREIGN_CALL "SCM_STRING_SET_FAST" (port-buf port) (port-pos port) ch)
+	(sys:FOREIGN_CALL "SCM_STRING_SET" (port-buf port) (port-pos port) ch))
     (port-pos-set! port (+ 1 (port-pos port)))
     (when (eq? #\newline ch)
       ((port-fillflush port) port)))))
