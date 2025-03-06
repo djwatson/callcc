@@ -1802,7 +1802,7 @@
    (() (read-char (current-input-port)))
    ((port)
     (if (< (port-pos port) (port-len port))
-	(let ((res (string-ref (port-buf port) (port-pos port))))
+	(let ((res (sys:FOREIGN_CALL "SCM_STRING_REF_FAST" (port-buf port) (port-pos port))))
 	  (port-pos-set! port (+ 1 (port-pos port)))
 	  res)
 	(begin

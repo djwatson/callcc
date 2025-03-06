@@ -1433,6 +1433,25 @@ INLINE gc_obj SCM_STRING_REF(gc_obj str, gc_obj pos) {
   return tag_char(s->strdata[i]);
 }
 
+INLINE gc_obj SCM_STRING_REF_FAST(gc_obj str, gc_obj pos) {
+  auto s = to_string(str);
+  uint64_t i = to_fixnum(pos);
+  if (unlikely(s->len.value != s->bytes.value)) {
+    // Slow, utf8-path.
+    int32_t codepoint;
+    uint32_t bytepos = 0;
+    for(uint64_t ch = 0; ch <= i; ch++) {
+      auto res = utf8proc_iterate((const unsigned char*)&s->strdata[bytepos], to_fixnum(s->bytes), &codepoint);
+      if (res < 0) {
+	abort();
+      }
+      bytepos+= res;
+    }
+    return tag_char(codepoint);
+  } 
+  return tag_char(s->strdata[i]);
+}
+
 // TODO: remove and replace with bytevector stuff.
 gc_obj SCM_STRING_SET_FAST(gc_obj str, gc_obj pos, gc_obj ch) {
   to_string(str)->strdata[to_fixnum(pos)] = to_char(ch);
