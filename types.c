@@ -1750,23 +1750,48 @@ static uint64_t utf8_count_bytes(unsigned char* buf, uint64_t len) {
   return bytes;
 }
 
+static bool is_ascii(uint8_t* data, uint32_t bytes) {
+  uint8_t *ptr = data;
+  uint8_t *end = data + bytes;
+  // Ensure we have 8 valid bytes for fastpath.
+  uint8_t *end_sentinel = data + bytes - 7;
+  uint32_t rem = bytes;
+  while(ptr < end_sentinel) {
+    uint64_t d;
+    memcpy(&d, ptr, 8);
+    if(d&0x8080808080808080) {
+      return false;
+    }
+    ptr += 8;
+  }
+  for(; ptr < end; ptr++) {
+    if (*ptr & 0x80) {
+      return false;
+    }
+  }
+  return true;
+}
+
 static uint32_t count_utf8(uint8_t* data, uint32_t bytes, bool abort_on_invalid) {
+  if (likely(is_ascii(data, bytes))) {
+    return bytes;
+  }
   uint32_t bytepos = 0;
   int32_t codepoint;
   uint32_t chars = 0;
   while(bytepos < bytes) {
     auto res = utf8proc_iterate(&data[bytepos], bytes, &codepoint);
     if (res < 0) {
-      if(abort_on_invalid) {
-	abort();
+      if (abort_on_invalid) {
+        abort();
       } else {
-	return chars;
+        return chars;
       }
     }
     chars++;
     bytepos += res;
   }
-  if (bytepos != bytes && abort_on_invalid) {
+  if (unlikely(bytepos != bytes && abort_on_invalid)) {
     abort();
   }
   return chars;

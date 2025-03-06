@@ -2031,7 +2031,7 @@
 ;; bytevectors
 (define utf8->string
   (case-lambda
-    ((bytevector) (utf8->string bytevector 0 (bytevector-length bytevector)))
+    ((bytevector) (sys:FOREIGN_CALL "SCM_UTF8_STRING" bytevector))
     ((bytevector start) (utf8->string bytevector start (bytevector-length bytevector)))
     ((bytevector start end)
      (unless (and (fixnum? start) (fixnum? end)) (error "bad start utf8-string" start))
@@ -2042,16 +2042,15 @@
      (sys:FOREIGN_CALL "SCM_UTF8_STRING" (bytevector-copy bytevector start end)))))
 (define string->utf8
   (case-lambda
-    ((string) (string->utf8 string 0 (string-length string)))
+    ((string) (sys:FOREIGN_CALL "SCM_STRING_UTF8" string))
     ((string start) (string->utf8 string start (string-length string)))
     ((string start end)
-     ;; Count codepoints, ending at NULL terminator
      (unless (and (fixnum? start) (fixnum? end)) (error "string->utf8" start))
      (unless (or (< -1 start (string-length string))
 		 (= start end)) (error "string->utf8" start))
      (unless (<= 0 end (string-length string)) (error "string->utf8" end))
      (when (> start end) (error "string->utf8" end))
-     ;; TODO: remove copy.
+     ;; TODO: remove copy?
      (sys:FOREIGN_CALL "SCM_STRING_UTF8" (substring string start end)))))
 (define (bytevector-u8-ref bv i) (sys:FOREIGN_CALL "SCM_BYTEVECTOR_REF" bv i))
 (define (bytevector-length bv) (sys:FOREIGN_CALL "SCM_BYTEVECTOR_LENGTH" bv))
