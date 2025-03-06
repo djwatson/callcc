@@ -2173,7 +2173,7 @@
     (display "ERROR:" eport)
     (write (error-object-type e) eport) (newline eport)
     (display (error-object-message e) eport)
-    (for-each (lambda (x) (write eport)) (error-object-irritants e))
+    (for-each (lambda (x) (write x eport)) (error-object-irritants e))
     (newline eport)
     (sys:FOREIGN_CALL "SCM_EXIT" -1)))
 
