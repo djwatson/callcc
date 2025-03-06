@@ -1494,7 +1494,7 @@
 (define (make-record sz)
   (sys:FOREIGN_CALL "SCM_MAKE_RECORD" sz))
 (define (record? p)
-  (sys:GUARD p record-tag))
+  (sys:GUARD p #b001010))
 
 (define :record-type (make-record 3))
 (record-set! :record-type 0 :record-type)	; Its type is itself.
