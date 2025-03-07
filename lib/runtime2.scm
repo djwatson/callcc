@@ -719,9 +719,7 @@
   (sys:FOREIGN_CALL "SCM_EXACT" a))
 (define (exact x) (inexact->exact x))
 (define (exact->inexact a)
-  (if (fixnum? a)
-      (sys:FOREIGN_CALL "SCM_INEXACT" a)
-      a))
+  (sys:FOREIGN_CALL "SCM_INEXACT" a))
 (define (inexact x) (exact->inexact x))
 
 ;; List
@@ -1943,7 +1941,8 @@
   (sys:FOREIGN_CALL "SCM_FILE_EXISTS" name))
 
 (define (delete-file name)
-  (sys:FOREIGN_CALL "SCM_DELETE_FILE" name))
+  (unless (= 0 (sys:FOREIGN_CALL "SCM_DELETE_FILE" name))
+    (raise (make-error-object 'file "delete file not found:" (list name)))))
 
 (define read-line
   (case-lambda
@@ -2167,10 +2166,12 @@
   (raise (make-error-object 'default-error msg rest)))
 
 (define (file-error? e)
-  (eq? 'file (error-object-type e)))
+  (and (error-object? e)
+       (eq? 'file (error-object-type e))))
 
 (define (read-error? e)
-  (eq? 'read (error-object-type e)))
+  (and (error-object? e)
+       (eq? 'read (error-object-type e))))
 
 (define (default-exception-handler e)
   (let ((eport (current-error-port)))

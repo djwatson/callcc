@@ -2,9 +2,12 @@
 
 # plan
   * get r7rs-tests working
+    * symbol names \", eofports
   * Get all abort() to S_error() instead in types.c
   * regain lost perf
 	* better control of inlining, read-char/peek-char should be inlined & fast.
+	* error should have noreturn
+	
 	* OK with pgo: dynamic, sum1, wc , bv2string, cat, tail, slatex
 	
     * bv2string,read1,slatex - strcmp
@@ -18,7 +21,7 @@
 
 	 
 # full r7rs / safety / tests
-  * r7rs test - symbol names, file-error, asin, acos, denominator, inexact, eofports
+  * r7rs test - asin, acos - basically all the arithmetic should work on ratnum and compnum too.
   
   Mostly error paths:
   * argtype stress test
@@ -27,14 +30,17 @@
   * copyish tests
   * gset check
   
-# CLEANUP
+# GC stuff:
+* recheck GC get stack top - fixme
+  * environ is getting smashed by call/cc
 
-* figure out strategy for intrinsics????
-* cleanup runtime - move as much to scm as possible
-* environments/eval
-  * check if necessary to rename intrinsics? Works in other eval somehow
-     * I think this is caused by needing to 'expand' symbols inserted by 
-	   syntax-case, and by the macro serializer.
+* gc fd's.
+* cleanup vector sizing: just use another header for large similar to small logbits?
+  * large could always use markbits, but it doesn't show up in any tests currently.
+* And do same thing for static symbols?
+* Cleanup the GC roots, some should be in types, add_root unused currently.
+* Remove the radix tree: just use pre-allocated virtual space.
+* cleanup strdata gc_log
 
 # benchmarks / perf improvements:
   * Needs inliner to remove alloc: graphs
@@ -49,18 +55,6 @@
   * auto-listify globals: consargs stub in compiler called a lot: 
     * vector. Hand-coded in chez
 
-# GC stuff:
-* recheck GC get stack top
-
-* gc fd's.
-* cleanup vector sizing: just use another header for large similar to small logbits?
-  * large could always use markbits, but it doesn't show up in any tests currently.
-* And do same thing for static symbols?
-* Cleanup the GC roots, some should be in types, add_root unused currently.
-* Remove the radix tree: just use pre-allocated virtual space.
-* cleanup strdata gc_log
-* environ is getting smashed by call/cc
-
 
 
 ----------------------------------------
@@ -68,8 +62,19 @@
 
 # PROBABLY NEVER:	 
 
+# CLEANUP
+
+* figure out strategy for intrinsics????
+* cleanup runtime - move as much to scm as possible
+* environments/eval
+  * check if necessary to rename intrinsics? Works in other eval somehow
+     * I think this is caused by needing to 'expand' symbols inserted by 
+	   syntax-case, and by the macro serializer.
+
 * cpstak:
   * argcnt needs a register somehow?
+  
+# PERF
 
 * fast globals, a.la chez
 
