@@ -1,10 +1,9 @@
 # known bugs:
+  * display #<undef> fails
+  * environ is getting smashed by call/cc
 
 # plan
   * get r7rs-tests working
-	* environments/eval
-	   * fix 'environment', boot order, check paths work
-	   * check if necessary to rename intrinsics? Works in other eval somehow
   * Get all abort() to S_error() instead in types.c
   * regain lost perf
 	* better control of inlining, read-char/peek-char should be inlined & fast.
@@ -16,7 +15,7 @@
 	* fixup writing w-out going through write-char if possible?
 	* equal - hash table junk - move to case-lambda, check eqhash and strhash are working.
                resize and use and instead of modulo.
-	* maybe just pgo: conform??, cpstak??, gcbench, lattice, pnpoly, puzzle, quicksort, ray, scheme, sum, takl
+	* maybe just pgo: conformY, cpstakY, gcbenchN, lattice, pnpoly, puzzle, quicksort, ray, scheme, sum, takl
   * install - fix dirs
 
 	 
@@ -34,6 +33,10 @@
 
 * figure out strategy for intrinsics????
 * cleanup runtime - move as much to scm as possible
+* environments/eval
+  * check if necessary to rename intrinsics? Works in other eval somehow
+     * I think this is caused by needing to 'expand' symbols inserted by 
+	   syntax-case, and by the macro serializer.
 
 # benchmarks / perf improvements:
   * Needs inliner to remove alloc: graphs

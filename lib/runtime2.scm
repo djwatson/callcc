@@ -468,7 +468,9 @@
 			 (display " " port)
 			 (loop (cdr n)))))))
       (display ")" port))
-     (else (sys:FOREIGN_CALL "SCM_DISPLAY" n (port-fd port)) (0)))
+     (else
+      (display "UNKNOWN DISPLAY:" port)
+      (sys:FOREIGN_CALL "SCM_DISPLAY" n (port-fd port)) (0)))
     )))
 
 (define (check-shared? shared x port)

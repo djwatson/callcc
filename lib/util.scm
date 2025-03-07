@@ -73,7 +73,8 @@
       (read-file-rec (cons next sexps)))))
 
 (define gen-sym
-  (let ((n 0))
+  ;; TODO fuckin' hack - gensyms need to be unique because of serialization. FUCK
+  (let ((n (cond-expand (callcc 100000) (else 0))))
     (lambda (a)
       (set! n (+ n 1))
       (string->symbol

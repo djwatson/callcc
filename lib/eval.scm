@@ -13,7 +13,8 @@
 	(rename (util) (ilength util-ilength))
 	(match))
 
-;; Eval: Necessary identifiers????
+;; Eval: these are generated from the expander without a namespace: export them here sans-namespace:
+;; TODO: fix up symbol expansion so this isn't necessary.
 (define ilength util-ilength)
 (define make-ident expand-make-ident)
 (define identifier? expand-identifier?)
@@ -24,11 +25,35 @@
 (define make-library expand-make-library)
 
 (expander-init runtime-man)
-(define env (make-env #f))
-(define (environment . lst) (interaction-environment))
-(define (interaction-environment)
-  (run-boot)
-  env)
+
+(define (environment . lst)
+  (let ((env (make-env #f)))
+    (eval `(import ,@lst) env)
+    env))
+
+(define interaction-environment
+  (let ((env #f))
+    (lambda ()
+      (unless env
+	;; Build an environment with all the scheme report imported.
+	(set! env (make-env #f))
+	(eval '(import (scheme base)
+		       (scheme repl)
+		       (scheme write)
+		       (scheme read)
+		       (scheme file)
+		       (scheme case-lambda)
+		       (scheme char)
+		       (scheme complex)
+		       (scheme cxr)
+		       (scheme eval)
+		       (scheme inexact)
+		       (scheme lazy)
+		       (scheme load)
+		       (scheme process-context)
+		       (scheme r5rs)
+		       (scheme time))  env))
+      env)))
 (define (get-compile-path)
   (let ((slash (memq #\/ (reverse (string->list (car (command-line)))))))
     (if slash (list->string (reverse slash))
@@ -37,33 +62,16 @@
 (set! library-search-paths (cons (string-append path "lib/srfi2") library-search-paths))
 (set! library-search-paths (cons (string-append path "lib/headers") library-search-paths))
 (set! library-search-paths (cons (string-append path "lib") library-search-paths))
-(define booted #f)
-(define (run-boot)
-  (unless booted
-    (set! booted #t)
-    (expand-program '((import (scheme base)
-			      (scheme repl)
-			      (scheme write)
-			      (scheme read)
-			      (scheme file)
-			      (scheme case-lambda)
-			      (scheme char)
-			      (scheme complex)
-			      (scheme cxr)
-			      (scheme eval)
-			      (scheme inexact)
-			      (scheme lazy)
-			      (scheme load)
-			      (scheme process-context)
-			      (scheme r5rs)
-			      (scheme time))) "PROG-" runtime-man env)))
 
 ;; A simple ast-walking interpreter.  It is very slow.
 ;; It directly parses what comes out of the expander.
 
 ;; It could be improved by:
 ;; a) running it through some of the optimization passes (closure conversion, etc)
-;; b) Pre-compile, compiling-with-closures. 
+;; b) Pre-compile, compiling-with-closures.
+
+;; This 'env' is only the lexical environment, the global environment
+;; is handled by the expander.
 (define (base-eval e env)
   (match e
     ((lambda ,largs ,lbody)
@@ -129,18 +137,22 @@
       (else (sys:FOREIGN_CALL "SCM_LOAD_GLOBAL" sym))))
     (,self-eval
      self-eval)))
-(define (eval prog env2)
-  (define expand (not (and (pair? prog) (eq? 'no-expand (car prog)))))
-  (define e (if expand (let ((v (expand-program (list prog) "PROG-" runtime-man env)))
-			 v) (list (cdr prog))))
-  (define res '())
-  ;; (when expand
-  ;;   (display "My eval: ") (display e) (newline))
-  (for expr e
-       (set! res (base-eval expr '())))
-  res)
+
+(define (eval expr env)
+  (unless (environment? env) (error "Eval: not an environment" env))
+  (match expr
+    ((no-expand . ,expr) (evals (list expr) env #f))
+    (,expr (evals (list expr) env #t))))
+
+;; Evaluate a list of expressions, possibly expanding them as well.
+(define (evals prog expand-env expand)
+  (let ((expanded (if expand (expand-program prog "PROG-" runtime-man expand-env)
+		      prog)))
+    (let loop ((exprs expanded) (res #f))
+      (if (null? exprs)
+	  res
+	  (loop (cdr exprs) (base-eval (car exprs) '()))))))
       
 (define (load file)
   (define input (with-input-from-file file (lambda () (read-file))))
-  (for e input
-       (eval e (interaction-environment))))
+  (evals input (interaction-environment) #t))
