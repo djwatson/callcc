@@ -515,7 +515,7 @@ static bool has_ptr_tag(gc_obj n) {
   return (((uint32_t)1 << (n.value & 0x1f)) &
           (~(uint32_t)0 / 0xff * PTR_TAG_SET)) != 0;
 }
-INLINE void SCM_SET_GLOBAL(gc_obj a, gc_obj b) {
+INLINE gc_obj SCM_SET_GLOBAL(gc_obj a, gc_obj b) {
   auto sym = to_symbol(a);
   sym->val = b;
   // gclog check if static, if not, quick set
@@ -523,6 +523,7 @@ INLINE void SCM_SET_GLOBAL(gc_obj a, gc_obj b) {
   if (has_ptr_tag(b)) {
     gc_log((uint64_t)&sym->val);
   }
+  return UNDEFINED;
 }
 
 NOINLINE void SCM_ARGCNT_FAIL() {

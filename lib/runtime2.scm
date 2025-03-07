@@ -468,8 +468,9 @@
 			 (display " " port)
 			 (loop (cdr n)))))))
       (display ")" port))
+     ((undefined? n) (display "#<undef>" port))
      (else
-      (display "UNKNOWN DISPLAY:" port)
+      (display "UNKNOWN DISPLAY:\n" port)
       (sys:FOREIGN_CALL "SCM_DISPLAY" n (port-fd port)) (0)))
     )))
 
@@ -672,6 +673,7 @@
 (define (rational? x) (and (number? x) (not (compnum? x)) (not (and (flonum? x) (or (sys:FOREIGN_CALL "SCM_ISNAN" x) (sys:FOREIGN_CALL "SCM_ISINF" x))))))
 
 (define (fixnum? x) (fixnum? x))
+(define (undefined? x) (sys:GUARD x #x26 ))
 (define (bignum? x) (sys:FOREIGN_CALL "SCM_IS_BIGNUM" x))
 (define (ratnum? x) (sys:FOREIGN_CALL "SCM_IS_RATNUM" x))
 (define (compnum? x) (sys:FOREIGN_CALL "SCM_IS_COMPNUM" x))

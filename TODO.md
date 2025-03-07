@@ -1,5 +1,4 @@
 # known bugs:
-  * display #<undef> fails
   * environ is getting smashed by call/cc
 
 # plan
