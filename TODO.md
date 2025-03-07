@@ -13,7 +13,7 @@
 	* fixup writing w-out going through write-char if possible?
 	* equal - hash table junk - move to case-lambda, check eqhash and strhash are working.
                resize and use and instead of modulo.
-	* maybe just pgo: conformY, cpstakY, gcbenchN, lattice, pnpoly, puzzle, quicksort, ray, scheme, sum, takl
+	* maybe just pgo: conformY, cpstakY, gcbenchN??, lattice, pnpoly, puzzle, quicksort, ray, scheme, sum, takl
   * install - fix dirs
 
 	 

@@ -156,3 +156,13 @@
 (define (load file)
   (define input (with-input-from-file file (lambda () (read-file))))
   (evals input (interaction-environment) #t))
+
+(define (scheme-report-environment version)
+  (unless (= 5 version) (error "scheme-report-environment supports only version 5" version))
+  (environment '(scheme r5rs)))
+
+(define (null-environment version)
+  (unless (= 5 version) (error "null-environment supports only version 5" version))
+  (environment '(only (scheme r5rs) syntax-rules define quasiquote let let* letrec letrec-syntax
+		      do case cond and or delay force
+		      lambda begin if quote define-syntax let-syntax set!)))
