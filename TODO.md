@@ -1,5 +1,4 @@
 # known bugs:
-  * environ is getting smashed by call/cc
 
 # plan
   * get r7rs-tests working
@@ -60,6 +59,7 @@
 * Cleanup the GC roots, some should be in types, add_root unused currently.
 * Remove the radix tree: just use pre-allocated virtual space.
 * cleanup strdata gc_log
+* environ is getting smashed by call/cc
 
 
 
