@@ -235,11 +235,6 @@ void gc_init(int argc_in, char **argv_in) {
 #endif
   /* printf("frametop %p pthreadtop %p\n", stacktop, addr); */
   stacktop = addr;
-  // TODO FIX HACKKKKKKKKKKKKKKKKKKKKKKKK
-  // Save somewhere? Or use correct stack top?
-  // We really need just stack pointer on entry to main
-  // (before any frame size is reserved for spills in main)
-  stacktop = (uint64_t*)environ - 1;
 
   // Set defaults so we don't have to check for wrapping in
   // the fastpath.

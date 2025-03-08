@@ -1123,13 +1123,22 @@ typedef struct ccsave {
   int64_t stack[];
 } ccsave;
 
+extern char **environ;
+void* get_stack_top() {
+  // TODO FIX HACKKKKKKKKKKKKKKKKKKKKKKKK
+  // Save somewhere? Or use correct stack top?
+  // We really need just stack pointer on entry to main
+  // (before any frame size is reserved for spills in main)
+   return  ((uint64_t*)environ - 1);
+}
+
 ccsave *cur_link = NULL;
 static uint8_t tmpstack[100];
 gc_obj ccresthunk(gc_obj unused, gc_obj n) {
   ccsave *c = (ccsave *)to_closure(unused);
   cur_link = c->prev_link;
 
-  int64_t stack_bottom = (int64_t)gc_get_stack_top() - c->sz;
+  int64_t stack_bottom = (int64_t)get_stack_top() - c->sz;
   void *saved_stack = c->stack;
   size_t saved_sz = c->sz;
   uint64_t tmpstackalign = ((uint64_t)tmpstack + 100) & ~15;
@@ -1196,7 +1205,8 @@ SCM_CALLCC(gc_obj cont) {
   auto clo = to_closure(cont);
 
   void *stack_bottom = __builtin_frame_address(0);
-  void *stacktop = (void *)gc_get_stack_top();
+  void *stacktop = get_stack_top();
+
   size_t stack_sz = stacktop - stack_bottom;
   ccsave *stack = rcimmix_alloc(sizeof(ccsave) + stack_sz);
   stack->sz = stack_sz;
@@ -1982,7 +1992,6 @@ gc_obj SCM_DOUBLE_AS_U64(gc_obj b) {
 }
 
 // process-context
-extern char **environ;
 
 extern int argc;
 extern char **argv;
