@@ -396,11 +396,20 @@
   (and (number? c) (exact? c) (integer? c)  (real? c)
        (< (abs c) #x1fffffffffffffff)))
 
+(define (escape-quotes str)
+  (list->string 
+   (apply append 
+          (map (lambda (ch) 
+                 (if (char=? ch #\")
+                     (string->list "\\22")
+                     (list ch)))
+               (string->list str)))))
+
 (define (add-const c)
   (cond
    ((symbol? c)
     (let ((str (emit-const (symbol->string c)))
-	  (sym-name (string-append "SYM-" (symbol->string c))))
+	  (sym-name (string-append "SYM-" (escape-quotes (symbol->string c)))))
       (push! consts (format "@\"~a\" = private unnamed_addr global {i64, i64, i64} {i64 ~a, i64 ~a, i64 ~a}, align 8\n"
 			    sym-name symbol-tag str undefined-tag))
       (format "add (i64 ~a, i64 ptrtoint ({i64, i64, i64}* @\"~a\" to i64))"
@@ -427,9 +436,9 @@
    ((null? c) nil-tag)
    ((string? c)
     (let* ((id (next-id))
-	  (bv (string->utf8 c))
-	  (bytes (bytevector-length bv))
-	  (len (string-length c)))
+	   (bv (string->utf8 c))
+	   (bytes (bytevector-length bv))
+	   (len (string-length c)))
       (push! consts (format "@strdata~a = private unnamed_addr constant [~a x i8] [~a]"
 			    id bytes (join ", " (omap num (bytevector->list bv) (format "i8 ~a" num)))))
       (push! consts (format "@str~a = private unnamed_addr constant {i64, i64, i64, ptr} {i64 ~a, i64 ~a, i64 ~a, ptr @strdata~a}, align 8\n"
@@ -503,7 +512,7 @@ declare void @SCM_SET_GLOBAL(i64, i64)
 declare ptr @SCM_LOAD_CLOSURE_PTR(i64)
 declare preserve_nonecc i64 @SCM_CALLCC (i64)  #0
 declare preserve_nonecc i64 @SCM_CALLCC_ONESHOT (i64)  #0
-declare void @consargs_stub () #0
+declare void @consargs_stub ()
 declare i64 @SCM_CONS (i64, i64)
 declare i64 @SCM_CAR (i64)
 declare i64 @SCM_CDR (i64)

@@ -2,7 +2,7 @@
 
 # plan
   * get r7rs-tests working
-    * symbol names \", eofports
+    * eofports
   * Get all abort() to S_error() instead in types.c
   * regain lost perf
 	* better control of inlining, read-char/peek-char should be inlined & fast.
