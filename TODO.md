@@ -1,4 +1,5 @@
 # known bugs:
+  * stacktop still broken, smashes environ, but if set to environ-1, breaks other things.
 
 # plan
   * Get all abort() to S_error() instead in types.c
@@ -6,14 +7,8 @@
 	* better control of inlining, read-char/peek-char should be inlined & fast.
 	* error should have noreturn
 	
-	* OK with pgo: dynamic, sum1, wc , bv2string, cat, tail, slatex
-	
-	* read1 - hash table ref, utf89proc_get_property, category, equal? somehow, etc etc, general reading of strings (delimited)
-	* parsing, -- ??
 	* fixup writing w-out going through write-char if possible?
-	* equal - hash table junk - move to case-lambda, check eqhash and strhash are working.
-               resize and use and instead of modulo.
-	* maybe just pgo: conformY, cpstakY, gcbenchN??, lattice, pnpoly, puzzle, quicksort, ray, scheme, sum, takl
+	* gcbench: ratnums are too slow.  Doh.  Hand-roll ratnums?
   * install - fix dirs
 
 	 
@@ -60,6 +55,8 @@
 # PROBABLY NEVER:	 
 
 # CLEANUP
+
+* srfi69 is already builtin
 
 * figure out strategy for intrinsics????
 * cleanup runtime - move as much to scm as possible
