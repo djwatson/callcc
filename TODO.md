@@ -8,7 +8,6 @@
 	
 	* OK with pgo: dynamic, sum1, wc , bv2string, cat, tail, slatex
 	
-    * bv2string,read1,slatex - strcmp
 	* read1 - hash table ref, utf89proc_get_property, category, equal? somehow, etc etc, general reading of strings (delimited)
 	* parsing, -- ??
 	* fixup writing w-out going through write-char if possible?

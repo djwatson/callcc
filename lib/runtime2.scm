@@ -1216,10 +1216,19 @@
 (define (char-lower-case? c)
   (sys:FOREIGN_CALL "SCM_CHAR_LOWERCASE" c))
 (define (char-whitespace? c)
-  (sys:FOREIGN_CALL "SCM_CHAR_WHITESPACE" c))
+  (let ((n (char->integer c)))
+    (if (< n 128)
+	(or (eq? n 32) (eq? n 9) (eq? n 12) (eq? n 10) (eq? n 13))
+	(sys:FOREIGN_CALL "SCM_CHAR_WHITESPACE" c))))
 
 (define (char-downcase c)
-  (sys:FOREIGN_CALL "SCM_DOWNCASE" c))
+  (let ((n (char->integer c)))
+    (if (< n 128)
+	(if (or (< n #x41)		; A
+		(> n #x5a))		; Z
+	    (integer->char n)
+	    (integer->char (+ n 32)))
+	(sys:FOREIGN_CALL "SCM_DOWNCASE" c))))
 (define (char-foldcase c) (sys:FOREIGN_CALL "SCM_FOLDCASE" c))
 (define (char-upcase c) (sys:FOREIGN_CALL "SCM_UPCASE" c))
 

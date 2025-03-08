@@ -24,6 +24,18 @@
 	 (lst lst (cdr lst)))
 	((= i len) bv)
       (bytevector-u8-set! bv i (car lst)))))
+(define strbuf (make-string 100))
+(define strbuf-loc 0)
+(define (strbuf-add c)
+  (if (< strbuf-loc (string-length strbuf))
+      (begin
+	(sys:FOREIGN_CALL "SCM_STRING_SET_FAST" strbuf strbuf-loc c)
+	(set! strbuf-loc (+ strbuf-loc 1)))
+      (error "strbuf too short")))
+(define (get-strbuf)
+  (let ((res (substring strbuf 0 strbuf-loc)))
+    (set! strbuf-loc 0)
+    res))
 (define read
   (case-lambda
    (() (read (current-input-port)))
@@ -32,16 +44,17 @@
 	  (holes #f))
       (define (read2 port)
 	(define (read-to-delimited)
-	  (let loop ((res '()) (c (peek-char port)))
+	  (let loop ( (c (peek-char port)))
 	    (if (eof-object? c)
-		(if (null? res)
+		(if (= 0 strbuf-loc)
 		    c
-		    (list->string (reverse res)))
+		    (get-strbuf))
 		(case c
 		  ((#\( #\) #\" #\| #\newline #\return #\space #\tab #\;)
-		   (list->string (reverse res)))
+		   (get-strbuf))
 		  (else
-		   (loop (cons (read-char port) res) (peek-char port)))))))
+		   (read-char port)
+		   (strbuf-add c) (loop (peek-char port)))))))
 	(define (skip-whitespace)
 	  (let loop ()
 	    (let ((c (peek-char port)))
