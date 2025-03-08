@@ -1483,27 +1483,10 @@ INLINE gc_obj SCM_STRING_REF_FAST(gc_obj str, gc_obj pos) {
   return tag_char(s->strdata[i]);
 }
 
-gc_obj SCM_STRING_SET(gc_obj str, gc_obj pos, gc_obj scm_ch) {
-  #ifndef UNSAVE
-  if (unlikely(!is_string(str))) {
-    abort();
-  }
-  if (unlikely(!is_fixnum(pos))) {
-    abort();
-  }
-  if (unlikely(!is_char(scm_ch))) {
-    abort();
-  }
-  #endif
+NOINLINE gc_obj SCM_STRING_SET_SLOW(gc_obj str, gc_obj pos, gc_obj scm_ch) {
   auto s = to_string(str);
   uint64_t i = to_fixnum(pos);
   uint32_t c = to_char(scm_ch);
-  #ifndef UNSAFE
-  if (unlikely(i >= (uint64_t)to_fixnum(s->len))) {
-    abort();
-  }
-  #endif
-  if (unlikely(s->len.value != s->bytes.value || c >= 128)) {
     uint8_t buf[4];
     auto bytecnt = utf8proc_encode_char(c, buf);
     assert(bytecnt != 0);
@@ -1535,6 +1518,29 @@ gc_obj SCM_STRING_SET(gc_obj str, gc_obj pos, gc_obj scm_ch) {
     }
     memcpy(&s->strdata[bytepos], buf, bytecnt);
     return UNDEFINED;
+}
+INLINE gc_obj SCM_STRING_SET(gc_obj str, gc_obj pos, gc_obj scm_ch) {
+  #ifndef UNSAVE
+  if (unlikely(!is_string(str))) {
+    abort();
+  }
+  if (unlikely(!is_fixnum(pos))) {
+    abort();
+  }
+  if (unlikely(!is_char(scm_ch))) {
+    abort();
+  }
+  #endif
+  auto s = to_string(str);
+  uint64_t i = to_fixnum(pos);
+  uint32_t c = to_char(scm_ch);
+  #ifndef UNSAFE
+  if (unlikely(i >= (uint64_t)to_fixnum(s->len))) {
+    abort();
+  }
+  #endif
+  if (unlikely(s->len.value != s->bytes.value || c >= 128)) {
+    [[clang::musttail]] return SCM_STRING_SET_SLOW(str, pos, scm_ch);
   }
   s->strdata[i] = c;
   assert(s->strdata[i] != 0);
