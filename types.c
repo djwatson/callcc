@@ -1255,7 +1255,7 @@ static const int64_t reg_arg_cnt = 6;
 /* #endif */
 
 // TODO: gc shadow_stack
-uint64_t shadow_stack_size = 0;
+int64_t shadow_stack_size = 0;
 gc_obj *shadow_stack = nullptr;
 ///// Shadow stack
 
@@ -1777,11 +1777,11 @@ gc_obj SCM_OPEN_FD(gc_obj filename, gc_obj input) {
       open(name, readonly ? O_RDONLY : O_WRONLY | O_CREAT | O_TRUNC, 0777));
 }
 
-static uint64_t utf8_count_bytes(unsigned char* buf, uint64_t len) {
+static uint64_t utf8_count_bytes(char* buf, uint64_t len) {
   uint64_t bytes = 0;
   int32_t codepoint_res;
   for(uint64_t codepoint = 0; codepoint < len; codepoint++) {
-    auto res = utf8proc_iterate(&buf[bytes], (long)(len*4), &codepoint_res);
+    auto res = utf8proc_iterate((unsigned char*)&buf[bytes], (long)(len*4), &codepoint_res);
     bytes += res;
   }
   return bytes;
@@ -1792,7 +1792,6 @@ static bool is_ascii(uint8_t* data, uint32_t bytes) {
   uint8_t *end = data + bytes;
   // Ensure we have 8 valid bytes for fastpath.
   uint8_t *end_sentinel = data + bytes - 7;
-  uint32_t rem = bytes;
   while(ptr < end_sentinel) {
     uint64_t d;
     memcpy(&d, ptr, 8);
@@ -1857,7 +1856,7 @@ gc_obj SCM_READ_FD(gc_obj scmfd, gc_obj scmbuf) {
     exit(-1);
   }
   buf->bytes = tag_fixnum(res + remaining);
-  auto len = count_utf8(buf->strdata, to_fixnum(buf->bytes), false);
+  auto len = count_utf8((uint8_t*)buf->strdata, to_fixnum(buf->bytes), false);
   buf->len = tag_fixnum(len);
   
   return buf->len;

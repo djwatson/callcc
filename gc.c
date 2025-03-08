@@ -60,7 +60,7 @@ typedef struct freelist_s {
 extern int64_t symbol_table;
 extern uint64_t *complex_constants[];
 extern uint64_t complex_constants_len;
-extern uint64_t shadow_stack_size;
+extern int64_t shadow_stack_size;
 extern int64_t* shadow_stack;
 
 static uintptr_t align(uintptr_t val, uintptr_t alignment) {
