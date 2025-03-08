@@ -1463,47 +1463,6 @@ INLINE gc_obj SCM_STRING_REF_FAST(gc_obj str, gc_obj pos) {
   return tag_char(s->strdata[i]);
 }
 
-// TODO: remove and replace with bytevector stuff.
-gc_obj SCM_STRING_SET_FAST(gc_obj str, gc_obj pos, gc_obj scm_ch) {
-  auto s = to_string(str);
-  uint64_t i = to_fixnum(pos);
-  uint32_t c = to_char(scm_ch);
-  if (unlikely(s->len.value != s->bytes.value || c >= 128)) {
-    uint8_t buf[4];
-    auto bytecnt = utf8proc_encode_char(c, buf);
-    assert(bytecnt != 0);
-    
-    int32_t codepoint;
-    uint32_t bytepos = 0;
-    ssize_t res;
-    for(uint64_t ch = 0; ch <= i; ch++) {
-      res = utf8proc_iterate((const unsigned char*)&s->strdata[bytepos], to_fixnum(s->bytes), &codepoint);
-      if (res < 0) {
-	abort();
-      }
-      if (ch == i) {
-	break;
-      }
-      bytepos+= res;
-    }
-    if (res != bytecnt) {
-      auto old_data = s->strdata;
-      auto new_bytes = to_fixnum(s->bytes) + bytecnt - res;
-      auto new_bytes_aligned = (new_bytes + 7) & ~7;
-      s->strdata = rcimmix_alloc(new_bytes_aligned);
-      gc_log((uint64_t)&s->strdata);
-      memcpy(s->strdata, old_data, bytepos);
-      memcpy(&s->strdata[bytepos], buf, bytecnt);
-      memcpy(&s->strdata[bytepos + bytecnt], &old_data[bytepos + res], to_fixnum(s->bytes) - bytepos - res);
-      s->bytes = tag_fixnum(new_bytes);
-      return UNDEFINED;
-    }
-    memcpy(&s->strdata[bytepos], buf, bytecnt);
-    return UNDEFINED;
-  }
-  s->strdata[i] = c;
-  return UNDEFINED;
-}
 gc_obj SCM_STRING_SET(gc_obj str, gc_obj pos, gc_obj scm_ch) {
   #ifndef UNSAVE
   if (unlikely(!is_string(str))) {
@@ -1559,6 +1518,16 @@ gc_obj SCM_STRING_SET(gc_obj str, gc_obj pos, gc_obj scm_ch) {
   }
   s->strdata[i] = c;
   assert(s->strdata[i] != 0);
+  return UNDEFINED;
+}
+INLINE gc_obj SCM_STRING_SET_FAST(gc_obj str, gc_obj pos, gc_obj scm_ch) {
+  auto s = to_string(str);
+  uint64_t i = to_fixnum(pos);
+  uint32_t c = to_char(scm_ch);
+  if (unlikely(s->len.value != s->bytes.value || c >= 128)) {
+    [[clang::musttail]] return SCM_STRING_SET(str, pos, scm_ch);
+  }
+  s->strdata[i] = c;
   return UNDEFINED;
 }
 
