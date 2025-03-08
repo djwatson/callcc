@@ -1351,6 +1351,26 @@ gc_obj consargs_stub(gc_obj a0, gc_obj a1, gc_obj a2, gc_obj a3, gc_obj a4,
 
 INLINE gc_obj SCM_STRING_LENGTH(gc_obj obj) { return to_string(obj)->len; }
 
+gc_obj SCM_STRING_CMP(gc_obj a, gc_obj b) {
+  auto sa = to_string(a);
+  auto sb = to_string(b);
+  auto len = to_fixnum(sa->bytes);
+  if (to_fixnum(sb->bytes) < len) {
+    len = to_fixnum(sb->bytes);
+  }
+  auto res = strncmp(sa->strdata, sb->strdata, len);
+  if (res == 0) {
+    if (to_fixnum(sa->len) > to_fixnum(sb->len)) {
+      return tag_fixnum(1);
+    }
+    if (to_fixnum(sa->len) < to_fixnum(sb->len)) {
+      return tag_fixnum(-1);
+    }
+    return tag_fixnum(0);
+  }
+  return tag_fixnum(res);
+}
+
 INLINE gc_obj SCM_EQ(gc_obj a, gc_obj b) {
   if (a.value == b.value) {
     return TRUE_REP;

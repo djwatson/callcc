@@ -1285,7 +1285,7 @@
        #\x1D7F6               ;MATHEMATICAL MONOSPACE DIGIT ZERO
        ))
 ;;;;;;;;; string
-(define (strcmp eq? f a b eq lt gt)
+(define (strcmp eq? f eq lt gt a b)
   (let loop ((pos 0) (rema (string-length a)) (remb (string-length b)))
     (cond
      ((and (= rema 0 ) (= remb 0))  eq)
@@ -1298,22 +1298,30 @@
 
 (define-syntax define-strcmp
   (syntax-rules (strcmp)
-    ((_ name (strcmp eq? cmp? a b eq lt gt))
+    ((_ name (call args ...))
      (define name
        (case-lambda
-	((a b) (strcmp eq? cmp? a b eq lt gt))
+	((a b) (call args ... a b))
 	(rest
 	 (comparer name rest)))))))
-(define-strcmp string<? (strcmp char=? char<? a b #f #t #f))
-(define-strcmp string>? (strcmp char=? char>? a b #f #f #t))
-(define-strcmp string<=? (strcmp char=? char<=? a b #t #t #f))
-(define-strcmp string>=? (strcmp char=? char>=? a b #t #f #t))
-(define-strcmp string=? (strcmp char=? char=? a b #t #f #f))
-(define-strcmp string-ci<?  (strcmp char-ci=? char-ci<? a b #f #t #f))
-(define-strcmp string-ci>?  (strcmp char-ci=? char-ci>? a b #f #f #t))
-(define-strcmp string-ci<=?  (strcmp char-ci=? char-ci<=? a b #t #t #f))
-(define-strcmp string-ci>=?  (strcmp char-ci=? char-ci>=? a b #t #f #t))
-(define-strcmp string-ci=?  (strcmp char-ci=? char-ci=? a b #t #f #f))
+(define-syntax define-strcmp-fast
+  (syntax-rules ()
+    ((_ name cmp)
+     (define name
+       (case-lambda
+	((a b) (cmp (sys:FOREIGN_CALL "SCM_STRING_CMP" a b) 0))
+	(rest
+	 (comparer name rest)))))))
+(define-strcmp-fast string<? <)
+(define-strcmp-fast string>? >)
+(define-strcmp-fast string<=? <=)
+(define-strcmp-fast string>=? >=)
+(define-strcmp-fast string=? =)
+(define-strcmp string-ci<?  (strcmp char-ci=? char-ci<? #f #t #f))
+(define-strcmp string-ci>?  (strcmp char-ci=? char-ci>? #f #f #t))
+(define-strcmp string-ci<=?  (strcmp char-ci=? char-ci<=? #t #t #f))
+(define-strcmp string-ci>=?  (strcmp char-ci=? char-ci>=? #t #f #t))
+(define-strcmp string-ci=?  (strcmp char-ci=? char-ci=? #t #f #f))
 (define (string-downcase s)
   (let loop ((out '()) (in (string->list s)))
     (cond
@@ -1989,7 +1997,7 @@
 (define scm-symbol-table '())
 (define (string->symbol str)
   (when (null? scm-symbol-table)
-    (set! scm-symbol-table (make-hash-table equal? string-hash))
+    (set! scm-symbol-table (make-hash-table string=? string-hash))
     (let ((table (sys:FOREIGN_CALL "SCM_GET_SYM_TABLE")))
       (for-each (lambda (x) (hash-table-set! scm-symbol-table (symbol->string x) x)) (vector->list table))))
   (cond
