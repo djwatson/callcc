@@ -390,7 +390,7 @@
 (define (set-cdr! n v) (sys:FOREIGN_CALL "SCM_SETCDR" n v))
 
 (define (cons  n a) (sys:FOREIGN_CALL "SCM_CONS" n a))
-(define (vector-length n) (sys:FOREIGN_CALL "SCM_VECTOR_LENGTH" n))
+(define (vector-length n)  (sys:FOREIGN_CALL "SCM_VECTOR_LENGTH" n))
 (define make-vector
   (case-lambda
    ((len) (sys:FOREIGN_CALL "SCM_MAKE_VECTOR" len))
@@ -603,7 +603,9 @@
       (string-set!
        str i
        (apply proc (map (lambda (x) (string-ref x i)) strs))))))
-(define (string-length n) (sys:FOREIGN_CALL "SCM_STRING_LENGTH" n))
+(define (string-length n)
+  (unless (string? n) (error "Not a string:" n))
+  (sys:FOREIGN_CALL "SCM_STRING_LENGTH" n))
 (define make-string
   (case-lambda
    ((n) (sys:FOREIGN_CALL "SCM_MAKE_STRING" n #f))
@@ -1318,7 +1320,8 @@
     ((_ name cmp)
      (define name
        (case-lambda
-	((a b) (cmp (sys:FOREIGN_CALL "SCM_STRING_CMP" a b) 0))
+	((a b) (unless (and (string? a) (string? b)) (error "Strcmp not strings"))
+	 (cmp (sys:FOREIGN_CALL "SCM_STRING_CMP" a b) 0))
 	(rest
 	 (comparer name rest)))))))
 (define-strcmp-fast string<? <)
@@ -1498,11 +1501,16 @@
    ((string) (substring string 0 (string-length string)))
    ((string start) (substring string start (string-length string)))
    ((string start end) (substring string start end))))
-(define (substring s start end)
-  (let ((new (make-string (- end start))))
-    (sys:FOREIGN_CALL "SCM_STRING_CPY" new 0 s start end)
-    ;(string-copy! new 0 s start end)
-    new))
+(define (substring str start end)
+  (unless (and (fixnum? start)
+	       (fixnum? end)) (error "substring" start))
+  (unless (or (< -1 start (string-length str))
+	      (= start end)) (error "substring" start))
+  (unless (<= 0 end (string-length str)) (error "substring" end))
+  (when (> start end) (error "substring" end))
+  (let ((c (make-string (- end start))))
+    (string-copy! c 0 str start end)
+    c))
 ;;;;;; Records
 (define (record-set! record index value)
   ;(unless (record? record) (error "record-set!: not a record" record))
@@ -1733,7 +1741,9 @@
 (define flush-output-port
   (case-lambda
    (() (flush-output-port (current-output-port)))
-   ((port) ((port-fillflush port) port))))
+   ((port)
+    (unless (port? port) (error "not a port:" port))
+    ((port-fillflush port) port))))
 
 (define port-buffer-size 512)
 
@@ -1808,6 +1818,7 @@
   (case-lambda
    (() (peek-char (current-input-port)))
    ((port)
+    (unless (port? port) (error "display: not a port" port))
     (if (eq? #t (port-open? port))
 	(if (< (port-pos port) (port-len port))
 	    (string-ref (port-buf port) (port-pos port))
@@ -1824,6 +1835,7 @@
   (case-lambda
    (() (read-char (current-input-port)))
    ((port)
+    (unless (port? port) (error "display: not a port" port))
     (if (eq? #t (port-open? port))
 	(if (< (port-pos port) (port-len port))
 	    (let ((res (sys:FOREIGN_CALL "SCM_STRING_REF_FAST" (port-buf port) (port-pos port))))
@@ -1842,6 +1854,7 @@
   (case-lambda
    (() (read-u8 (current-input-port)))
    ((port)
+    (unless (port? port) (error "display: not a port" port))
     (unless (port-open? port) (error "Port not open"))
     (if (< (port-pos port) (port-len port))
 	(let ((res (bytevector-u8-ref (port-buf port) (port-pos port))))
@@ -1856,12 +1869,16 @@
 (define char-ready?
   (case-lambda
    (() (char-ready? (current-input-port)))
-   ((port) (< (port-pos port) (port-len port)))))
+   ((port)
+    (unless (port? port) (error "display: not a port" port))
+    (< (port-pos port) (port-len port)))))
 
 (define u8-ready?
   (case-lambda
    (() (u8-ready? (current-input-port)))
-   ((port) (< (port-pos port) (port-len port)))))
+   ((port)
+    (unless (port? port) (error "display: not a port" port))
+    (< (port-pos port) (port-len port)))))
 
 (define read-string
   (case-lambda
@@ -1907,6 +1924,7 @@
   (case-lambda
    ((ch) (write-char ch (current-output-port)))
    ((ch port)
+    (unless (port? port) (error "display: not a port" port))
     (unless (port-open? port) (error "Port not open"))
     (when (>= (port-pos port) (port-len port))
       ((port-fillflush port) port))
@@ -2015,6 +2033,7 @@
 (define (symbol->string a) (sys:FOREIGN_CALL "SCM_SYMBOL_STRING" a))
 (define scm-symbol-table '())
 (define (string->symbol str)
+  (unless (string? str) (error "string->symbol: not a string" str))
   (when (null? scm-symbol-table)
     (set! scm-symbol-table (make-hash-table string=? string-hash))
     (let ((table (sys:FOREIGN_CALL "SCM_GET_SYM_TABLE")))

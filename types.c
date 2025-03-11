@@ -187,7 +187,7 @@ static bool is_string(gc_obj obj) {
 /* static bool is_undefined(gc_obj obj) { return get_imm_tag(obj) ==
  * UNDEFINED_TAG; } */
 static bool is_vector(gc_obj obj) { return get_tag(obj) == VECTOR_TAG; }
-/* static bool is_symbol(gc_obj obj) { return get_tag(obj) == SYMBOL_TAG; } */
+static bool is_symbol(gc_obj obj) { return is_ptr(obj) && get_ptr_tag(obj) == SYMBOL_TAG; }
 static bool is_fixnum(gc_obj obj) { return get_tag(obj) == FIXNUM_TAG; }
 static bool is_bignum(gc_obj obj) {
   return is_ptr(obj) && get_ptr_tag(obj) == BIGNUM_TAG;
@@ -482,19 +482,25 @@ gc_obj SCM_DISPLAY(gc_obj obj, gc_obj scmfd) {
 
 ////////////// MATH
 
-void S_error(gc_obj closure, gc_obj msg, gc_obj arg);
+_Noreturn  void S_error(gc_obj closure, gc_obj msg, gc_obj arg);
 static gc_obj from_c_str(char *str);
 
 extern int64_t argcnt;
 extern int64_t wanted_argcnt;
 
+NOINLINE _Noreturn static void scm_runtime_error1(char* msg, gc_obj obj) {
+  argcnt = 3;
+  S_error(UNDEFINED, from_c_str(msg), obj);
+}
+NOINLINE _Noreturn static void scm_runtime_error0(char* msg) {
+  argcnt = 2;
+  S_error(UNDEFINED, from_c_str(msg), UNDEFINED);
+}
 NOINLINE gc_obj SCM_LOAD_GLOBAL_FAIL(gc_obj a) {
   auto str = to_string(to_symbol(a)->name);
   printf("Attempting to load undefined sym: %.*s\n", (int)to_fixnum(str->bytes),
          str->strdata);
-  argcnt = 3;
-  S_error(UNDEFINED, from_c_str("Attempting to load undefined sym:"), a);
-  abort();
+  scm_runtime_error1("Attempting to load undefined sym:", a);
 }
 INLINE gc_obj SCM_LOAD_GLOBAL(gc_obj a) {
   // assert(is_symbol(a));
@@ -527,15 +533,11 @@ INLINE gc_obj SCM_SET_GLOBAL(gc_obj a, gc_obj b) {
 }
 
 NOINLINE void SCM_ARGCNT_FAIL() {
-  printf("Call with invalid argcnt\n");
-  abort();
+  scm_runtime_error0("Call with invalid argcnt\n");
 }
 
 NOINLINE void *SCM_LOAD_CLOSURE_PTR_FAIL(gc_obj a) {
-  printf("Attempting to call non-closure:");
-  SCM_DISPLAY(a, tag_fixnum(0));
-  printf("\n");
-  abort();
+  scm_runtime_error1("Attempting to call non-closure:", a);
 }
 INLINE void *SCM_LOAD_CLOSURE_PTR(gc_obj a) {
 #ifndef UNSAFE
@@ -620,19 +622,22 @@ gc_obj SCM_INEXACT(gc_obj fix) {
     auto r = to_ratnum(fix);
     return double_to_gc_slow(mpq_get_d(r->x));
   }
-  assert(is_bignum(fix));
-  return double_to_gc_slow(mpz_get_d(to_bignum(fix)->x));
+  if (is_bignum(fix)) {
+    return double_to_gc_slow(mpz_get_d(to_bignum(fix)->x));
+  }
+  scm_runtime_error1("Not a number:", fix);
 }
 
 static void get_bignum(gc_obj obj, mpz_t *loc) {
-  assert(!is_flonum(obj));
-  assert(!is_ratnum(obj));
   if (is_bignum(obj)) {
     mpz_init_set(*loc, to_bignum(obj)->x);
     return;
   }
-  assert(is_fixnum(obj));
-  mpz_init_set_si(*loc, to_fixnum(obj));
+  if (is_fixnum(obj)) {
+    mpz_init_set_si(*loc, to_fixnum(obj));
+    return;
+  }
+  scm_runtime_error1("Not a number: ", obj);
 }
 
 gc_obj SCM_NUMERATOR(gc_obj obj) {
@@ -660,7 +665,7 @@ static void get_ratnum(gc_obj obj, mpq_t *loc) {
     auto fix = to_fixnum(obj);
     mpq_set_si(*loc, fix, 1);
   } else {
-    assert(false);
+    scm_runtime_error1("Not a number:", obj);
   }
 }
 
@@ -741,10 +746,7 @@ static gc_obj compnum_mul(gc_obj a, gc_obj b) {
       mpz_##OPLCNAME(bres, ba, bb);                                            \
       return tag_bignum(bres);                                                 \
     }                                                                          \
-    printf(#OPNAME ": not a number:");                                         \
-    SCM_DISPLAY(a, tag_fixnum(0));                                             \
-    printf("\n");                                                              \
-    abort();                                                                   \
+    scm_runtime_error1(#OPNAME ": not a number:", a);			\
   }                                                                            \
                                                                                \
   INLINE gc_obj SCM_##OPNAME(gc_obj a, gc_obj b) {                             \
@@ -782,7 +784,7 @@ MATH_OVERFLOW_OP(MUL, mul, MATH_MUL, SHIFT)
                                                                                \
   NOINLINE gc_obj SCM_##OPNAME##_SLOW(gc_obj a, gc_obj b) {                    \
     if (is_compnum(a) || is_compnum(b)) {                                      \
-      abort();                                                                 \
+      scm_runtime_error0("Compnums not supported for " # OPNAME);	\
     } else if (is_flonum(a) || is_flonum(b)) {                                 \
       return double_to_gc_slow(                                                \
           FPOP(to_double(SCM_INEXACT(a)), to_double(SCM_INEXACT(b))));         \
@@ -796,12 +798,12 @@ MATH_OVERFLOW_OP(MUL, mul, MATH_MUL, SHIFT)
     } else if (is_fixnum(a) && is_fixnum(b)) {                                 \
       return tag_fixnum(OP(to_fixnum(a), to_fixnum(b)));                       \
     }                                                                          \
-    abort();                                                                   \
+    scm_runtime_error0("Invalid types in " # OPNAME);	\
   }                                                                            \
                                                                                \
   INLINE gc_obj SCM_##OPNAME(gc_obj a, gc_obj b) {                             \
     if (likely((is_fixnum(a) & is_fixnum(b)) == 1)) {                          \
-      return tag_fixnum(OP(to_fixnum(a), to_fixnum(b)));                       \
+     return tag_fixnum(OP(to_fixnum(a), to_fixnum(b)));                       \
     } else if (likely((is_flonum_fast(a) & is_flonum_fast(b)) == 1)) {         \
       gc_obj res;                                                              \
       if (likely(double_to_gc(FPOP(to_double_fast(a), to_double_fast(b)),      \
@@ -823,7 +825,7 @@ MATH_SIMPLE_OP(MOD, MATH_MOD, MATH_FPMOD, r)
 
 NOINLINE gc_obj SCM_DIV_SLOW(gc_obj a, gc_obj b) {
   if (is_compnum(a) || is_compnum(b)) {
-    abort();
+    scm_runtime_error0("DIV does not support compnum");
   } else if (is_flonum(a) || is_flonum(b)) {
     return double_to_gc_slow(to_double(SCM_INEXACT(a)) /
                              to_double(SCM_INEXACT(b)));
@@ -835,7 +837,7 @@ NOINLINE gc_obj SCM_DIV_SLOW(gc_obj a, gc_obj b) {
     mpq_div(rres, ra, rb);
     return tag_ratnum(rres);
   }
-  abort();
+  scm_runtime_error0("Invalid type in div");
 }
 
 INLINE gc_obj SCM_DIV(gc_obj a, gc_obj b) {
@@ -872,7 +874,7 @@ INLINE gc_obj SCM_DIV(gc_obj a, gc_obj b) {
     } else if (is_fixnum(a) && is_fixnum(b)) {                                 \
       res = OP(to_fixnum(a), to_fixnum(b));                                    \
     } else {                                                                   \
-      abort();                                                                 \
+      scm_runtime_error0("Invalid type in " # OPNAME);			\
     }                                                                          \
     if (res) {                                                                 \
       return TRUE_REP;                                                         \
@@ -902,8 +904,7 @@ INLINE gc_obj SCM_DIV(gc_obj a, gc_obj b) {
 #define MATH_GTE(a, b) ((a) >= (b))
 #define MATH_EQ(a, b) ((a) == (b))
 static bool COMP_FAIL(gc_obj a, gc_obj b) {
-  printf("Not a real number!\n");
-  abort();
+  scm_runtime_error0("Not a real number!\n");
 }
 
 gc_obj SCM_NUM_EQ(gc_obj a, gc_obj b);
@@ -937,7 +938,7 @@ gc_obj SCM_ISINF(gc_obj obj) {
 INLINE gc_obj SCM_CAR(gc_obj obj) {
 #ifndef UNSAFE
   if (!is_cons(obj)) {
-    abort();
+    scm_runtime_error1("CAR: not a cons", obj);
   }
 #endif
   return to_cons(obj)->a;
@@ -946,7 +947,7 @@ INLINE gc_obj SCM_CAR(gc_obj obj) {
 INLINE gc_obj SCM_CDR(gc_obj obj) {
 #ifndef UNSAFE
   if (!is_cons(obj)) {
-    abort();
+    scm_runtime_error1("CDR: not a cons", obj);
   }
 #endif
   return to_cons(obj)->b;
@@ -955,7 +956,7 @@ INLINE gc_obj SCM_CDR(gc_obj obj) {
 INLINE gc_obj SCM_SETCAR(gc_obj obj, gc_obj val) {
 #ifndef UNSAFE
   if (!is_cons(obj)) {
-    abort();
+    scm_runtime_error1("setcar: not a cons:", obj);
   }
 #endif
   auto c = to_cons(obj);
@@ -970,7 +971,7 @@ INLINE gc_obj SCM_SETCAR(gc_obj obj, gc_obj val) {
 INLINE gc_obj SCM_SETCDR(gc_obj obj, gc_obj val) {
 #ifndef UNSAFE
   if (!is_cons(obj)) {
-    abort();
+    scm_runtime_error1("setcdr: not a cons:", obj);
   }
 #endif
   auto c = to_cons(obj);
@@ -1019,28 +1020,26 @@ INLINE gc_obj SCM_MAKE_VECTOR(gc_obj obj) {
 }
 
 INLINE gc_obj SCM_VECTOR_LENGTH(gc_obj vec) {
-#ifndef UNSAFE
   if (unlikely(!is_vector(vec))) {
-    abort();
+    scm_runtime_error1("vector-length: not a vector", vec);
   }
-#endif
   return to_vector(vec)->len;
 }
 
 INLINE gc_obj SCM_VECTOR_REF(gc_obj vec, gc_obj idx) {
 #ifndef UNSAFE
   if (unlikely(!is_fixnum(idx))) {
-    abort();
+    scm_runtime_error1("vector-ref: not a valid idx", idx);
   }
   if (unlikely(!is_vector(vec))) {
-    abort();
+    scm_runtime_error1("vector-ref: not a vector", vec);
   }
 #endif
   auto v = to_vector(vec);
   auto i = to_fixnum(idx);
 #ifndef UNSAFE
   if (unlikely(i >= to_fixnum(v->len))) {
-    abort();
+    scm_runtime_error1("vector-ref: idx out of range", vec);
   }
 #endif
 
@@ -1050,17 +1049,17 @@ INLINE gc_obj SCM_VECTOR_REF(gc_obj vec, gc_obj idx) {
 INLINE gc_obj SCM_VECTOR_SET(gc_obj vec, gc_obj idx, gc_obj val) {
 #ifndef UNSAFE
   if (unlikely(!is_fixnum(idx))) {
-    abort();
+    scm_runtime_error1("vector-set: not a valid idx", idx);
   }
   if (unlikely(!is_vector(vec))) {
-    abort();
+    scm_runtime_error1("vector-set: not a vector", vec);
   }
 #endif
   auto v = to_vector(vec);
   auto i = to_fixnum(idx);
 #ifndef UNSAFE
   if (unlikely(i >= to_fixnum(v->len))) {
-    abort();
+    scm_runtime_error1("vector-set: idx out of range", vec);
   }
 #endif
   v->v[i] = val;
@@ -1201,7 +1200,9 @@ void ccresthunk_oneshot();
 
 __attribute__((returns_twice, noinline, preserve_none)) gc_obj
 SCM_CALLCC(gc_obj cont) {
-  assert(is_closure(cont));
+  if (!is_closure(cont)) {
+    scm_runtime_error1("Not a continuation:", cont);
+  }
   auto clo = to_closure(cont);
 
   void *stack_bottom = __builtin_frame_address(0);
@@ -1430,22 +1431,26 @@ INLINE gc_obj SCM_CHAR_INTEGER(gc_obj ch) { return tag_fixnum(to_char(ch)); }
 
 INLINE gc_obj SCM_INTEGER_CHAR(gc_obj i) { return tag_char(to_fixnum(i)); }
 
-INLINE gc_obj SCM_SYMBOL_STRING(gc_obj sym) { return to_symbol(sym)->name; }
+INLINE gc_obj SCM_SYMBOL_STRING(gc_obj sym) {
+  if (!is_symbol(sym)) {
+    scm_runtime_error1("symbol->string: not a symbol", sym);
+  }
+  return to_symbol(sym)->name; }
 
 INLINE gc_obj SCM_STRING_REF(gc_obj str, gc_obj pos) {
 #ifndef UNSAFE
   if (unlikely(!is_string(str))) {
-    abort();
+    scm_runtime_error1("string-set: not a string", str);
   }
   if (unlikely(!is_fixnum(pos))) {
-    abort();
+    scm_runtime_error1("string-set: not a valid idx", pos);
   }
 #endif
   auto s = to_string(str);
   uint64_t i = to_fixnum(pos);
   #ifndef UNSAFE
   if (unlikely(i >= (uint64_t)to_fixnum(s->len))) {
-    abort();
+    scm_runtime_error1("string-set: idx out of range", pos);
   }
 #endif
   if (unlikely(s->len.value != s->bytes.value)) {
@@ -1455,7 +1460,7 @@ INLINE gc_obj SCM_STRING_REF(gc_obj str, gc_obj pos) {
     for(uint64_t ch = 0; ch <= i; ch++) {
       auto res = utf8proc_iterate((const unsigned char*)&s->strdata[bytepos], to_fixnum(s->bytes), &codepoint);
       if (res < 0) {
-	abort();
+	scm_runtime_error0("Tried to read invalid utf8");
       }
       bytepos+= res;
     }
@@ -1474,7 +1479,7 @@ INLINE gc_obj SCM_STRING_REF_FAST(gc_obj str, gc_obj pos) {
     for(uint64_t ch = 0; ch <= i; ch++) {
       auto res = utf8proc_iterate((const unsigned char*)&s->strdata[bytepos], to_fixnum(s->bytes), &codepoint);
       if (res < 0) {
-	abort();
+	scm_runtime_error0("Tried to read invalid utf8");
       }
       bytepos+= res;
     }
@@ -1497,7 +1502,7 @@ NOINLINE gc_obj SCM_STRING_SET_SLOW(gc_obj str, gc_obj pos, gc_obj scm_ch) {
     for(uint64_t ch = 0; ch <= i; ch++) {
       res = utf8proc_iterate((const unsigned char*)&s->strdata[bytepos], to_fixnum(s->bytes), &codepoint);
       if (res < 0) {
-	abort();
+	scm_runtime_error0("Tried to read invalid utf8");
       }
       if (ch == i) {
 	break;
@@ -1522,13 +1527,13 @@ NOINLINE gc_obj SCM_STRING_SET_SLOW(gc_obj str, gc_obj pos, gc_obj scm_ch) {
 INLINE gc_obj SCM_STRING_SET(gc_obj str, gc_obj pos, gc_obj scm_ch) {
   #ifndef UNSAVE
   if (unlikely(!is_string(str))) {
-    abort();
+    scm_runtime_error1("string-set: not a string", str);
   }
   if (unlikely(!is_fixnum(pos))) {
-    abort();
+    scm_runtime_error1("string-set: not a valid idx", pos);
   }
   if (unlikely(!is_char(scm_ch))) {
-    abort();
+    scm_runtime_error1("string-set: not a char", scm_ch);
   }
   #endif
   auto s = to_string(str);
@@ -1536,7 +1541,7 @@ INLINE gc_obj SCM_STRING_SET(gc_obj str, gc_obj pos, gc_obj scm_ch) {
   uint32_t c = to_char(scm_ch);
   #ifndef UNSAFE
   if (unlikely(i >= (uint64_t)to_fixnum(s->len))) {
-    abort();
+    scm_runtime_error1("string-set: idx out of range", pos);
   }
   #endif
   if (unlikely(s->len.value != s->bytes.value || c >= 128)) {
@@ -1714,7 +1719,7 @@ gc_obj SCM_STRING_CPY(gc_obj tostr, gc_obj tostart, gc_obj fromstr,
       }
       auto res = utf8proc_iterate((const unsigned char*)&from->strdata[bytepos], to_fixnum(from->bytes), &codepoint);
       if (res < 0) {
-	abort();
+	scm_runtime_error0("Tried to read invalid utf8");
       }
       pos++;
       bytepos += res;
@@ -1730,7 +1735,7 @@ gc_obj SCM_STRING_CPY(gc_obj tostr, gc_obj tostart, gc_obj fromstr,
     while(pos < to_fixnum(tostart)) {
       auto res = utf8proc_iterate((const unsigned char*)&to->strdata[bytepos], to_fixnum(to->bytes), &codepoint);
       if (res < 0) {
-	abort();
+	scm_runtime_error0("Tried to read invalid utf8");
       }
       pos ++;
       bytepos+= res;
@@ -1745,7 +1750,7 @@ gc_obj SCM_STRING_CPY(gc_obj tostr, gc_obj tostart, gc_obj fromstr,
     while(pos < (to_fixnum(tostart) + len_in_chars)) {
       auto res = utf8proc_iterate((const unsigned char*)&to->strdata[bytepos], to_fixnum(to->bytes), &codepoint);
       if (res < 0) {
-	abort();
+	scm_runtime_error0("Tried to read invalid utf8");
       }
       pos ++;
       bytepos+= res;
@@ -1824,7 +1829,7 @@ static uint32_t count_utf8(uint8_t* data, uint32_t bytes, bool abort_on_invalid)
     auto res = utf8proc_iterate(&data[bytepos], bytes, &codepoint);
     if (res < 0) {
       if (abort_on_invalid) {
-        abort();
+	scm_runtime_error0("Tried to read invalid utf8");
       } else {
         return chars;
       }
@@ -1833,7 +1838,7 @@ static uint32_t count_utf8(uint8_t* data, uint32_t bytes, bool abort_on_invalid)
     bytepos += res;
   }
   if (unlikely(bytepos != bytes && abort_on_invalid)) {
-    abort();
+    scm_runtime_error0("Tried to read invalid utf8");
   }
   return chars;
 }

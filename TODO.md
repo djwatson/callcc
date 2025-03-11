@@ -3,6 +3,7 @@
 
 # plan
   * Get all abort() to S_error() instead in types.c
+     * need checking for records
   * regain lost perf
 	* better control of inlining, read-char/peek-char should be inlined & fast.
 	* error should have noreturn
