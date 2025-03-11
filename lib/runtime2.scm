@@ -1707,7 +1707,10 @@
   (port-pos-set! port 0)
   (port-len-set! port
 		 (sys:FOREIGN_CALL "SCM_READ_FD" (port-fd port)
-				   (port-buf port))))
+				   (port-buf port)))
+  (when (= (port-len port) 0)
+    (port-open-set! port (eof-object))))
+
 (define (port-fd-flush port)
   (unless (port-fd port) (error "ERROR port flush"))
   (sys:FOREIGN_CALL "SCM_WRITE_FD" (port-fd port) (string->utf8 (port-buf port) 0 (port-pos port)))
@@ -1805,28 +1808,35 @@
   (case-lambda
    (() (peek-char (current-input-port)))
    ((port)
-    (if (< (port-pos port) (port-len port))
-	(string-ref (port-buf port) (port-pos port))
-	(begin
-	  ((port-fillflush port) port)
-	  (if (< (port-pos port) (port-len port))
-	      (peek-char port)
-	      (eof-object)))))))
+    (if (eq? #t (port-open? port))
+	(if (< (port-pos port) (port-len port))
+	    (string-ref (port-buf port) (port-pos port))
+	    (begin
+	      ((port-fillflush port) port)
+	      (if (< (port-pos port) (port-len port))
+		  (peek-char port)
+		  (eof-object))))
+	(if (port-open? port)
+	    (eof-object)
+	    (error "Port not open"))))))
 
 (define read-char
   (case-lambda
    (() (read-char (current-input-port)))
    ((port)
-    (unless (port-open? port) (error "Port not open"))
-    (if (< (port-pos port) (port-len port))
-	(let ((res (sys:FOREIGN_CALL "SCM_STRING_REF_FAST" (port-buf port) (port-pos port))))
-	  (port-pos-set! port (+ 1 (port-pos port)))
-	  res)
-	(begin
-	  ((port-fillflush port) port)
-	  (if (< (port-pos port) (port-len port))
-	      (read-char port)
-	      (eof-object)))))))
+    (if (eq? #t (port-open? port))
+	(if (< (port-pos port) (port-len port))
+	    (let ((res (sys:FOREIGN_CALL "SCM_STRING_REF_FAST" (port-buf port) (port-pos port))))
+	      (port-pos-set! port (+ 1 (port-pos port)))
+	      res)
+	    (begin
+	      ((port-fillflush port) port)
+	      (if (< (port-pos port) (port-len port))
+		  (read-char port)
+		  (eof-object))))
+	(if (port-open? port)
+	    (eof-object)
+	    (error "Port not open"))))))
 
 (define read-u8
   (case-lambda
