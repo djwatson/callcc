@@ -55,6 +55,9 @@
     (if (and (< q 0) (not (integer? q)))
         (- qq 1)
         qq)))
+(define (floor-remainder a b)
+  (let ((div (floor (quotient a b))))
+    (- a (* b div))))
 (define (floor x)
   (cond
    ((flonum? x) (sys:FOREIGN_CALL "SCM_FLOOR" x))
@@ -95,6 +98,11 @@
   (let* ((div (truncate (quotient a b)))
 	 (rem (- a (* b div))))
     (values div rem)))
+(define (truncate-quotient a b)
+  (truncate (quotient a b)))
+(define (truncate-remainder a b)
+  (let ((div (truncate (quotient a b))))
+    (- a (* b div))))
 (define (rationalize x e)
   ;; Implementation by Alan Bawden.
   (define (simplest-rational x y)
@@ -1236,7 +1244,7 @@
 
 
 (define (digit-value ch)
-  (unless (char? ch) (error "not a char: "c))
+  (unless (char? ch) (error "not a char: "ch))
   (let ((n (char->integer ch)))
     (let lp ((lo 0) (hi (- (vector-length zeros) 1)))
       (if (> lo hi)
@@ -1694,6 +1702,14 @@
 
 (include "lib/str2num.scm")
 
+;;;;;;;; parameters
+(define (make-parameter init . val)
+  (let ((cell init))
+    (lambda arg
+      (if (pair? arg)
+	  (set! cell (car arg))
+	  cell))))
+
 ;;;;;;;;;;;;; IO
 (define-record-type port (make-port input textual open fold-case fd pos len buf fillflush) port?
 		    (input input-port?)
@@ -1747,22 +1763,24 @@
 
 (define port-buffer-size 512)
 
-(define *current-input-port* (make-port #t #t #t #f 0 0 0 (make-string port-buffer-size) port-fd-fill))
-(define (current-input-port) *current-input-port*)
-(define *current-output-port* (make-port #f #t #t #f 1 0 port-buffer-size (make-string port-buffer-size) port-fd-flush))
-(define (current-output-port) *current-output-port*)
-(define *current-error-port* (make-port #f #t #t #f 2 0 0 (make-string port-buffer-size) port-fd-flush))
-(define (current-error-port) *current-error-port*)
+(define current-input-port (make-parameter (make-port #t #t #t #f 0 0 0 (make-string port-buffer-size) port-fd-fill)))
+(define current-output-port (make-parameter (make-port #f #t #t #f 1 0 port-buffer-size (make-string port-buffer-size) port-fd-flush)))
+(define current-error-port (make-parameter (make-port #f #t #t #f 2 0 0 (make-string port-buffer-size) port-fd-flush)))
 
 (define (binary-port? port) (not (textual-port? port)))
 (define (open-input-file file)
+  (unless (string? file) (error "Not a string:" file))
   (let ((fd (sys:FOREIGN_CALL "SCM_OPEN_FD" file #t)))
     (when (< fd 0) (raise-continuable (make-error-object 'file "No such file:" (list file))))
     (make-port #t #t #t #f fd 0 0 (make-string port-buffer-size) port-fd-fill)))
+;; TODO!! neet port-fd-fill-binary or something
+(define open-binary-input-file open-input-file)
 (define (open-output-file file)
+  (unless (string? file) (error "Not a string:" file))
   (let ((fd (sys:FOREIGN_CALL "SCM_OPEN_FD" file #f)))
     (when (< fd 0) (error "open-output-file error:" file))
     (make-port #f #t #t #f fd 0 port-buffer-size (make-string port-buffer-size) port-fd-flush)))
+(define open-binary-output-file open-output-file)
 (define (open-input-string str)
   (make-port #t #t #t #f #f 0 (string-length str) str (lambda (port) #f)))
 (define (open-output-string)
@@ -1776,13 +1794,9 @@
 (define (open-output-bytevector)
   (make-port #f #f #t #f #f 0 port-buffer-size (make-bytevector port-buffer-size) port-bytevector-flush))
 (define (with-output-to-file name thunk)
-  (let ((file (open-output-file name))
-	(old-port *current-output-port*))
-    ;; TODO parameterize
-    (set! *current-output-port* file)
-    (thunk)
-    (set! *current-output-port* old-port)
-    (close-output-port file)))
+  (let ((file (open-output-file name)))
+    (parameterize ((current-output-port file))
+      (thunk))))
 
 (define (close-input-port p)
   (close-port p))
@@ -1984,9 +1998,11 @@
        (write-u8 (bytevector-u8-ref bv i) port)))))
 
 (define (file-exists? name)
+  (unless (string? name) (error "Not a string:" name))
   (sys:FOREIGN_CALL "SCM_FILE_EXISTS" name))
 
 (define (delete-file name)
+  (unless (string? name) (error "Not a string:" name))
   (unless (= 0 (sys:FOREIGN_CALL "SCM_DELETE_FILE" name))
     (raise (make-error-object 'file "delete file not found:" (list name)))))
 
@@ -2016,13 +2032,12 @@
        (write-char (string-ref str i) port)))))
 
 (define (with-input-from-file file thunk)
-  (let ((p (open-input-file file))
-	(old-port *current-input-port*))
-    (set! *current-input-port* p)
-    (let ((res (thunk)))
-      (close-input-port p)
-      (set! *current-input-port* old-port)
-      res)))
+  (let ((p (open-input-file file)))
+    (parameterize
+	((current-input-port p))
+      (let ((res (thunk)))
+	(close-input-port p)
+	res))))
 
 ;;;;;;; equals?, hash tables.
 
@@ -2044,14 +2059,6 @@
 		(new-sym (sys:FOREIGN_CALL "SCM_MAKE_SYMBOL" strcopy)))
 	   (hash-table-set! scm-symbol-table strcopy new-sym)
 	   new-sym))))
-
-;;;;;;;; parameters
-(define (make-parameter init . val)
-  (let ((cell init))
-    (lambda arg
-      (if (pair? arg)
-	  (set! cell (car arg))
-	  cell))))
 
 ;; process context
 (define (command-line) (sys:FOREIGN_CALL "SCM_COMMAND_LINE"))

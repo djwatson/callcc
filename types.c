@@ -181,6 +181,9 @@ static bool is_closure(gc_obj obj) {
 static bool is_string(gc_obj obj) {
   return is_ptr(obj) && get_ptr_tag(obj) == STRING_TAG;
 }
+static bool is_bytevector(gc_obj obj) {
+  return is_ptr(obj) && get_ptr_tag(obj) == BYTEVECTOR_TAG;
+}
 /* static bool is_record(gc_obj obj) { */
 /*   return is_ptr(obj) && get_ptr_tag(obj) == RECORD_TAG; */
 /* } */
@@ -1056,9 +1059,9 @@ INLINE gc_obj SCM_VECTOR_SET(gc_obj vec, gc_obj idx, gc_obj val) {
   }
 #endif
   auto v = to_vector(vec);
-  auto i = to_fixnum(idx);
+  uint64_t i = to_fixnum(idx);
 #ifndef UNSAFE
-  if (unlikely(i >= to_fixnum(v->len))) {
+  if (unlikely(i >= (uint64_t)to_fixnum(v->len))) {
     scm_runtime_error1("vector-set: idx out of range", vec);
   }
 #endif
@@ -1777,6 +1780,7 @@ INLINE gc_obj SCM_AND(gc_obj num, gc_obj mask) {
 #include <unistd.h>
 
 gc_obj SCM_OPEN_FD(gc_obj filename, gc_obj input) {
+  
   auto str = to_string(filename);
   char name[256];
   memcpy(name, str->strdata, to_fixnum(str->bytes));
@@ -2066,6 +2070,9 @@ gc_obj SCM_SYSTEM(gc_obj strn) {
 }
 
 gc_obj SCM_STRING_UTF8(gc_obj str) {
+  if (unlikely(!is_string(str))) {
+    scm_runtime_error1("string->utf8: not a string", str);
+  }
   auto s = to_string(str);
   auto bytes_aligned = (to_fixnum(s->bytes) + 7) & ~7;
   bytevector_s* utf8 = rcimmix_alloc(sizeof(bytevector_s) + bytes_aligned);
@@ -2076,6 +2083,9 @@ gc_obj SCM_STRING_UTF8(gc_obj str) {
 }
 
 gc_obj SCM_UTF8_STRING(gc_obj scm_bv) {
+  if (unlikely(!is_bytevector(scm_bv))) {
+    scm_runtime_error1("utf8->string: not a bytevector", scm_bv);
+  }
   auto bv = to_bytevector(scm_bv);
   auto bytes_aligned = (to_fixnum(bv->len) + 7) & ~7;
   string_s* str = rcimmix_alloc(sizeof(string_s));
@@ -2089,13 +2099,45 @@ gc_obj SCM_UTF8_STRING(gc_obj scm_bv) {
 }
 
 gc_obj SCM_BYTEVECTOR_REF(gc_obj scm_bv, gc_obj idx) {
-  return tag_fixnum(to_bytevector(scm_bv)->v[to_fixnum(idx)]);
+  if (unlikely(!is_fixnum(idx))) {
+    scm_runtime_error1("bytevector-ref: not a valid idx", idx);
+  }
+  if (unlikely(!is_bytevector(scm_bv))) {
+    scm_runtime_error1("bytevector-ref: not a bytevector", scm_bv);
+  }
+  auto bv = to_bytevector(scm_bv);
+  uint64_t i = to_fixnum(idx);
+  if (unlikely(i >= (uint64_t)to_fixnum(bv->len))) {
+    scm_runtime_error1("bytevector-ref: idx out of range", idx);
+  }
+  return tag_fixnum(bv->v[i]);
 }
-gc_obj SCM_BYTEVECTOR_SET(gc_obj bv, gc_obj idx, gc_obj val) {
-  to_bytevector(bv)->v[to_fixnum(idx)] = to_fixnum(val);
+gc_obj SCM_BYTEVECTOR_SET(gc_obj scm_bv, gc_obj idx, gc_obj val) {
+  if (unlikely(!is_fixnum(idx))) {
+    scm_runtime_error1("bytevector-ref: not a valid idx", idx);
+  }
+  if (unlikely(!is_bytevector(scm_bv))) {
+    scm_runtime_error1("bytevector-ref: not a bytevector", scm_bv);
+  }
+  auto bv = to_bytevector(scm_bv);
+  uint64_t i = to_fixnum(idx);
+  if (unlikely(i >= (uint64_t)to_fixnum(bv->len))) {
+    scm_runtime_error1("bytevector-ref: idx out of range", idx);
+  }
+  if (unlikely(!is_fixnum(val))) {
+    scm_runtime_error1("bytevector-ref: val not a u8", val);
+  }
+  uint64_t v = to_fixnum(val);
+  if (unlikely(v >= 256)) {
+    scm_runtime_error1("bytevector-ref: val not a u8", val);
+  }
+  bv->v[i] = v;
   return UNDEFINED;
 }
 gc_obj SCM_BYTEVECTOR_LENGTH(gc_obj scm_bv) {
+  if (!is_bytevector(scm_bv)) {
+    scm_runtime_error1("bytevector-length: not a bytevector", scm_bv);
+  }
   auto bv = to_bytevector(scm_bv);
   return bv->len;
 }

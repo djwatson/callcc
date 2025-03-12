@@ -2,9 +2,8 @@
   * stacktop still broken, smashes environ, but if set to environ-1, breaks other things.
 
 # plan
-  * Get all abort() to S_error() instead in types.c
-     * need checking for records
   * regain lost perf
+    * after typechecks: browse, cat, dynamic, parsing, ray, slatex, string, tail*, wc, 
 	* better control of inlining, read-char/peek-char should be inlined & fast.
 	* error should have noreturn
 	
@@ -17,8 +16,7 @@
   * r7rs test - asin, acos - basically all the arithmetic should work on ratnum and compnum too.
   
   Mostly error paths:
-  * argtype stress test
-  * macro tests - work!
+  * macro tests - work!, import them.
   * port tests
   * copyish tests
   * gset check
@@ -48,7 +46,9 @@
   * auto-listify globals: consargs stub in compiler called a lot: 
     * vector. Hand-coded in chez
 
+# CLEANUP
 
+* srfi69 is already builtin
 
 ----------------------------------------
 
@@ -56,8 +56,6 @@
 # PROBABLY NEVER:	 
 
 # CLEANUP
-
-* srfi69 is already builtin
 
 * figure out strategy for intrinsics????
 * cleanup runtime - move as much to scm as possible
