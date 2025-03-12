@@ -208,6 +208,7 @@
 (define <
   (case-lambda
    ((a b) (base< a b))
+   ((a b c) (and (base< a b) (base< b c)))
    (rest
     (comparer (lambda (a b) (base< a b)) rest))))
 (define >
@@ -218,6 +219,7 @@
 (define <=
   (case-lambda
    ((a b) (base<= a b))
+   ((a b c) (and (base<= a b) (base<= b c)))
    (rest
     (comparer (lambda (a b) (base<= a b)) rest))))
 (define >=
@@ -1703,12 +1705,18 @@
 (include "lib/str2num.scm")
 
 ;;;;;;;; parameters
-(define (make-parameter init . val)
-  (let ((cell init))
-    (lambda arg
-      (if (pair? arg)
-	  (set! cell (car arg))
-	  cell))))
+(define make-parameter
+  (case-lambda
+   ((init)
+    (let ((cell init))
+      (case-lambda
+       (() cell)
+       ((new) (set! cell new)))))
+   ((init converter)
+    (let ((cell (converter init)))
+      (case-lambda
+       (() cell)
+       ((new) (set! cell (converter new))))))))
 
 ;;;;;;;;;;;;; IO
 (define-record-type port (make-port input textual open fold-case fd pos len buf fillflush) port?

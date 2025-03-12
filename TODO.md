@@ -4,10 +4,11 @@
 # plan
   * regain lost perf
     * after typechecks: browse, cat, dynamic, parsing, ray, slatex, string, tail*, wc, 
+	         Seems to be just pgo/inlining issues, mostly with read/write-char
 	* better control of inlining, read-char/peek-char should be inlined & fast.
 	* error should have noreturn
 	
-	* fixup writing w-out going through write-char if possible?
+	* fixup writing w-out going through write-char if possible?: doesn't seem to affect perf much.
 	* gcbench: ratnums are too slow.  Doh.  Hand-roll ratnums?
   * install - fix dirs
 

@@ -506,7 +506,6 @@ NOINLINE gc_obj SCM_LOAD_GLOBAL_FAIL(gc_obj a) {
   scm_runtime_error1("Attempting to load undefined sym:", a);
 }
 INLINE gc_obj SCM_LOAD_GLOBAL(gc_obj a) {
-  // assert(is_symbol(a));
   auto sym = to_symbol(a);
   auto val = sym->val;
 #ifndef UNSAFE
@@ -1551,7 +1550,6 @@ INLINE gc_obj SCM_STRING_SET(gc_obj str, gc_obj pos, gc_obj scm_ch) {
     [[clang::musttail]] return SCM_STRING_SET_SLOW(str, pos, scm_ch);
   }
   s->strdata[i] = c;
-  assert(s->strdata[i] != 0);
   return UNDEFINED;
 }
 INLINE gc_obj SCM_STRING_SET_FAST(gc_obj str, gc_obj pos, gc_obj scm_ch) {
@@ -1880,11 +1878,6 @@ gc_obj SCM_WRITE_FD(gc_obj scmfd, gc_obj scmbuf) {
   int fd = (int)to_fixnum(scmfd);
   auto buf = to_bytevector(scmbuf);
   auto len = to_fixnum(buf->len);
-  #ifndef NDEBUG
-  for(uint64_t i = 0; i < len; i++) {
-    assert(buf->v[i] != 0);
-  }
-  #endif
   auto res = write(fd, buf->v, len);
   if (res != len) {
     printf("Could not write %li bytes to fd %i\n", len, fd);

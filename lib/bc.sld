@@ -18,9 +18,7 @@
 		      (let ((p (open-input-string (get-output-string p))))
 			(read-u64 p))))
 		  (define (link output output-file opts)
-		    (display "Cross-compiling can't currently link, please run:\n")
-		    (display (get-link-command output output-file opts))
-		    (newline))))
+		    #f)))
 	       (callcc
 		(import (prefix (flow sys) sys:)
 			(only (flow all) system))

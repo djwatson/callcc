@@ -1,7 +1,6 @@
 # callcc requires clang/llvm.
 CC = clang
-CFLAGS = -O3 -flto -DNDEBUG -g  -std=gnu23 -Wall  -march=native -mtune=native -ffat-lto-objects -Wextra -Wnull-dereference  -Wshadow -Wno-unused-parameter
-#CFLAGS = -flto -O3 -std=gnu23 -Wall
+CFLAGS = -O3 -flto=full -DNDEBUG -g  -std=gnu23 -Wall  -march=native -mtune=native -ffat-lto-objects -Wextra -Wnull-dereference  -Wshadow -Wno-unused-parameter
 LIBS = -lm -lgmp -lutf8proc
 SRCS = alloc_table.c gc.c types.c list.c callcc.S
 OBJECTS = $(patsubst %, %.o, $(basename $(SRCS)))
