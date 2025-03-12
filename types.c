@@ -247,6 +247,15 @@ static bool is_flonum(gc_obj obj) {
   return is_flonum_fast(obj) || (is_ptr(obj) && get_ptr_tag(obj) == FLONUM_TAG);
 }
 
+INLINE gc_obj SCM_EOF() { return EOF_OBJ; }
+
+INLINE gc_obj SCM_IS_EOF(gc_obj a) {
+  if (a.value == EOF_OBJ.value) {
+    return TRUE_REP;
+  }
+  return FALSE_REP;
+}
+
 gc_obj SCM_IS_FLONUM_SLOW(gc_obj obj) {
   if (is_flonum(obj)) {
     return TRUE_REP;
@@ -508,6 +517,7 @@ NOINLINE gc_obj SCM_LOAD_GLOBAL_FAIL(gc_obj a) {
 INLINE gc_obj SCM_LOAD_GLOBAL(gc_obj a) {
   auto sym = to_symbol(a);
   auto val = sym->val;
+  //SCM_DISPLAY(a, tag_fixnum(0));
 #ifndef UNSAFE
   if (likely(val.value != UNDEFINED.value)) {
     return val;

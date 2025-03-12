@@ -3,8 +3,6 @@
 
 # plan
   * regain lost perf
-    * after typechecks: browse, cat, dynamic, parsing, ray, slatex, string, tail*, wc, 
-	         Seems to be just pgo/inlining issues, mostly with read/write-char
 	* better control of inlining, read-char/peek-char should be inlined & fast.
 	* error should have noreturn
 	

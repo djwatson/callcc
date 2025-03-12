@@ -536,16 +536,16 @@ SECTION(6 10 2)
 SECTION(6 10 3)
 (#<closure> "tmp1" #<closure>)  ==> #t
 (#<closure> #<record>)  ==> (define foo (quote (#t #f #\a () 9739 -3 . #((test) "te \" \" st" "" test #() b c))))
-(#<closure> #<record>)  ==> #t
-(#<closure> #<record>)  ==> #t
+(#<closure> #<eof>)  ==> #t
+(#<closure> #<eof>)  ==> #t
 (input-port? #t)  ==> #t
 (#<closure> #<record>)  ==> #\;
 (#<closure> #<record>)  ==> (#t #f a () 9739 -3 . #((test) te " " st test #() b c))
 (#<closure> #<record>)  ==> (define foo (quote (#t #f #\a () 9739 -3 . #((test) "te \" \" st" "" test #() b c))))
 (#<closure> #<record>)  ==> #t
 (#<closure> #<record>)  ==> (define foo (quote (#t #f #\a () 9739 -3 . #((test) "te \" \" st" "" test #() b c))))
-(#<closure> #<record>)  ==> #t
-(#<closure> #<record>)  ==> #t
+(#<closure> #<eof>)  ==> #t
+(#<closure> #<eof>)  ==> #t
 (input-port? #t)  ==> #t
 (#<closure> #<record>)  ==> #\;
 (#<closure> #<record>)  ==> (#t #f a () 9739 -3 . #((test) te " " st test #() b c))
@@ -569,8 +569,8 @@ SECTION(6 5 5)
 (#<closure> 4.5)  ==> 4.0
 (#<closure> "tmp3" #<closure>)  ==> #t
 (#<closure> #<record>)  ==> (define foo (quote (0.25 -3.25)))
-(#<closure> #<record>)  ==> #t
-(#<closure> #<record>)  ==> #t
+(#<closure> #<eof>)  ==> #t
+(#<closure> #<eof>)  ==> #t
 (input-port? #t)  ==> #t
 (#<closure> #<record>)  ==> #\;
 (#<closure> #<record>)  ==> (0.25 -3.25)

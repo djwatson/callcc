@@ -478,6 +478,7 @@
 			 (display " " port)
 			 (loop (cdr n)))))))
       (display ")" port))
+     ((eof-object? n) (display "#<eof>" port))
      ((undefined? n) (display "#<undef>" port))
      (else
       (display "UNKNOWN DISPLAY:\n" port)
@@ -1834,7 +1835,9 @@
     (close-output-port p)
     res))
 
-(define-record-type base-eof-object (eof-object) eof-object?)
+;; This isn't a record, because record predicates are slower than eq?.
+(define (eof-object? x) (sys:FOREIGN_CALL "SCM_IS_EOF" x))
+(define (eof-object) (sys:FOREIGN_CALL "SCM_EOF"))
 
 (define peek-char
   (case-lambda
@@ -1857,7 +1860,7 @@
   (case-lambda
    (() (read-char (current-input-port)))
    ((port)
-    (unless (port? port) (error "display: not a port" port))
+    ;(unless (port? port) (error "display: not a port" port))
     (if (eq? #t (port-open? port))
 	(if (< (port-pos port) (port-len port))
 	    (let ((res (sys:FOREIGN_CALL "SCM_STRING_REF_FAST" (port-buf port) (port-pos port))))
@@ -1946,7 +1949,7 @@
   (case-lambda
    ((ch) (write-char ch (current-output-port)))
    ((ch port)
-    (unless (port? port) (error "display: not a port" port))
+    ;(unless (port? port) (error "display: not a port" port))
     (unless (port-open? port) (error "Port not open"))
     (when (>= (port-pos port) (port-len port))
       ((port-fillflush port) port))
