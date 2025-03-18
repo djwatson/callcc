@@ -1949,7 +1949,7 @@
   (case-lambda
    ((ch) (write-char ch (current-output-port)))
    ((ch port)
-    ;(unless (port? port) (error "display: not a port" port))
+    (unless (port? port) (error "display: not a port" port))
     (unless (port-open? port) (error "Port not open"))
     (when (>= (port-pos port) (port-len port))
       ((port-fillflush port) port))

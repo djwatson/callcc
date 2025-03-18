@@ -211,31 +211,8 @@ static void *rcimmix_realloc_align(void *p, size_t old_sz, size_t new_sz) {
 }
 static void rcimmix_free(void *, size_t) {}
 
-int argc;
-char **argv;
-extern char **environ;
-void gc_init(int argc_in, char **argv_in) {
-  argc = argc_in;
-  argv = argv_in;
-  stacktop = (uint64_t *)__builtin_frame_address(0);
-
-  void *addr;
-#if __APPLE__
-  addr = pthread_get_stackaddr_np(pthread_self());
-#elif __linux__
-  size_t size;
-  pthread_attr_t attr;
-  pthread_attr_init(&attr);
-  pthread_getattr_np(pthread_self(), &attr);
-  pthread_attr_getstack(&attr, &addr, &size);
-  pthread_attr_destroy(&attr);
-  addr = (unsigned char *)addr + size;
-#else
-#error "Unknown OS: Can't get stack base"
-#endif
-  /* printf("frametop %p pthreadtop %p\n", stacktop, addr); */
-  stacktop = addr;
-
+void gc_init(void* stacktop_in) {
+  stacktop = stacktop_in;
   // Set defaults so we don't have to check for wrapping in
   // the fastpath.
   for (uint64_t i = 0; i < size_classes; i++) {

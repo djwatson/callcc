@@ -1,13 +1,6 @@
 # known bugs:
-  * stacktop still broken, smashes environ, but if set to environ-1, breaks other things.
 
 # plan
-  * regain lost perf
-	* better control of inlining, read-char/peek-char should be inlined & fast.
-	* error should have noreturn
-	
-	* fixup writing w-out going through write-char if possible?: doesn't seem to affect perf much.
-	* gcbench: ratnums are too slow.  Doh.  Hand-roll ratnums?
   * install - fix dirs
 
 	 
@@ -21,8 +14,6 @@
   * gset check
   
 # GC stuff:
-* recheck GC get stack top - fixme
-  * environ is getting smashed by call/cc
 
 * gc fd's.
 * cleanup vector sizing: just use another header for large similar to small logbits?
@@ -63,10 +54,11 @@
      * I think this is caused by needing to 'expand' symbols inserted by 
 	   syntax-case, and by the macro serializer.
 
-* cpstak:
-  * argcnt needs a register somehow?
-  
 # PERF
+* better control of inlining, read-char/peek-char should be inlined fastpath.
+* S_error should have noreturn
+* fixup writing w-out going through write-char if possible?: doesn't seem to affect perf much.
+* gcbench: ratnums are too slow.  Doh.  Hand-roll ratnums?
 
 * fast globals, a.la chez
 

@@ -654,8 +654,7 @@ attributes #0 = { returns_twice}
 					,@prog
 					0 ;; default return value.
 					)))
-	 (main-fun (make-fun "main")))
-    (fun-args-set! main-fun '("%argc" "%argv"))
+	 (main-fun (make-fun "SCM_MAIN")))
     (when verbose
       (display (format "Compiling ~a\n" file) (current-error-port))
       ;;(pretty-print lowered (current-error-port))
@@ -693,15 +692,13 @@ attributes #0 = { returns_twice}
 		  (format "!~a = !DILocation(line:1, scope: !~a)" debug-loc-id debug-id))
 	   
 	   (display (format "define ~a i64 @\"~a\"(~a) #0 !dbg !~a {\n" 
-			    (if (or (equal? (fun-name func) "main")
+			    (if (or (equal? (fun-name func) "SCM_MAIN")
 				    (equal? (fun-name func) "S_error"))
 				"" "internal")
 			    (fun-name func)
 			    (reg-args-to-param-list reg-args)
 			    (fun-debug-id func)))
 	   (display (format " entry:\n"))
-	   (when (equal? "main" (fun-name func))
-	     (display (format "  call void @gc_init(i64 %argc, i64 %argv), !dbg !~a\n" (fun-debug-loc-id func))))
 	   (for (arg i) (stack-args (iota (length stack-args)))
 		(display (format "  ~a = call i64 @SCM_READ_SHADOW_STACK(i64 ~a), !dbg !~a\n"
 				 arg i (fun-debug-loc-id func))))

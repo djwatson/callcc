@@ -1136,11 +1136,8 @@ typedef struct ccsave {
 
 extern char **environ;
 void* get_stack_top() {
-  // TODO FIX HACKKKKKKKKKKKKKKKKKKKKKKKK
-  // Save somewhere? Or use correct stack top?
-  // We really need just stack pointer on entry to main
-  // (before any frame size is reserved for spills in main)
-   return  ((uint64_t*)environ - 1);
+  // Ensure alignment, since we are resetting the stack to here.
+  return (void*)((uintptr_t)gc_get_stack_top() & ~0x7);
 }
 
 ccsave *cur_link = NULL;
@@ -2000,8 +1997,9 @@ gc_obj SCM_DOUBLE_AS_U64(gc_obj b) {
 
 // process-context
 
-extern int argc;
-extern char **argv;
+static int argc;
+static char **argv;
+
 // TODO: check utf8
 static gc_obj from_c_str(char *str) {
   auto len = strlen(str);
@@ -2219,4 +2217,17 @@ gc_obj SCM_DOWNCASE(gc_obj ch) {
 }
 gc_obj SCM_FOLDCASE(gc_obj ch) {
   return tag_char(utf8proc_tolower(utf8proc_toupper(to_char(ch))));
+}
+
+int SCM_MAIN();
+
+int main(int argc_in, char* argv_in[]) {
+  // grab the stack top: this is used for both callcc
+  // stack replacement, *and* GC conservative collection.
+  auto fp = __builtin_frame_address(0);
+  // Save command line args for get-command-line
+  argc = argc_in;
+  argv = argv_in;
+  gc_init(fp);
+  SCM_MAIN();
 }

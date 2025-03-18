@@ -2,7 +2,7 @@
 
 #include <stdint.h>
 
-void gc_init(int argc_in, char**argv_in);
+void gc_init(void* stacktop);
 void gc_add_root(uint64_t *rootp);
 void gc_pop_root(uint64_t const *rootp);
 uint64_t* gc_get_stack_top();
