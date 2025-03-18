@@ -2,24 +2,24 @@
 
 # plan
   * install - fix dirs
+  * records need record check
+    * can remove port? check in places
+	* needs to be fast-ish somehow.
+	* record? bits should be in type header?
 
 # full r7rs / safety / tests
   * macro tests - work!, import them.
   * port tests
   * copyish tests
-  * records need record check
-    * can remove port? check in places
-	* needs to be fast-ish somehow.
-	* record? bits should be in type header?
   
 # GC stuff:
+
+* Cleanup the GC roots, some should be in types, add_root unused currently.
+* Remove the radix tree: just use pre-allocated virtual space.
 
 * cleanup vector sizing: just use another header for large similar to small logbits?
   * large could always use markbits, but it doesn't show up in any tests currently.
 * And do same thing for static symbols?
-* Cleanup the GC roots, some should be in types, add_root unused currently.
-* Remove the radix tree: just use pre-allocated virtual space.
-* cleanup strdata gc_log
 
 # benchmarks / perf improvements:
   * faster with single-shot continuations: ctak fibc
@@ -27,6 +27,10 @@
   * faster with list/int typecheck removal: quicksort primes puzzle array1
 
 # CLEANUP
+
+* lint all C
+* get a scm formatter
+* scm lint as much as possible
 
 ----------------------------------------
 
@@ -37,6 +41,7 @@
 
 * gc fd's.
 * figure out strategy for intrinsics????
+  * we can auto-gen the header for llvm (excepting like SCM_CALL_CC that need extra flags)
   * what we've got is fine, gen-libraries can remove the old intrinsics
 * cleanup runtime - move as much to scm as possible?
   * especially moving the number routine slowpaths would be cleaner?

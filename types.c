@@ -1414,12 +1414,15 @@ INLINE gc_obj SCM_EQV(gc_obj a, gc_obj b) {
 gc_obj SCM_MAKE_STRING(gc_obj len, gc_obj fill) {
   // Align.
   auto strlen = (to_fixnum(len) + 7) & ~7;
-  string_s *str = rcimmix_alloc(sizeof(string_s));
   uint8_t buf[4];
   auto bytecnt = utf8proc_encode_char(to_char(fill), buf);
   auto totallen = strlen * bytecnt;
-  str->strdata = rcimmix_alloc(totallen);
-  gc_log((uint64_t)&str->strdata);
+  // Note: Allocing data here first, so that modifications to
+  // str don't require gc_log (since the second rcimmix_alloc
+  // won't promote str from young to old gen).
+  auto data = rcimmix_alloc(totallen);
+  string_s *str = rcimmix_alloc(sizeof(string_s));
+  str->strdata = data; 
   str->type = STRING_TAG;
   str->len = len;
   str->bytes = tag_fixnum(bytecnt * to_fixnum(len));
@@ -1948,9 +1951,9 @@ gc_obj SCM_BIGNUM_STR(gc_obj b) {
   auto len = mpz_sizeinbase(bignum->x, 10) + 2;
   // Align.
   len = (len + 7) & ~7;
+  auto data = rcimmix_alloc(len);
   string_s *str = rcimmix_alloc(sizeof(string_s));
-  str->strdata = rcimmix_alloc(len);
-  gc_log((uint64_t)&str->strdata);
+  str->strdata = data;
   mpz_get_str(str->strdata, 10, bignum->x);
   str->len = tag_fixnum(strlen(str->strdata));
   str->bytes = tag_fixnum(strlen(str->strdata));
@@ -1965,8 +1968,9 @@ gc_obj SCM_RATNUM_STR(gc_obj b) {
              mpz_sizeinbase(mpq_denref(ratnum->x), 10) + 3;
   // Align.
   len = (len + 7) & ~7;
+  auto data = rcimmix_alloc(len);
   string_s *str = rcimmix_alloc(sizeof(string_s));
-  str->strdata = rcimmix_alloc(len);
+  str->strdata = data;
   mpq_get_str(str->strdata, 10, ratnum->x);
   str->len = tag_fixnum(strlen(str->strdata));
   str->bytes = tag_fixnum(strlen(str->strdata));
@@ -1982,9 +1986,9 @@ gc_obj SCM_BIGNUM_SQRT(gc_obj b) {
 }
 
 gc_obj SCM_FLONUM_STR(gc_obj b) {
+  auto data = rcimmix_alloc(40);
   string_s *str = rcimmix_alloc(sizeof(string_s));
-  str->strdata = rcimmix_alloc(40);
-  gc_log((uint64_t)&str->strdata);
+  str->strdata = data;
   str->type = STRING_TAG;
   double d = to_double(b);
   snprintf(str->strdata, 40 - 3, "%g", d);
@@ -2103,11 +2107,11 @@ gc_obj SCM_UTF8_STRING(gc_obj scm_bv) {
   }
   auto bv = to_bytevector(scm_bv);
   auto bytes_aligned = (to_fixnum(bv->len) + 7) & ~7;
+  auto data = rcimmix_alloc(bytes_aligned);
   string_s *str = rcimmix_alloc(sizeof(string_s));
   str->type = STRING_TAG;
   str->bytes = bv->len;
-  str->strdata = rcimmix_alloc(bytes_aligned);
-  gc_log((uint64_t)&str->strdata);
+  str->strdata = data;
   memcpy(str->strdata, bv->v, to_fixnum(bv->len));
   str->len = tag_fixnum(count_utf8(bv->v, to_fixnum(bv->len), true));
   return tag_string(str);
