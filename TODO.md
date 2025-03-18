@@ -7,15 +7,16 @@
 # full r7rs / safety / tests
   * r7rs test - asin, acos - basically all the arithmetic should work on ratnum and compnum too.
   
-  Mostly error paths:
   * macro tests - work!, import them.
   * port tests
   * copyish tests
-  * gset check
+  * records need record check
+    * can remove port? check in places
+	* needs to be fast-ish somehow.
+	* record? bits should be in type header?
   
 # GC stuff:
 
-* gc fd's.
 * cleanup vector sizing: just use another header for large similar to small logbits?
   * large could always use markbits, but it doesn't show up in any tests currently.
 * And do same thing for static symbols?
@@ -24,17 +25,11 @@
 * cleanup strdata gc_log
 
 # benchmarks / perf improvements:
-  * Needs inliner to remove alloc: graphs
-    * simple called-once: Do it based on libraries?
-  * faster with float type: fft fibfp mbrot pnpoly simplex sumfp
-  * faster with list/int typecheck removal: quicksort primes puzzle array1
   * faster with single-shot continuations: ctak fibc
-  * storage use analysis: unboxing flonums, longjmp/setjmp call/cc, and typecheck removal.
-    * call/cc can just be a simple escape analysis? global though
+  * faster with float type: fft fibfp mbrot pnpoly simplex sumfp. some might need inlining?
+  * faster with list/int typecheck removal: quicksort primes puzzle array1
   
-  * stack size check: earley, divrec
-  * auto-listify globals: consargs stub in compiler called a lot: 
-    * vector. Hand-coded in chez
+  * stack size check: earley, divrec.  maybe call ulimit?
 
 # CLEANUP
 
@@ -43,18 +38,26 @@
 ----------------------------------------
 
 
-# PROBABLY NEVER:	 
+# Long term:	 
 
 # CLEANUP
 
+* gc fd's.
 * figure out strategy for intrinsics????
-* cleanup runtime - move as much to scm as possible
+  * what we've got is fine, gen-libraries can remove the old intrinsics
+* cleanup runtime - move as much to scm as possible?
+  * especially moving the number routine slowpaths would be cleaner?
 * environments/eval
   * check if necessary to rename intrinsics? Works in other eval somehow
      * I think this is caused by needing to 'expand' symbols inserted by 
 	   syntax-case, and by the macro serializer.
+  * The whole expander needs to be re-written a-la chez with wrappers instead.
 
 # PERF
+* Needs inliner to remove alloc: graphs
+  * simple called-once: Do it based on libraries?
+* auto-listify globals: consargs stub in compiler called a lot: 
+  * vector. Hand-coded in chez
 * better control of inlining, read-char/peek-char should be inlined fastpath.
 * S_error should have noreturn
 * fixup writing w-out going through write-char if possible?: doesn't seem to affect perf much.

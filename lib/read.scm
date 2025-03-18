@@ -31,7 +31,10 @@
       (begin
 	(sys:FOREIGN_CALL "SCM_STRING_SET_FAST" strbuf strbuf-loc c)
 	(set! strbuf-loc (+ strbuf-loc 1)))
-      (error "strbuf too short")))
+      (let ((oldbuf strbuf))
+	(set! strbuf (make-string (* 2 (string-length oldbuf))))
+	(string-copy! strbuf 0 oldbuf)
+	(strbuf-add c))))
 (define (get-strbuf)
   (let ((res (substring strbuf 0 strbuf-loc)))
     (set! strbuf-loc 0)
