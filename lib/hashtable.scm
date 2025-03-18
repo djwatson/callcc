@@ -22,7 +22,7 @@
   (case-lambda
    ((obj) (hash obj *default-bound*))
    ((obj bound)
-    (cond ((inexact? obj) 0)
+    (cond ((inexact? obj) (string-hash (number->string obj) bound))
 	  ((integer? obj) (modulo obj bound))
 	  ((string? obj) (string-hash obj bound))
 	  ((symbol? obj) (symbol-hash obj bound))
@@ -36,12 +36,19 @@
 			       bound))
 	  ((null? obj) 0)
 	  ((not obj) 0)
+	  ((bytevector? obj) (bytevector-hash obj bound))
 	  ((boolean? obj ) 0)
 	  ((procedure? obj) (error "hash: procedures cannot be hashed" obj))
 	  (else
-	   (error "Unknown object in hash:" obj)
-	   1
-	   )))))
+	   (error "Unknown object in hash:" obj))))))
+
+(define (bytevector-hash v bound)
+  (let ((hashvalue 571)
+	(len (bytevector-length v)))
+    (do ((index 0 (+ index 1)))
+	((>= index len) (modulo hashvalue bound))
+      (set! hashvalue (modulo (+ (* 257 hashvalue) (hash (bytevector-u8-ref v index)))
+					   *default-bound*)))))
 
 (define hash-by-identity
   (case-lambda

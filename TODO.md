@@ -28,8 +28,6 @@
 
 # CLEANUP
 
-* srfi69 is already builtin
-
 ----------------------------------------
 
 
