@@ -61,7 +61,7 @@ extern int64_t symbol_table;
 extern uint64_t *complex_constants[];
 extern uint64_t complex_constants_len;
 extern int64_t shadow_stack_size;
-extern int64_t* shadow_stack;
+extern int64_t *shadow_stack;
 
 static uintptr_t align(uintptr_t val, uintptr_t alignment) {
   return (val + alignment - 1) & ~(alignment - 1);
@@ -211,7 +211,7 @@ static void *rcimmix_realloc_align(void *p, size_t old_sz, size_t new_sz) {
 }
 static void rcimmix_free(void *, size_t) {}
 
-void gc_init(void* stacktop_in) {
+void gc_init(void *stacktop_in) {
   stacktop = stacktop_in;
   // Set defaults so we don't have to check for wrapping in
   // the fastpath.

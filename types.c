@@ -31,7 +31,7 @@
   X(RECORD, 0xa)                                                               \
   X(CLOSURE, 0x12)                                                             \
   X(SYMBOL, 0x1a)                                                              \
-  X(BYTEVECTOR, 0x22)							       \
+  X(BYTEVECTOR, 0x22)                                                          \
   X(NUMBER, 0x2a)                                                              \
   X(FLONUM, 0x2a)                                                              \
   X(BIGNUM, 0x12a)                                                             \
@@ -190,7 +190,9 @@ static bool is_bytevector(gc_obj obj) {
 /* static bool is_undefined(gc_obj obj) { return get_imm_tag(obj) ==
  * UNDEFINED_TAG; } */
 static bool is_vector(gc_obj obj) { return get_tag(obj) == VECTOR_TAG; }
-static bool is_symbol(gc_obj obj) { return is_ptr(obj) && get_ptr_tag(obj) == SYMBOL_TAG; }
+static bool is_symbol(gc_obj obj) {
+  return is_ptr(obj) && get_ptr_tag(obj) == SYMBOL_TAG;
+}
 static bool is_fixnum(gc_obj obj) { return get_tag(obj) == FIXNUM_TAG; }
 static bool is_bignum(gc_obj obj) {
   return is_ptr(obj) && get_ptr_tag(obj) == BIGNUM_TAG;
@@ -411,11 +413,11 @@ gc_obj SCM_DISPLAY(gc_obj obj, gc_obj scmfd) {
     case BYTEVECTOR_TAG: {
       dprintf(fd, "#u8(");
       auto bv = to_bytevector(obj);
-      for(int64_t i = 0; i < to_fixnum(bv->len); i++) {
-	if (i != 0) {
-	  dprintf(fd, " ");
-	}
-	dprintf(fd, "%i", bv->v[i]);
+      for (int64_t i = 0; i < to_fixnum(bv->len); i++) {
+        if (i != 0) {
+          dprintf(fd, " ");
+        }
+        dprintf(fd, "%i", bv->v[i]);
       }
       dprintf(fd, ")");
       break;
@@ -494,17 +496,17 @@ gc_obj SCM_DISPLAY(gc_obj obj, gc_obj scmfd) {
 
 ////////////// MATH
 
-_Noreturn  void S_error(gc_obj closure, gc_obj msg, gc_obj arg);
+_Noreturn void S_error(gc_obj closure, gc_obj msg, gc_obj arg);
 static gc_obj from_c_str(char *str);
 
 extern int64_t argcnt;
 extern int64_t wanted_argcnt;
 
-NOINLINE _Noreturn static void scm_runtime_error1(char* msg, gc_obj obj) {
+NOINLINE _Noreturn static void scm_runtime_error1(char *msg, gc_obj obj) {
   argcnt = 3;
   S_error(UNDEFINED, from_c_str(msg), obj);
 }
-NOINLINE _Noreturn static void scm_runtime_error0(char* msg) {
+NOINLINE _Noreturn static void scm_runtime_error0(char *msg) {
   argcnt = 2;
   S_error(UNDEFINED, from_c_str(msg), UNDEFINED);
 }
@@ -517,7 +519,7 @@ NOINLINE gc_obj SCM_LOAD_GLOBAL_FAIL(gc_obj a) {
 INLINE gc_obj SCM_LOAD_GLOBAL(gc_obj a) {
   auto sym = to_symbol(a);
   auto val = sym->val;
-  //SCM_DISPLAY(a, tag_fixnum(0));
+  // SCM_DISPLAY(a, tag_fixnum(0));
 #ifndef UNSAFE
   if (likely(val.value != UNDEFINED.value)) {
     return val;
@@ -758,7 +760,7 @@ static gc_obj compnum_mul(gc_obj a, gc_obj b) {
       mpz_##OPLCNAME(bres, ba, bb);                                            \
       return tag_bignum(bres);                                                 \
     }                                                                          \
-    scm_runtime_error1(#OPNAME ": not a number:", a);			\
+    scm_runtime_error1(#OPNAME ": not a number:", a);                          \
   }                                                                            \
                                                                                \
   INLINE gc_obj SCM_##OPNAME(gc_obj a, gc_obj b) {                             \
@@ -796,7 +798,7 @@ MATH_OVERFLOW_OP(MUL, mul, MATH_MUL, SHIFT)
                                                                                \
   NOINLINE gc_obj SCM_##OPNAME##_SLOW(gc_obj a, gc_obj b) {                    \
     if (is_compnum(a) || is_compnum(b)) {                                      \
-      scm_runtime_error0("Compnums not supported for " # OPNAME);	\
+      scm_runtime_error0("Compnums not supported for " #OPNAME);               \
     } else if (is_flonum(a) || is_flonum(b)) {                                 \
       return double_to_gc_slow(                                                \
           FPOP(to_double(SCM_INEXACT(a)), to_double(SCM_INEXACT(b))));         \
@@ -810,12 +812,12 @@ MATH_OVERFLOW_OP(MUL, mul, MATH_MUL, SHIFT)
     } else if (is_fixnum(a) && is_fixnum(b)) {                                 \
       return tag_fixnum(OP(to_fixnum(a), to_fixnum(b)));                       \
     }                                                                          \
-    scm_runtime_error0("Invalid types in " # OPNAME);	\
+    scm_runtime_error0("Invalid types in " #OPNAME);                           \
   }                                                                            \
                                                                                \
   INLINE gc_obj SCM_##OPNAME(gc_obj a, gc_obj b) {                             \
     if (likely((is_fixnum(a) & is_fixnum(b)) == 1)) {                          \
-     return tag_fixnum(OP(to_fixnum(a), to_fixnum(b)));                       \
+      return tag_fixnum(OP(to_fixnum(a), to_fixnum(b)));                       \
     } else if (likely((is_flonum_fast(a) & is_flonum_fast(b)) == 1)) {         \
       gc_obj res;                                                              \
       if (likely(double_to_gc(FPOP(to_double_fast(a), to_double_fast(b)),      \
@@ -886,7 +888,7 @@ INLINE gc_obj SCM_DIV(gc_obj a, gc_obj b) {
     } else if (is_fixnum(a) && is_fixnum(b)) {                                 \
       res = OP(to_fixnum(a), to_fixnum(b));                                    \
     } else {                                                                   \
-      scm_runtime_error0("Invalid type in " # OPNAME);			\
+      scm_runtime_error0("Invalid type in " #OPNAME);                          \
     }                                                                          \
     if (res) {                                                                 \
       return TRUE_REP;                                                         \
@@ -1135,9 +1137,9 @@ typedef struct ccsave {
 } ccsave;
 
 extern char **environ;
-void* get_stack_top() {
+void *get_stack_top() {
   // Ensure alignment, since we are resetting the stack to here.
-  return (void*)((uintptr_t)gc_get_stack_top() & ~0x7);
+  return (void *)((uintptr_t)gc_get_stack_top() & ~0x7);
 }
 
 ccsave *cur_link = NULL;
@@ -1203,7 +1205,6 @@ static void need_more_frames(gc_obj res) {
 #else
 #error "Arch not supported for CALLCC"
 #endif
-
 
 void ccresthunk_oneshot();
 
@@ -1349,7 +1350,7 @@ gc_obj consargs_stub(gc_obj a0, gc_obj a1, gc_obj a2, gc_obj a3, gc_obj a4,
     if (cur <= wanted_argcnt) {
       *tail = res;
       SCM_WRITE_SHADOW_STACK(tag_fixnum(cur - reg_arg_cnt), head);
-      //shadow_stack[cur - reg_arg_cnt] = head;
+      // shadow_stack[cur - reg_arg_cnt] = head;
       return head;
     }
     res = SCM_CONS(SCM_READ_SHADOW_STACK(cur - reg_arg_cnt - 1), res);
@@ -1426,8 +1427,8 @@ gc_obj SCM_MAKE_STRING(gc_obj len, gc_obj fill) {
     if (bytecnt == 1) {
       memset(str->strdata, to_char(fill), to_fixnum(len));
     } else {
-      for(int64_t i = 0; i < totallen; i+= bytecnt) {
-	memcpy(&str->strdata[i], buf, bytecnt);
+      for (int64_t i = 0; i < totallen; i += bytecnt) {
+        memcpy(&str->strdata[i], buf, bytecnt);
       }
     }
   } else {
@@ -1444,7 +1445,8 @@ INLINE gc_obj SCM_SYMBOL_STRING(gc_obj sym) {
   if (!is_symbol(sym)) {
     scm_runtime_error1("symbol->string: not a symbol", sym);
   }
-  return to_symbol(sym)->name; }
+  return to_symbol(sym)->name;
+}
 
 INLINE gc_obj SCM_STRING_REF(gc_obj str, gc_obj pos) {
 #ifndef UNSAFE
@@ -1457,7 +1459,7 @@ INLINE gc_obj SCM_STRING_REF(gc_obj str, gc_obj pos) {
 #endif
   auto s = to_string(str);
   uint64_t i = to_fixnum(pos);
-  #ifndef UNSAFE
+#ifndef UNSAFE
   if (unlikely(i >= (uint64_t)to_fixnum(s->len))) {
     scm_runtime_error1("string-set: idx out of range", pos);
   }
@@ -1466,15 +1468,16 @@ INLINE gc_obj SCM_STRING_REF(gc_obj str, gc_obj pos) {
     // Slow, utf8-path.
     int32_t codepoint;
     uint32_t bytepos = 0;
-    for(uint64_t ch = 0; ch <= i; ch++) {
-      auto res = utf8proc_iterate((const unsigned char*)&s->strdata[bytepos], to_fixnum(s->bytes), &codepoint);
+    for (uint64_t ch = 0; ch <= i; ch++) {
+      auto res = utf8proc_iterate((const unsigned char *)&s->strdata[bytepos],
+                                  to_fixnum(s->bytes), &codepoint);
       if (res < 0) {
-	scm_runtime_error0("Tried to read invalid utf8");
+        scm_runtime_error0("Tried to read invalid utf8");
       }
-      bytepos+= res;
+      bytepos += res;
     }
     return tag_char(codepoint);
-  } 
+  }
   return tag_char(s->strdata[i]);
 }
 
@@ -1485,15 +1488,16 @@ INLINE gc_obj SCM_STRING_REF_FAST(gc_obj str, gc_obj pos) {
     // Slow, utf8-path.
     int32_t codepoint;
     uint32_t bytepos = 0;
-    for(uint64_t ch = 0; ch <= i; ch++) {
-      auto res = utf8proc_iterate((const unsigned char*)&s->strdata[bytepos], to_fixnum(s->bytes), &codepoint);
+    for (uint64_t ch = 0; ch <= i; ch++) {
+      auto res = utf8proc_iterate((const unsigned char *)&s->strdata[bytepos],
+                                  to_fixnum(s->bytes), &codepoint);
       if (res < 0) {
-	scm_runtime_error0("Tried to read invalid utf8");
+        scm_runtime_error0("Tried to read invalid utf8");
       }
-      bytepos+= res;
+      bytepos += res;
     }
     return tag_char(codepoint);
-  } 
+  }
   return tag_char(s->strdata[i]);
 }
 
@@ -1501,40 +1505,42 @@ NOINLINE gc_obj SCM_STRING_SET_SLOW(gc_obj str, gc_obj pos, gc_obj scm_ch) {
   auto s = to_string(str);
   uint64_t i = to_fixnum(pos);
   uint32_t c = to_char(scm_ch);
-    uint8_t buf[4];
-    auto bytecnt = utf8proc_encode_char(c, buf);
-    assert(bytecnt != 0);
-    
-    int32_t codepoint;
-    uint32_t bytepos = 0;
-    ssize_t res;
-    for(uint64_t ch = 0; ch <= i; ch++) {
-      res = utf8proc_iterate((const unsigned char*)&s->strdata[bytepos], to_fixnum(s->bytes), &codepoint);
-      if (res < 0) {
-	scm_runtime_error0("Tried to read invalid utf8");
-      }
-      if (ch == i) {
-	break;
-      }
-      bytepos+= res;
+  uint8_t buf[4];
+  auto bytecnt = utf8proc_encode_char(c, buf);
+  assert(bytecnt != 0);
+
+  int32_t codepoint;
+  uint32_t bytepos = 0;
+  ssize_t res;
+  for (uint64_t ch = 0; ch <= i; ch++) {
+    res = utf8proc_iterate((const unsigned char *)&s->strdata[bytepos],
+                           to_fixnum(s->bytes), &codepoint);
+    if (res < 0) {
+      scm_runtime_error0("Tried to read invalid utf8");
     }
-    if (res != bytecnt) {
-      auto old_data = s->strdata;
-      auto new_bytes = to_fixnum(s->bytes) + bytecnt - res;
-      auto new_bytes_aligned = (new_bytes + 7) & ~7;
-      s->strdata = rcimmix_alloc(new_bytes_aligned);
-      gc_log((uint64_t)&s->strdata);
-      memcpy(s->strdata, old_data, bytepos);
-      memcpy(&s->strdata[bytepos], buf, bytecnt);
-      memcpy(&s->strdata[bytepos + bytecnt], &old_data[bytepos + res], to_fixnum(s->bytes) - bytepos - res);
-      s->bytes = tag_fixnum(new_bytes);
-      return UNDEFINED;
+    if (ch == i) {
+      break;
     }
+    bytepos += res;
+  }
+  if (res != bytecnt) {
+    auto old_data = s->strdata;
+    auto new_bytes = to_fixnum(s->bytes) + bytecnt - res;
+    auto new_bytes_aligned = (new_bytes + 7) & ~7;
+    s->strdata = rcimmix_alloc(new_bytes_aligned);
+    gc_log((uint64_t)&s->strdata);
+    memcpy(s->strdata, old_data, bytepos);
     memcpy(&s->strdata[bytepos], buf, bytecnt);
+    memcpy(&s->strdata[bytepos + bytecnt], &old_data[bytepos + res],
+           to_fixnum(s->bytes) - bytepos - res);
+    s->bytes = tag_fixnum(new_bytes);
     return UNDEFINED;
+  }
+  memcpy(&s->strdata[bytepos], buf, bytecnt);
+  return UNDEFINED;
 }
 INLINE gc_obj SCM_STRING_SET(gc_obj str, gc_obj pos, gc_obj scm_ch) {
-  #ifndef UNSAVE
+#ifndef UNSAVE
   if (unlikely(!is_string(str))) {
     scm_runtime_error1("string-set: not a string", str);
   }
@@ -1544,15 +1550,15 @@ INLINE gc_obj SCM_STRING_SET(gc_obj str, gc_obj pos, gc_obj scm_ch) {
   if (unlikely(!is_char(scm_ch))) {
     scm_runtime_error1("string-set: not a char", scm_ch);
   }
-  #endif
+#endif
   auto s = to_string(str);
   uint64_t i = to_fixnum(pos);
   uint32_t c = to_char(scm_ch);
-  #ifndef UNSAFE
+#ifndef UNSAFE
   if (unlikely(i >= (uint64_t)to_fixnum(s->len))) {
     scm_runtime_error1("string-set: idx out of range", pos);
   }
-  #endif
+#endif
   if (unlikely(s->len.value != s->bytes.value || c >= 128)) {
     [[clang::musttail]] return SCM_STRING_SET_SLOW(str, pos, scm_ch);
   }
@@ -1708,10 +1714,10 @@ INLINE gc_obj SCM_STRING_HASH(gc_obj h) {
 }
 
 gc_obj SCM_STRING_CPY(gc_obj tostr, gc_obj tostart, gc_obj fromstr,
-                             gc_obj fromstart, gc_obj fromend) {
+                      gc_obj fromstart, gc_obj fromend) {
   auto to = to_string(tostr);
   auto from = to_string(fromstr);
-  
+
   auto from_pos = to_fixnum(fromstart);
   auto len = to_fixnum(fromend) - from_pos;
   // If either string  is non-ascii, run slowpath.
@@ -1721,13 +1727,15 @@ gc_obj SCM_STRING_CPY(gc_obj tostr, gc_obj tostart, gc_obj fromstr,
     int64_t pos = 0;
     uint64_t bytepos = 0;
     int32_t codepoint;
-    while(pos < to_fixnum(fromend)) {
+    while (pos < to_fixnum(fromend)) {
       if (pos == to_fixnum(fromstart)) {
-	from_pos = bytepos;
+        from_pos = bytepos;
       }
-      auto res = utf8proc_iterate((const unsigned char*)&from->strdata[bytepos], to_fixnum(from->bytes), &codepoint);
+      auto res =
+          utf8proc_iterate((const unsigned char *)&from->strdata[bytepos],
+                           to_fixnum(from->bytes), &codepoint);
       if (res < 0) {
-	scm_runtime_error0("Tried to read invalid utf8");
+        scm_runtime_error0("Tried to read invalid utf8");
       }
       pos++;
       bytepos += res;
@@ -1740,13 +1748,14 @@ gc_obj SCM_STRING_CPY(gc_obj tostr, gc_obj tostart, gc_obj fromstr,
     // Now iterate dst string, copying to new.
     pos = 0;
     bytepos = 0;
-    while(pos < to_fixnum(tostart)) {
-      auto res = utf8proc_iterate((const unsigned char*)&to->strdata[bytepos], to_fixnum(to->bytes), &codepoint);
+    while (pos < to_fixnum(tostart)) {
+      auto res = utf8proc_iterate((const unsigned char *)&to->strdata[bytepos],
+                                  to_fixnum(to->bytes), &codepoint);
       if (res < 0) {
-	scm_runtime_error0("Tried to read invalid utf8");
+        scm_runtime_error0("Tried to read invalid utf8");
       }
-      pos ++;
-      bytepos+= res;
+      pos++;
+      bytepos += res;
     }
     // Ok, we are at the start.  Copy in old start
     memcpy(new_strdata, to->strdata, bytepos);
@@ -1755,20 +1764,22 @@ gc_obj SCM_STRING_CPY(gc_obj tostr, gc_obj tostart, gc_obj fromstr,
     auto newend = bytepos + len;
     // Advance past dst
     auto len_in_chars = to_fixnum(fromend) - to_fixnum(fromstart);
-    while(pos < (to_fixnum(tostart) + len_in_chars)) {
-      auto res = utf8proc_iterate((const unsigned char*)&to->strdata[bytepos], to_fixnum(to->bytes), &codepoint);
+    while (pos < (to_fixnum(tostart) + len_in_chars)) {
+      auto res = utf8proc_iterate((const unsigned char *)&to->strdata[bytepos],
+                                  to_fixnum(to->bytes), &codepoint);
       if (res < 0) {
-	scm_runtime_error0("Tried to read invalid utf8");
+        scm_runtime_error0("Tried to read invalid utf8");
       }
-      pos ++;
-      bytepos+= res;
+      pos++;
+      bytepos += res;
     }
     // Now copy in the tail.
-    memcpy(&new_strdata[newend], &to->strdata[bytepos], to_fixnum(to->bytes) - bytepos);
+    memcpy(&new_strdata[newend], &to->strdata[bytepos],
+           to_fixnum(to->bytes) - bytepos);
     to->strdata = new_strdata;
     gc_log((uint64_t)&to->strdata);
     to->bytes = tag_fixnum(newend + to_fixnum(to->bytes) - bytepos);
-    
+
     return UNDEFINED;
   }
   auto start = to_fixnum(tostart);
@@ -1785,7 +1796,7 @@ INLINE gc_obj SCM_AND(gc_obj num, gc_obj mask) {
 #include <unistd.h>
 
 gc_obj SCM_OPEN_FD(gc_obj filename, gc_obj input) {
-  
+
   auto str = to_string(filename);
   char name[256];
   memcpy(name, str->strdata, to_fixnum(str->bytes));
@@ -1796,30 +1807,31 @@ gc_obj SCM_OPEN_FD(gc_obj filename, gc_obj input) {
       open(name, readonly ? O_RDONLY : O_WRONLY | O_CREAT | O_TRUNC, 0777));
 }
 
-static uint64_t utf8_count_bytes(char* buf, uint64_t len) {
+static uint64_t utf8_count_bytes(char *buf, uint64_t len) {
   uint64_t bytes = 0;
   int32_t codepoint_res;
-  for(uint64_t codepoint = 0; codepoint < len; codepoint++) {
-    auto res = utf8proc_iterate((unsigned char*)&buf[bytes], (long)(len*4), &codepoint_res);
+  for (uint64_t codepoint = 0; codepoint < len; codepoint++) {
+    auto res = utf8proc_iterate((unsigned char *)&buf[bytes], (long)(len * 4),
+                                &codepoint_res);
     bytes += res;
   }
   return bytes;
 }
 
-static bool is_ascii(uint8_t* data, uint32_t bytes) {
+static bool is_ascii(uint8_t *data, uint32_t bytes) {
   uint8_t *ptr = data;
   uint8_t *end = data + bytes;
   // Ensure we have 8 valid bytes for fastpath.
   uint8_t *end_sentinel = data + bytes - 7;
-  while(ptr < end_sentinel) {
+  while (ptr < end_sentinel) {
     uint64_t d;
     memcpy(&d, ptr, 8);
-    if(d&0x8080808080808080) {
+    if (d & 0x8080808080808080) {
       return false;
     }
     ptr += 8;
   }
-  for(; ptr < end; ptr++) {
+  for (; ptr < end; ptr++) {
     if (*ptr & 0x80) {
       return false;
     }
@@ -1827,18 +1839,19 @@ static bool is_ascii(uint8_t* data, uint32_t bytes) {
   return true;
 }
 
-static uint32_t count_utf8(uint8_t* data, uint32_t bytes, bool abort_on_invalid) {
+static uint32_t count_utf8(uint8_t *data, uint32_t bytes,
+                           bool abort_on_invalid) {
   if (likely(is_ascii(data, bytes))) {
     return bytes;
   }
   uint32_t bytepos = 0;
   int32_t codepoint;
   uint32_t chars = 0;
-  while(bytepos < bytes) {
+  while (bytepos < bytes) {
     auto res = utf8proc_iterate(&data[bytepos], bytes, &codepoint);
     if (res < 0) {
       if (abort_on_invalid) {
-	scm_runtime_error0("Tried to read invalid utf8");
+        scm_runtime_error0("Tried to read invalid utf8");
       } else {
         return chars;
       }
@@ -1854,18 +1867,19 @@ static uint32_t count_utf8(uint8_t* data, uint32_t bytes, bool abort_on_invalid)
 
 gc_obj SCM_READ_FD(gc_obj scmfd, gc_obj scmbuf) {
   auto buf = to_string(scmbuf);
-  
+
   // The buffer is unique: The codepoint count may not match
   // the byte count: Extra bytes are unfinished unicode codepoints.
   uint64_t remaining = 0;
-  if(buf->bytes.value != buf->len.value) {
+  if (buf->bytes.value != buf->len.value) {
     auto bytecnt = utf8_count_bytes(buf->strdata, to_fixnum(buf->len));
     remaining = to_fixnum(buf->bytes) - bytecnt;
     memcpy(buf->strdata, &buf->strdata[bytecnt], remaining);
   }
-  
+
   int fd = (int)to_fixnum(scmfd);
-  auto res = read(fd, &buf->strdata[remaining], to_fixnum(buf->bytes) - remaining);
+  auto res =
+      read(fd, &buf->strdata[remaining], to_fixnum(buf->bytes) - remaining);
   if (res == 0) {
     assert(remaining == 0);
     return tag_fixnum(0);
@@ -1875,9 +1889,9 @@ gc_obj SCM_READ_FD(gc_obj scmfd, gc_obj scmbuf) {
     exit(-1);
   }
   buf->bytes = tag_fixnum(res + remaining);
-  auto len = count_utf8((uint8_t*)buf->strdata, to_fixnum(buf->bytes), false);
+  auto len = count_utf8((uint8_t *)buf->strdata, to_fixnum(buf->bytes), false);
   buf->len = tag_fixnum(len);
-  
+
   return buf->len;
 }
 
@@ -1952,7 +1966,7 @@ gc_obj SCM_RATNUM_STR(gc_obj b) {
   // Align.
   len = (len + 7) & ~7;
   string_s *str = rcimmix_alloc(sizeof(string_s));
-  str->strdata =rcimmix_alloc(len);
+  str->strdata = rcimmix_alloc(len);
   mpq_get_str(str->strdata, 10, ratnum->x);
   str->len = tag_fixnum(strlen(str->strdata));
   str->bytes = tag_fixnum(strlen(str->strdata));
@@ -2076,7 +2090,7 @@ gc_obj SCM_STRING_UTF8(gc_obj str) {
   }
   auto s = to_string(str);
   auto bytes_aligned = (to_fixnum(s->bytes) + 7) & ~7;
-  bytevector_s* utf8 = rcimmix_alloc(sizeof(bytevector_s) + bytes_aligned);
+  bytevector_s *utf8 = rcimmix_alloc(sizeof(bytevector_s) + bytes_aligned);
   utf8->type = BYTEVECTOR_TAG;
   utf8->len = s->bytes;
   memcpy(utf8->v, s->strdata, to_fixnum(s->bytes));
@@ -2089,7 +2103,7 @@ gc_obj SCM_UTF8_STRING(gc_obj scm_bv) {
   }
   auto bv = to_bytevector(scm_bv);
   auto bytes_aligned = (to_fixnum(bv->len) + 7) & ~7;
-  string_s* str = rcimmix_alloc(sizeof(string_s));
+  string_s *str = rcimmix_alloc(sizeof(string_s));
   str->type = STRING_TAG;
   str->bytes = bv->len;
   str->strdata = rcimmix_alloc(bytes_aligned);
@@ -2145,7 +2159,7 @@ gc_obj SCM_BYTEVECTOR_LENGTH(gc_obj scm_bv) {
 gc_obj SCM_MAKE_BYTEVECTOR(gc_obj scm_len, gc_obj init) {
   auto len = to_fixnum(scm_len);
   auto len_aligned = (len + 7) & ~7;
-  bytevector_s* bv = rcimmix_alloc(sizeof(bytevector_s) + len_aligned);
+  bytevector_s *bv = rcimmix_alloc(sizeof(bytevector_s) + len_aligned);
   bv->type = BYTEVECTOR_TAG;
   bv->len = scm_len;
   memset(bv->v, (uint8_t)to_fixnum(init), len);
@@ -2156,11 +2170,11 @@ gc_obj SCM_MAKE_BYTEVECTOR(gc_obj scm_len, gc_obj init) {
 
 gc_obj SCM_CHAR_ALPHABETIC(gc_obj ch) {
   utf8proc_category_t category = utf8proc_category(to_char(ch));
-    if (category == UTF8PROC_CATEGORY_LU ||  // Uppercase letter
-            category == UTF8PROC_CATEGORY_LL ||  // Lowercase letter
-            category == UTF8PROC_CATEGORY_LT ||  // Titlecase letter
-            category == UTF8PROC_CATEGORY_LM ||  // Modifier letter
-	category == UTF8PROC_CATEGORY_LO){   // Other letter
+  if (category == UTF8PROC_CATEGORY_LU || // Uppercase letter
+      category == UTF8PROC_CATEGORY_LL || // Lowercase letter
+      category == UTF8PROC_CATEGORY_LT || // Titlecase letter
+      category == UTF8PROC_CATEGORY_LM || // Modifier letter
+      category == UTF8PROC_CATEGORY_LO) { // Other letter
     return TRUE_REP;
   }
   return FALSE_REP;
@@ -2182,8 +2196,7 @@ gc_obj SCM_CHAR_LOWERCASE(gc_obj ch) {
 
 gc_obj SCM_CHAR_NUMERIC(gc_obj ch) {
   utf8proc_category_t category = utf8proc_category(to_char(ch));
-  if (category == UTF8PROC_CATEGORY_ND||
-      category == UTF8PROC_CATEGORY_NL ||
+  if (category == UTF8PROC_CATEGORY_ND || category == UTF8PROC_CATEGORY_NL ||
       category == UTF8PROC_CATEGORY_NO) {
     return TRUE_REP;
   }
@@ -2193,25 +2206,21 @@ gc_obj SCM_CHAR_NUMERIC(gc_obj ch) {
 gc_obj SCM_CHAR_WHITESPACE(gc_obj scm_ch) {
   auto ch = to_char(scm_ch);
   utf8proc_category_t category = utf8proc_category(ch);
-  if (category == UTF8PROC_CATEGORY_ZS||
-      category == UTF8PROC_CATEGORY_ZL ||
-      category == UTF8PROC_CATEGORY_ZP ||
-       ch == 0x0009 ||  // Tab
-       ch == 0x000A ||  // Line feed
-            ch == 0x000B ||  // Vertical tab
-            ch == 0x000C ||  // Form feed
-            ch == 0x000D ||  // Carriage return
-            ch == 0x0085 ||  // Next line (NEL)
-            ch == 0x2028 ||  // Line separator
-      ch == 0x2029) {   // Paragraph separator
+  if (category == UTF8PROC_CATEGORY_ZS || category == UTF8PROC_CATEGORY_ZL ||
+      category == UTF8PROC_CATEGORY_ZP || ch == 0x0009 || // Tab
+      ch == 0x000A ||                                     // Line feed
+      ch == 0x000B ||                                     // Vertical tab
+      ch == 0x000C ||                                     // Form feed
+      ch == 0x000D ||                                     // Carriage return
+      ch == 0x0085 ||                                     // Next line (NEL)
+      ch == 0x2028 ||                                     // Line separator
+      ch == 0x2029) {                                     // Paragraph separator
     return TRUE_REP;
   }
   return FALSE_REP;
 }
 
-gc_obj SCM_UPCASE(gc_obj ch) {
-  return tag_char(utf8proc_toupper(to_char(ch)));
-}
+gc_obj SCM_UPCASE(gc_obj ch) { return tag_char(utf8proc_toupper(to_char(ch))); }
 gc_obj SCM_DOWNCASE(gc_obj ch) {
   return tag_char(utf8proc_tolower(to_char(ch)));
 }
@@ -2223,7 +2232,7 @@ int SCM_MAIN();
 
 #include <sys/resource.h>
 
-int main(int argc_in, char* argv_in[]) {
+int main(int argc_in, char *argv_in[]) {
   // grab the stack top: this is used for both callcc
   // stack replacement, *and* GC conservative collection.
   auto fp = __builtin_frame_address(0);
@@ -2232,7 +2241,7 @@ int main(int argc_in, char* argv_in[]) {
   argv = argv_in;
 
   auto lim = (struct rlimit){RLIM_INFINITY, RLIM_INFINITY};
-  auto res = setrlimit(RLIMIT_STACK,&lim);
+  auto res = setrlimit(RLIMIT_STACK, &lim);
   if (res) {
     perror("Setrlimit error");
   }
