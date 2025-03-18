@@ -1,0 +1,1670 @@
+(import
+  (scheme base)
+  (scheme char)
+  (scheme cxr)
+  (scheme lazy)
+  (scheme inexact)
+  (scheme complex)
+  (scheme time)
+  (scheme file)
+  (scheme read)
+  (scheme write)
+  (scheme eval)
+  (scheme process-context)
+  (scheme case-lambda)
+  (scheme r5rs)
+  (only (srfi 1) cons*))
+(define PROG-cur-section '())
+(define PROG-errs '())
+(define PROG-SECTION
+  (lambda GENSYM-args-1858
+    (begin
+      (display "SECTION")
+      (write GENSYM-args-1858)
+      (newline)
+      (set! PROG-cur-section GENSYM-args-1858)
+      #t)))
+(define PROG-record-error
+  (lambda (GENSYM-e-1859)
+    (set! PROG-errs
+      (cons (list PROG-cur-section GENSYM-e-1859)
+            PROG-errs))))
+(define PROG-test
+  (lambda (GENSYM-expect-1860
+           GENSYM-fun-1861
+           .
+           GENSYM-args-1862)
+    (begin
+      (write (cons GENSYM-fun-1861 GENSYM-args-1862))
+      (display "  ==> ")
+      ((lambda (GENSYM-res-1863)
+         (begin
+           (write GENSYM-res-1863)
+           (newline)
+           (if (not (equal? GENSYM-expect-1860 GENSYM-res-1863))
+             (begin
+               (PROG-record-error
+                 (list GENSYM-res-1863
+                       GENSYM-expect-1860
+                       (cons GENSYM-fun-1861 GENSYM-args-1862)))
+               (display " BUT EXPECTED ")
+               (write GENSYM-expect-1860)
+               (newline)
+               #f)
+             #t)))
+       (if (procedure? GENSYM-fun-1861)
+         (apply GENSYM-fun-1861 GENSYM-args-1862)
+         (car GENSYM-args-1862))))))
+(define PROG-report-errs
+  (lambda ()
+    (begin
+      (newline)
+      (if (null? PROG-errs)
+        (display "Passed all tests")
+        (begin
+          (display "errors were:")
+          (newline)
+          (display "(SECTION (got expected (call)))")
+          (newline)
+          (for-each
+            (lambda (GENSYM-l-1864)
+              (begin (write GENSYM-l-1864) (newline)))
+            PROG-errs)))
+      (newline))))
+(PROG-SECTION 2 1)
+'(+ -
+    ...
+    !..
+    $.+
+    %.-
+    &.!
+    /:.
+    :+.
+    <-.
+    =.
+    >.
+    ?.
+    ~.
+    _.
+    ^.)
+(PROG-SECTION 3 4)
+(define PROG-disjoint-type-functions
+  (list boolean?
+        char?
+        null?
+        number?
+        pair?
+        procedure?
+        string?
+        symbol?
+        vector?))
+(define PROG-type-examples
+  (list #t
+        #f
+        #\a
+        '()
+        9739
+        '(test)
+        PROG-record-error
+        "test"
+        ""
+        'test
+        '#()
+        '#(a b c)))
+(define PROG-i 1)
+(for-each
+  (lambda (GENSYM-x-1865)
+    (begin
+      (display (make-string PROG-i #\space))
+      (set! PROG-i (+ 3 PROG-i))
+      (write GENSYM-x-1865)
+      (newline)))
+  PROG-disjoint-type-functions)
+(define PROG-type-matrix
+  (map (lambda (GENSYM-x-1866)
+         ((lambda (GENSYM-t-1867)
+            (begin
+              (write GENSYM-t-1867)
+              (write GENSYM-x-1866)
+              (newline)
+              GENSYM-t-1867))
+          (map (lambda (GENSYM-f-1868)
+                 (GENSYM-f-1868 GENSYM-x-1866))
+               PROG-disjoint-type-functions)))
+       PROG-type-examples))
+(set! PROG-i 0)
+(define PROG-j 0)
+(for-each
+  (lambda (GENSYM-x-1869 GENSYM-y-1870)
+    (begin
+      (set! PROG-j (+ 1 PROG-j))
+      (set! PROG-i 0)
+      (for-each
+        (lambda (GENSYM-f-1871)
+          (begin
+            (set! PROG-i (+ 1 PROG-i))
+            (if (= PROG-i PROG-j)
+              (if (not (GENSYM-f-1871 GENSYM-x-1869))
+                (PROG-test #t GENSYM-f-1871 GENSYM-x-1869)
+                #f)
+              (if (GENSYM-f-1871 GENSYM-x-1869)
+                (PROG-test #f GENSYM-f-1871 GENSYM-x-1869)
+                #f))
+            (if (= PROG-i PROG-j)
+              (if (not (GENSYM-f-1871 GENSYM-y-1870))
+                (PROG-test #t GENSYM-f-1871 GENSYM-y-1870)
+                #f)
+              (if (GENSYM-f-1871 GENSYM-y-1870)
+                (PROG-test #f GENSYM-f-1871 GENSYM-y-1870)
+                #f))))
+        PROG-disjoint-type-functions)))
+  (list #t
+        #\a
+        '()
+        9739
+        '(test)
+        PROG-record-error
+        "test"
+        'car
+        '#(a b c))
+  (list #f
+        #\newline
+        '()
+        -3252
+        '(t . t)
+        car
+        ""
+        'nil
+        '#()))
+(PROG-SECTION 4 1 2)
+(PROG-test ''a 'quote ''a)
+(PROG-test ''a 'quote ''a)
+(PROG-SECTION 4 1 3)
+(PROG-test 12 (if #f + *) 3 4)
+(PROG-SECTION 4 1 4)
+(PROG-test
+  8
+  (lambda (GENSYM-x-1872)
+    (+ GENSYM-x-1872 GENSYM-x-1872))
+  4)
+(define PROG-reverse-subtract
+  (lambda (GENSYM-x-1873 GENSYM-y-1874)
+    (- GENSYM-y-1874 GENSYM-x-1873)))
+(PROG-test 3 PROG-reverse-subtract 7 10)
+(define PROG-add4
+  ((lambda (GENSYM-x-1875)
+     (lambda (GENSYM-y-1876)
+       (+ GENSYM-x-1875 GENSYM-y-1876)))
+   4))
+(PROG-test 10 PROG-add4 6)
+(PROG-test
+  '(3 4 5 6)
+  (lambda GENSYM-x-1877 GENSYM-x-1877)
+  3
+  4
+  5
+  6)
+(PROG-test
+  '(5 6)
+  (lambda (GENSYM-x-1878 GENSYM-y-1879 . GENSYM-z-1880)
+    GENSYM-z-1880)
+  3
+  4
+  5
+  6)
+(PROG-SECTION 4 1 5)
+(PROG-test 'yes 'if (if (> 3 2) 'yes 'no))
+(PROG-test 'no 'if (if (> 2 3) 'yes 'no))
+(PROG-test '1 'if (if (> 3 2) (- 3 2) (+ 3 2)))
+(PROG-SECTION 4 1 6)
+(define PROG-x 2)
+(PROG-test 3 'define (+ PROG-x 1))
+(set! PROG-x 4)
+(PROG-test 5 'set! (+ PROG-x 1))
+(PROG-SECTION 4 2 1)
+(PROG-test
+  'greater
+  'cond
+  (if (> 3 2) 'greater (if (< 3 2) 'less #f)))
+(PROG-test
+  'equal
+  'cond
+  (if (> 3 3) 'greater (if (< 3 3) 'less 'equal)))
+(PROG-test
+  2
+  'cond
+  ((lambda (GENSYM-temp-1881)
+     (if GENSYM-temp-1881 (cadr GENSYM-temp-1881) #f))
+   (assv 'b '((a 1) (b 2)))))
+(PROG-test
+  'composite
+  'case
+  ((lambda (GENSYM-atom-key-1882)
+     (if (memv GENSYM-atom-key-1882 '(2 3 5 7))
+       'prime
+       (if (memv GENSYM-atom-key-1882 '(1 4 6 8 9))
+         'composite
+         #f)))
+   (* 2 3)))
+(PROG-test
+  'consonant
+  'case
+  ((lambda (GENSYM-atom-key-1883)
+     (if (memv GENSYM-atom-key-1883 '(a e i o u))
+       'vowel
+       (if (memv GENSYM-atom-key-1883 '(w y))
+         'semivowel
+         'consonant)))
+   (car '(c d))))
+(PROG-test #t 'and (if (= 2 2) (> 2 1) #f))
+(PROG-test #f 'and (if (= 2 2) (< 2 1) #f))
+(PROG-test
+  '(f g)
+  'and
+  (if 1 (if 2 (if 'c '(f g) #f) #f) #f))
+(PROG-test #t 'and #t)
+(PROG-test
+  #t
+  'or
+  ((lambda (GENSYM-x-1884)
+     (if GENSYM-x-1884 GENSYM-x-1884 (> 2 1)))
+   (= 2 2)))
+(PROG-test
+  #t
+  'or
+  ((lambda (GENSYM-x-1885)
+     (if GENSYM-x-1885 GENSYM-x-1885 (< 2 1)))
+   (= 2 2)))
+(PROG-test
+  #f
+  'or
+  ((lambda (GENSYM-x-1886)
+     (if GENSYM-x-1886
+       GENSYM-x-1886
+       ((lambda (GENSYM-x-1887)
+          (if GENSYM-x-1887 GENSYM-x-1887 #f))
+        #f)))
+   #f))
+(PROG-test #f 'or #f)
+(PROG-test
+  '(b c)
+  'or
+  ((lambda (GENSYM-x-1888)
+     (if GENSYM-x-1888 GENSYM-x-1888 (+ 3 0)))
+   (memq 'b '(a b c))))
+(PROG-SECTION 4 2 2)
+(PROG-test
+  6
+  'let
+  ((lambda (GENSYM-x-1889 GENSYM-y-1890)
+     (* GENSYM-x-1889 GENSYM-y-1890))
+   2
+   3))
+(PROG-test
+  35
+  'let
+  ((lambda (GENSYM-x-1891 GENSYM-y-1892)
+     ((lambda (GENSYM-x-1893 GENSYM-z-1894)
+        (* GENSYM-z-1894 GENSYM-x-1893))
+      7
+      (+ GENSYM-x-1891 GENSYM-y-1892)))
+   2
+   3))
+(PROG-test
+  70
+  'let*
+  ((lambda (GENSYM-x-1895 GENSYM-y-1896)
+     ((lambda (GENSYM-x-1897)
+        ((lambda (GENSYM-z-1898)
+           (* GENSYM-z-1898 GENSYM-x-1897))
+         (+ GENSYM-x-1897 GENSYM-y-1896)))
+      7))
+   2
+   3))
+(PROG-test
+  #t
+  'letrec
+  (letrec*
+    ((GENSYM-even?-1899
+       (lambda (GENSYM-n-1901)
+         (if (zero? GENSYM-n-1901)
+           #t
+           (GENSYM-odd?-1900 (- GENSYM-n-1901 1)))))
+     (GENSYM-odd?-1900
+       (lambda (GENSYM-n-1902)
+         (if (zero? GENSYM-n-1902)
+           #f
+           (GENSYM-even?-1899 (- GENSYM-n-1902 1))))))
+    (GENSYM-even?-1899 88)))
+(define PROG-x 34)
+(PROG-test
+  5
+  'let
+  ((lambda (GENSYM-x-1903)
+     (letrec* ((GENSYM-x-1904 5)) GENSYM-x-1904))
+   3))
+(PROG-test 34 'let PROG-x)
+(PROG-test
+  6
+  'let
+  (letrec* ((GENSYM-x-1905 6)) GENSYM-x-1905))
+(PROG-test 34 'let PROG-x)
+(PROG-test
+  7
+  'let*
+  ((lambda (GENSYM-x-1906)
+     (letrec* ((GENSYM-x-1907 7)) GENSYM-x-1907))
+   3))
+(PROG-test 34 'let* PROG-x)
+(PROG-test
+  8
+  'let*
+  (letrec* ((GENSYM-x-1908 8)) GENSYM-x-1908))
+(PROG-test 34 'let* PROG-x)
+(PROG-test
+  9
+  'letrec
+  (letrec* ((GENSYM-x-1909 9)) GENSYM-x-1909))
+(PROG-test 34 'letrec PROG-x)
+(PROG-test
+  10
+  'letrec
+  (letrec*
+    ((GENSYM-x-1910 3))
+    (letrec* ((GENSYM-x-1911 10)) GENSYM-x-1911)))
+(PROG-test 34 'letrec PROG-x)
+(PROG-SECTION 4 2 3)
+(define PROG-x 0)
+(PROG-test
+  6
+  'begin
+  (begin (set! PROG-x 5) (+ PROG-x 1)))
+(PROG-SECTION 4 2 4)
+(PROG-test
+  '#(0 1 2 3 4)
+  'do
+  (letrec*
+    ((GENSYM-loop-1912
+       (lambda (GENSYM-vec-1913 GENSYM-i-1914)
+         (if (= GENSYM-i-1914 5)
+           (begin (if #f #f #f) GENSYM-vec-1913)
+           (begin
+             (vector-set!
+               GENSYM-vec-1913
+               GENSYM-i-1914
+               GENSYM-i-1914)
+             (GENSYM-loop-1912
+               GENSYM-vec-1913
+               (+ GENSYM-i-1914 1)))))))
+    (GENSYM-loop-1912 (make-vector 5) 0)))
+(PROG-test
+  25
+  'do
+  ((lambda (GENSYM-x-1915)
+     (letrec*
+       ((GENSYM-loop-1916
+          (lambda (GENSYM-x-1917 GENSYM-sum-1918)
+            (if (null? GENSYM-x-1917)
+              (begin (if #f #f #f) GENSYM-sum-1918)
+              (GENSYM-loop-1916
+                (cdr GENSYM-x-1917)
+                (+ GENSYM-sum-1918 (car GENSYM-x-1917)))))))
+       (GENSYM-loop-1916 GENSYM-x-1915 0)))
+   '(1 3 5 7 9)))
+(PROG-test
+  1
+  'let
+  ((letrec*
+     ((GENSYM-foo-1919 (lambda () 1)))
+     GENSYM-foo-1919)))
+(PROG-test
+  '((6 1 3) (-5 -2))
+  'let
+  ((letrec*
+     ((GENSYM-loop-1920
+        (lambda (GENSYM-numbers-1921
+                 GENSYM-nonneg-1922
+                 GENSYM-neg-1923)
+          (if (null? GENSYM-numbers-1921)
+            (list GENSYM-nonneg-1922 GENSYM-neg-1923)
+            (if (negative? (car GENSYM-numbers-1921))
+              (GENSYM-loop-1920
+                (cdr GENSYM-numbers-1921)
+                GENSYM-nonneg-1922
+                (cons (car GENSYM-numbers-1921) GENSYM-neg-1923))
+              (GENSYM-loop-1920
+                (cdr GENSYM-numbers-1921)
+                (cons (car GENSYM-numbers-1921)
+                      GENSYM-nonneg-1922)
+                GENSYM-neg-1923))))))
+     GENSYM-loop-1920)
+   '(3 -2 1 6 -5)
+   '()
+   '()))
+(PROG-SECTION 4 2 6)
+(PROG-test
+  '(list 3 4)
+  'quasiquote
+  (cons 'list (append (list (+ 1 2)) '(4))))
+(PROG-test
+  '(list a 'a)
+  'quasiquote
+  ((lambda (GENSYM-name-1924)
+     (cons 'list
+           (append
+             (list GENSYM-name-1924)
+             (list (list 'quote GENSYM-name-1924)))))
+   'a))
+(PROG-test
+  '(a 3 4 5 6 b)
+  'quasiquote
+  (cons 'a
+        (append
+          (list (+ 1 2))
+          (append (map abs '(4 -5 6)) '(b)))))
+(PROG-test
+  '((foo 7) . cons)
+  'quasiquote
+  (cons (list 'foo (- 10 3))
+        (append (cdr '(c)) (car '(cons)))))
+(define PROG-sqt
+  (lambda (GENSYM-x-1925)
+    (letrec*
+      ((GENSYM-loop-1926
+         (lambda (GENSYM-i-1927)
+           (if (> (* GENSYM-i-1927 GENSYM-i-1927) GENSYM-x-1925)
+             (begin (if #f #f #f) (- GENSYM-i-1927 1))
+             (GENSYM-loop-1926 (+ GENSYM-i-1927 1))))))
+      (GENSYM-loop-1926 0))))
+(PROG-test
+  '#(10 5 2 4 3 8)
+  'quasiquote
+  (list->vector
+    (cons* '10
+           '5
+           (append
+             (list (PROG-sqt 4))
+             (append (map PROG-sqt '(16 9)) '(8))))))
+(PROG-test 5 'quasiquote (+ 2 3))
+(PROG-test
+  '(a `(b ,(+ 1 2) ,(foo 4 d) e) f)
+  'quasiquote
+  (cons* 'a
+         (list 'quasiquote
+               (cons* 'b
+                      ',(+ 1 2)
+                      (list 'unquote
+                            (cons 'foo (append (list (+ 1 3)) '(d))))
+                      '(e)))
+         '(f)))
+(PROG-test
+  '(a `(b ,x ,'y d) e)
+  'quasiquote
+  ((lambda (GENSYM-name1-1928 GENSYM-name2-1929)
+     (cons* 'a
+            (list 'quasiquote
+                  (cons* 'b
+                         (list 'unquote GENSYM-name1-1928)
+                         (list 'unquote (list 'quote GENSYM-name2-1929))
+                         '(d)))
+            '(e)))
+   'x
+   'y))
+(PROG-test
+  '(list 3 4)
+  'quasiquote
+  (cons 'list (append (list (+ 1 2)) '(4))))
+(PROG-test
+  '`(list ,(+ 1 2) 4)
+  'quasiquote
+  '`(list ,(+ 1 2) 4))
+(PROG-SECTION 5 2 1)
+(define PROG-add3
+  (lambda (GENSYM-x-1930) (+ GENSYM-x-1930 3)))
+(PROG-test 6 'define (PROG-add3 3))
+(define PROG-first car)
+(PROG-test 1 'define (PROG-first '(1 2)))
+(define PROG-old-+ +)
+(define PROG-+
+  (lambda (GENSYM-x-1931 GENSYM-y-1932)
+    (list GENSYM-y-1932 GENSYM-x-1931)))
+(set! PROG-+ PROG-old-+)
+(PROG-test 9 PROG-add3 6)
+(PROG-SECTION 5 2 2)
+(PROG-test
+  45
+  'define
+  ((lambda (GENSYM-x-1933)
+     (letrec*
+       ((GENSYM-foo-1934
+          (lambda (GENSYM-y-1936)
+            (GENSYM-bar-1935 GENSYM-x-1933 GENSYM-y-1936)))
+        (GENSYM-bar-1935
+          (lambda (GENSYM-a-1937 GENSYM-b-1938)
+            (PROG-+
+              (* GENSYM-a-1937 GENSYM-b-1938)
+              GENSYM-a-1937))))
+       (GENSYM-foo-1934 (PROG-+ GENSYM-x-1933 3))))
+   5))
+(define PROG-x 34)
+(define PROG-foo
+  (lambda ()
+    (letrec* ((GENSYM-x-1939 5)) GENSYM-x-1939)))
+(PROG-test 5 PROG-foo)
+(PROG-test 34 'define PROG-x)
+(define PROG-foo
+  (lambda ()
+    (letrec* ((GENSYM-x-1940 5)) GENSYM-x-1940)))
+(PROG-test 5 PROG-foo)
+(PROG-test 34 'define PROG-x)
+(define PROG-foo
+  (lambda (GENSYM-x-1941)
+    (begin
+      ((lambda ()
+         (letrec* ((GENSYM-x-1942 5)) GENSYM-x-1942)))
+      GENSYM-x-1941)))
+(PROG-test 88 PROG-foo 88)
+(PROG-test 4 PROG-foo 4)
+(PROG-test 34 'define PROG-x)
+(PROG-test
+  99
+  'internal-define
+  (letrec*
+    ((GENSYM-foo-1943
+       (lambda (GENSYM-arg-1945)
+         ((lambda (GENSYM-x-1946)
+            (if GENSYM-x-1946
+              GENSYM-x-1946
+              (if (procedure? GENSYM-foo-1943)
+                (GENSYM-foo-1943 99)
+                #f)))
+          GENSYM-arg-1945))))
+    (letrec*
+      ((GENSYM-bar-1944 (GENSYM-foo-1943 #f)))
+      (GENSYM-foo-1943 #f))))
+(PROG-test
+  77
+  'internal-define
+  (letrec*
+    ((GENSYM-foo-1947 77)
+     (GENSYM-bar-1948 #f)
+     (GENSYM-retfoo-1949 (lambda () GENSYM-foo-1947)))
+    (letrec*
+      ((GENSYM-baz-1950 (GENSYM-retfoo-1949)))
+      (GENSYM-retfoo-1949))))
+(PROG-SECTION 6 1)
+(PROG-test #f not #t)
+(PROG-test #f not 3)
+(PROG-test #f not (list 3))
+(PROG-test #t not #f)
+(PROG-test #f not '())
+(PROG-test #f not (list))
+(PROG-test #f not 'nil)
+(PROG-test #t boolean? #f)
+(PROG-test #f boolean? 0)
+(PROG-test #f boolean? '())
+(PROG-SECTION 6 2)
+(PROG-test #t eqv? 'a 'a)
+(PROG-test #f eqv? 'a 'b)
+(PROG-test #t eqv? 2 2)
+(PROG-test #t eqv? '() '())
+(PROG-test #t eqv? '10000 '10000)
+(PROG-test #f eqv? (cons 1 2) (cons 1 2))
+(PROG-test #f eqv? (lambda () 1) (lambda () 2))
+(PROG-test #f eqv? #f 'nil)
+((lambda (GENSYM-p-1951)
+   (PROG-test #t eqv? GENSYM-p-1951 GENSYM-p-1951))
+ (lambda (GENSYM-x-1952) GENSYM-x-1952))
+(define PROG-gen-counter
+  (lambda ()
+    ((lambda (GENSYM-n-1953)
+       (lambda ()
+         (begin
+           (set! GENSYM-n-1953 (PROG-+ GENSYM-n-1953 1))
+           GENSYM-n-1953)))
+     0)))
+((lambda (GENSYM-g-1954)
+   (PROG-test #t eqv? GENSYM-g-1954 GENSYM-g-1954))
+ (PROG-gen-counter))
+(PROG-test
+  #f
+  eqv?
+  (PROG-gen-counter)
+  (PROG-gen-counter))
+(letrec*
+  ((GENSYM-f-1955
+     (lambda ()
+       (if (eqv? GENSYM-f-1955 GENSYM-g-1956) 'f 'both)))
+   (GENSYM-g-1956
+     (lambda ()
+       (if (eqv? GENSYM-f-1955 GENSYM-g-1956) 'g 'both))))
+  (PROG-test #f eqv? GENSYM-f-1955 GENSYM-g-1956))
+(PROG-test #t eq? 'a 'a)
+(PROG-test #f eq? (list 'a) (list 'a))
+(PROG-test #t eq? '() '())
+(PROG-test #t eq? car car)
+((lambda (GENSYM-x-1957)
+   (PROG-test #t eq? GENSYM-x-1957 GENSYM-x-1957))
+ '(a))
+((lambda (GENSYM-x-1958)
+   (PROG-test #t eq? GENSYM-x-1958 GENSYM-x-1958))
+ '#())
+((lambda (GENSYM-x-1959)
+   (PROG-test #t eq? GENSYM-x-1959 GENSYM-x-1959))
+ (lambda (GENSYM-x-1960) GENSYM-x-1960))
+(PROG-test #t equal? 'a 'a)
+(PROG-test #t equal? '(a) '(a))
+(PROG-test #t equal? '(a (b) c) '(a (b) c))
+(PROG-test #t equal? "abc" "abc")
+(PROG-test #t equal? 2 2)
+(PROG-test
+  #t
+  equal?
+  (make-vector 5 'a)
+  (make-vector 5 'a))
+(PROG-SECTION 6 3)
+(PROG-test '(a b c d e) 'dot '(a b c d e))
+(define PROG-x (list 'a 'b 'c))
+(define PROG-y PROG-x)
+(if list? (PROG-test #t list? PROG-y) #f)
+(set-cdr! PROG-x 4)
+(PROG-test '(a . 4) 'set-cdr! PROG-x)
+(PROG-test #t eqv? PROG-x PROG-y)
+(PROG-test '(a b c . d) 'dot '(a b c . d))
+(if list? (PROG-test #f list? PROG-y) #f)
+(if list?
+  ((lambda (GENSYM-x-1961)
+     (begin
+       (set-cdr! GENSYM-x-1961 GENSYM-x-1961)
+       (PROG-test #f 'list? (list? GENSYM-x-1961))))
+   (list 'a))
+  #f)
+(PROG-test #t pair? '(a . b))
+(PROG-test #t pair? '(a . 1))
+(PROG-test #t pair? '(a b c))
+(PROG-test #f pair? '())
+(PROG-test #f pair? '#(a b))
+(PROG-test '(a) cons 'a '())
+(PROG-test '((a) b c d) cons '(a) '(b c d))
+(PROG-test '("a" b c) cons "a" '(b c))
+(PROG-test '(a . 3) cons 'a 3)
+(PROG-test '((a b) . c) cons '(a b) 'c)
+(PROG-test 'a car '(a b c))
+(PROG-test '(a) car '((a) b c d))
+(PROG-test 1 car '(1 . 2))
+(PROG-test '(b c d) cdr '((a) b c d))
+(PROG-test 2 cdr '(1 . 2))
+(PROG-test '(a 7 c) list 'a (PROG-+ 3 4) 'c)
+(PROG-test '() list)
+(PROG-test 3 length '(a b c))
+(PROG-test 3 length '(a (b) (c d e)))
+(PROG-test 0 length '())
+(PROG-test '(x y) append '(x) '(y))
+(PROG-test '(a b c d) append '(a) '(b c d))
+(PROG-test '(a (b) (c)) append '(a (b)) '((c)))
+(PROG-test '() append)
+(PROG-test '(a b c . d) append '(a b) '(c . d))
+(PROG-test 'a append '() 'a)
+(PROG-test '(c b a) reverse '(a b c))
+(PROG-test
+  '((e (f)) d (b c) a)
+  reverse
+  '(a (b c) d (e (f))))
+(PROG-test 'c list-ref '(a b c d) 2)
+(PROG-test '(a b c) memq 'a '(a b c))
+(PROG-test '(b c) memq 'b '(a b c))
+(PROG-test '#f memq 'a '(b c d))
+(PROG-test '#f memq (list 'a) '(b (a) c))
+(PROG-test '((a) c) member (list 'a) '(b (a) c))
+(PROG-test '(101 102) memv 101 '(100 101 102))
+(define PROG-e '((a 1) (b 2) (c 3)))
+(PROG-test '(a 1) assq 'a PROG-e)
+(PROG-test '(b 2) assq 'b PROG-e)
+(PROG-test #f assq 'd PROG-e)
+(PROG-test
+  #f
+  assq
+  (list 'a)
+  '(((a)) ((b)) ((c))))
+(PROG-test
+  '((a))
+  assoc
+  (list 'a)
+  '(((a)) ((b)) ((c))))
+(PROG-test '(5 7) assv 5 '((2 3) (5 7) (11 13)))
+(PROG-SECTION 6 4)
+(PROG-test #t symbol? 'foo)
+(PROG-test #t symbol? (car '(a b)))
+(PROG-test #f symbol? "bar")
+(PROG-test #t symbol? 'nil)
+(PROG-test #f symbol? '())
+(PROG-test #f symbol? #f)
+(define PROG-char-standard-case char-upcase)
+(if (string=? (symbol->string 'A) "a")
+  (set! PROG-char-standard-case char-downcase)
+  #f)
+(PROG-test
+  #t
+  'standard-case
+  (string=?
+    (symbol->string 'a)
+    (symbol->string 'A)))
+(PROG-test
+  #t
+  'standard-case
+  ((lambda (GENSYM-x-1962)
+     (if GENSYM-x-1962
+       GENSYM-x-1962
+       (string=? (symbol->string 'A) "a")))
+   (string=? (symbol->string 'a) "A")))
+(define PROG-str-copy
+  (lambda (GENSYM-s-1963)
+    ((lambda (GENSYM-v-1964)
+       (letrec*
+         ((GENSYM-loop-1965
+            (lambda (GENSYM-i-1966)
+              (if (< GENSYM-i-1966 0)
+                (begin (if #f #f #f) GENSYM-v-1964)
+                (begin
+                  (string-set!
+                    GENSYM-v-1964
+                    GENSYM-i-1966
+                    (string-ref GENSYM-s-1963 GENSYM-i-1966))
+                  (GENSYM-loop-1965 (- GENSYM-i-1966 1)))))))
+         (GENSYM-loop-1965
+           (- (string-length GENSYM-v-1964) 1))))
+     (make-string (string-length GENSYM-s-1963)))))
+(define PROG-string-standard-case
+  (lambda (GENSYM-s-1967)
+    (begin
+      (set! GENSYM-s-1967
+        (PROG-str-copy GENSYM-s-1967))
+      (letrec*
+        ((GENSYM-loop-1968
+           (lambda (GENSYM-i-1969 GENSYM-sl-1970)
+             (if (>= GENSYM-i-1969 GENSYM-sl-1970)
+               (begin (if #f #f #f) GENSYM-s-1967)
+               (begin
+                 (string-set!
+                   GENSYM-s-1967
+                   GENSYM-i-1969
+                   (PROG-char-standard-case
+                     (string-ref GENSYM-s-1967 GENSYM-i-1969)))
+                 (GENSYM-loop-1968
+                   (PROG-+ 1 GENSYM-i-1969)
+                   GENSYM-sl-1970))))))
+        (GENSYM-loop-1968
+          0
+          (string-length GENSYM-s-1967))))))
+(PROG-test
+  (PROG-string-standard-case "flying-fish")
+  symbol->string
+  'flying-fish)
+(PROG-test
+  (PROG-string-standard-case "martin")
+  symbol->string
+  'Martin)
+(PROG-test
+  "Malvina"
+  symbol->string
+  (string->symbol "Malvina"))
+(PROG-test #t 'standard-case (eq? 'a 'A))
+(define PROG-x (string #\a #\b))
+(define PROG-y (string->symbol PROG-x))
+(string-set! PROG-x 0 #\c)
+(PROG-test "cb" 'string-set! PROG-x)
+(PROG-test "ab" symbol->string PROG-y)
+(PROG-test PROG-y string->symbol "ab")
+(PROG-test #t eq? 'mISSISSIppi 'mississippi)
+(PROG-test
+  #f
+  'string->symbol
+  (eq? 'bitBlt (string->symbol "bitBlt")))
+(PROG-test
+  'JollyWog
+  string->symbol
+  (symbol->string 'JollyWog))
+(PROG-SECTION 6 5 5)
+(PROG-test #t number? 3)
+(PROG-test #t complex? 3)
+(PROG-test #t real? 3)
+(PROG-test #t rational? 3)
+(PROG-test #t integer? 3)
+(PROG-test #t exact? 3)
+(PROG-test #f inexact? 3)
+(PROG-test #t = 22 22 22)
+(PROG-test #t = 22 22)
+(PROG-test #f = 34 34 35)
+(PROG-test #f = 34 35)
+(PROG-test #t > 3 -6246)
+(PROG-test #f > 9 9 -2424)
+(PROG-test #t >= 3 -4 -6246)
+(PROG-test #t >= 9 9)
+(PROG-test #f >= 8 9)
+(PROG-test #t < -1 2 3 4 5 6 7 8)
+(PROG-test #f < -1 2 3 4 4 5 6 7)
+(PROG-test #t <= -1 2 3 4 5 6 7 8)
+(PROG-test #t <= -1 2 3 4 4 5 6 7)
+(PROG-test #f < 1 3 2)
+(PROG-test #f >= 1 3 2)
+(PROG-test #t zero? 0)
+(PROG-test #f zero? 1)
+(PROG-test #f zero? -1)
+(PROG-test #f zero? -100)
+(PROG-test #t positive? 4)
+(PROG-test #f positive? -4)
+(PROG-test #f positive? 0)
+(PROG-test #f negative? 4)
+(PROG-test #t negative? -4)
+(PROG-test #f negative? 0)
+(PROG-test #t odd? 3)
+(PROG-test #f odd? 2)
+(PROG-test #f odd? -4)
+(PROG-test #t odd? -1)
+(PROG-test #f even? 3)
+(PROG-test #t even? 2)
+(PROG-test #t even? -4)
+(PROG-test #f even? -1)
+(PROG-test 38 max 34 5 7 38 6)
+(PROG-test -24 min 3 5 5 330 4 -24)
+(PROG-test 7 PROG-+ 3 4)
+(PROG-test '3 PROG-+ 3)
+(PROG-test 0 PROG-+)
+(PROG-test 4 * 4)
+(PROG-test 1 *)
+(PROG-test -1 - 3 4)
+(PROG-test -3 - 3)
+(PROG-test 7 abs -7)
+(PROG-test 7 abs 7)
+(PROG-test 0 abs 0)
+(PROG-test 5 quotient 35 7)
+(PROG-test -5 quotient -35 7)
+(PROG-test -5 quotient 35 -7)
+(PROG-test 5 quotient -35 -7)
+(PROG-test 1 modulo 13 4)
+(PROG-test 1 remainder 13 4)
+(PROG-test 3 modulo -13 4)
+(PROG-test -1 remainder -13 4)
+(PROG-test -3 modulo 13 -4)
+(PROG-test 1 remainder 13 -4)
+(PROG-test -1 modulo -13 -4)
+(PROG-test -1 remainder -13 -4)
+(define PROG-divtest
+  (lambda (GENSYM-n1-1971 GENSYM-n2-1972)
+    (= GENSYM-n1-1971
+       (PROG-+
+         (* GENSYM-n2-1972
+            (quotient GENSYM-n1-1971 GENSYM-n2-1972))
+         (remainder GENSYM-n1-1971 GENSYM-n2-1972)))))
+(PROG-test #t PROG-divtest 238 9)
+(PROG-test #t PROG-divtest -238 9)
+(PROG-test #t PROG-divtest 238 -9)
+(PROG-test #t PROG-divtest -238 -9)
+(PROG-test 4 gcd 0 4)
+(PROG-test 4 gcd -4 0)
+(PROG-test 4 gcd 32 -36)
+(PROG-test 0 gcd)
+(PROG-test 288 lcm 32 -36)
+(PROG-test 1 lcm)
+(define PROG-test-inexact
+  (lambda ()
+    (letrec*
+      ((GENSYM-f3.9-1973 (string->number "3.9"))
+       (GENSYM-f4.0-1974 (string->number "4.0"))
+       (GENSYM-f-3.25-1975 (string->number "-3.25"))
+       (GENSYM-f.25-1976 (string->number ".25"))
+       (GENSYM-f4.5-1977 (string->number "4.5"))
+       (GENSYM-f3.5-1978 (string->number "3.5"))
+       (GENSYM-f0.0-1979 (string->number "0.0"))
+       (GENSYM-f0.8-1980 (string->number "0.8"))
+       (GENSYM-f1.0-1981 (string->number "1.0"))
+       (GENSYM-wto-1982 PROG-write-test-obj)
+       (GENSYM-dto-1983 PROG-display-test-obj)
+       (GENSYM-lto-1984 PROG-load-test-obj))
+      (begin
+        (newline)
+        (display ";testing inexact numbers; ")
+        (newline)
+        (PROG-SECTION 6 5 5)
+        (PROG-test #t inexact? GENSYM-f3.9-1973)
+        (PROG-test
+          #t
+          'inexact?
+          (inexact? (max GENSYM-f3.9-1973 4)))
+        (PROG-test
+          GENSYM-f4.0-1974
+          'max
+          (max GENSYM-f3.9-1973 4))
+        (PROG-test
+          GENSYM-f4.0-1974
+          'exact->inexact
+          (inexact 4))
+        (PROG-test
+          (- GENSYM-f4.0-1974)
+          round
+          (- GENSYM-f4.5-1977))
+        (PROG-test
+          (- GENSYM-f4.0-1974)
+          round
+          (- GENSYM-f3.5-1978))
+        (PROG-test
+          (- GENSYM-f4.0-1974)
+          round
+          (- GENSYM-f3.9-1973))
+        (PROG-test
+          GENSYM-f0.0-1979
+          round
+          GENSYM-f0.0-1979)
+        (PROG-test
+          GENSYM-f0.0-1979
+          round
+          GENSYM-f.25-1976)
+        (PROG-test
+          GENSYM-f1.0-1981
+          round
+          GENSYM-f0.8-1980)
+        (PROG-test
+          GENSYM-f4.0-1974
+          round
+          GENSYM-f3.5-1978)
+        (PROG-test
+          GENSYM-f4.0-1974
+          round
+          GENSYM-f4.5-1977)
+        (set! PROG-write-test-obj
+          (list GENSYM-f.25-1976 GENSYM-f-3.25-1975))
+        (set! PROG-display-test-obj
+          (list GENSYM-f.25-1976 GENSYM-f-3.25-1975))
+        (set! PROG-load-test-obj
+          (list 'define
+                'foo
+                (list 'quote PROG-write-test-obj)))
+        (PROG-test
+          #t
+          call-with-output-file
+          "tmp3"
+          (lambda (GENSYM-test-file-1985)
+            (begin
+              (write-char #\; GENSYM-test-file-1985)
+              (display
+                PROG-write-test-obj
+                GENSYM-test-file-1985)
+              (newline GENSYM-test-file-1985)
+              (write PROG-load-test-obj GENSYM-test-file-1985)
+              (output-port? GENSYM-test-file-1985))))
+        (PROG-check-test-file "tmp3")
+        (set! PROG-write-test-obj GENSYM-wto-1982)
+        (set! PROG-display-test-obj GENSYM-dto-1983)
+        (set! PROG-load-test-obj GENSYM-lto-1984)
+        ((lambda (GENSYM-x-1986 GENSYM-y-1987)
+           (PROG-test
+             #t
+             'pentium-fdiv-bug
+             (> GENSYM-f1.0-1981
+                (- GENSYM-x-1986
+                   (* (/ GENSYM-x-1986 GENSYM-y-1987) GENSYM-y-1987)))))
+         (string->number "4195835.0")
+         (string->number "3145727.0"))
+        (PROG-report-errs)))))
+(define PROG-test-bignum
+  (lambda ()
+    (letrec*
+      ((GENSYM-tb-1988
+         (lambda (GENSYM-n1-1989 GENSYM-n2-1990)
+           (= GENSYM-n1-1989
+              (PROG-+
+                (* GENSYM-n2-1990
+                   (quotient GENSYM-n1-1989 GENSYM-n2-1990))
+                (remainder GENSYM-n1-1989 GENSYM-n2-1990))))))
+      (begin
+        (newline)
+        (display ";testing bignums; ")
+        (newline)
+        (PROG-SECTION 6 5 5)
+        (PROG-test 0 modulo 33333333333333333333 3)
+        (PROG-test 0 modulo 33333333333333333333 -3)
+        (PROG-test 0 remainder 33333333333333333333 3)
+        (PROG-test 0 remainder 33333333333333333333 -3)
+        (PROG-test 2 modulo 33333333333333333332 3)
+        (PROG-test -1 modulo 33333333333333333332 -3)
+        (PROG-test 2 remainder 33333333333333333332 3)
+        (PROG-test 2 remainder 33333333333333333332 -3)
+        (PROG-test 1 modulo -33333333333333333332 3)
+        (PROG-test -2 modulo -33333333333333333332 -3)
+        (PROG-test -2 remainder -33333333333333333332 3)
+        (PROG-test -2 remainder -33333333333333333332 -3)
+        (PROG-test 3 modulo 3 33333333333333333333)
+        (PROG-test
+          33333333333333333330
+          modulo
+          -3
+          33333333333333333333)
+        (PROG-test 3 remainder 3 33333333333333333333)
+        (PROG-test -3 remainder -3 33333333333333333333)
+        (PROG-test
+          -33333333333333333330
+          modulo
+          3
+          -33333333333333333333)
+        (PROG-test -3 modulo -3 -33333333333333333333)
+        (PROG-test 3 remainder 3 -33333333333333333333)
+        (PROG-test -3 remainder -3 -33333333333333333333)
+        (PROG-test 0 modulo -2177452800 86400)
+        (PROG-test 0 modulo 2177452800 -86400)
+        (PROG-test 0 modulo 2177452800 86400)
+        (PROG-test 0 modulo -2177452800 -86400)
+        (PROG-test
+          #t
+          'remainder
+          (GENSYM-tb-1988 281474976710655325431 65535))
+        (PROG-test
+          #t
+          'remainder
+          (GENSYM-tb-1988 281474976710655325430 65535))
+        (PROG-SECTION 6 5 6)
+        (PROG-test
+          281474976710655325431
+          string->number
+          "281474976710655325431")
+        (PROG-test
+          "281474976710655325431"
+          number->string
+          281474976710655325431)
+        (PROG-report-errs)))))
+(PROG-SECTION 6 5 6)
+(PROG-test "0" number->string 0)
+(PROG-test "100" number->string 100)
+(PROG-test "100" number->string 256 16)
+(PROG-test 100 string->number "100")
+(PROG-test 256 string->number "100" 16)
+(PROG-test #f string->number "")
+(PROG-test #f string->number ".")
+(PROG-test #f string->number "d")
+(PROG-test #f string->number "D")
+(PROG-test #f string->number "i")
+(PROG-test #f string->number "I")
+(PROG-test #f string->number "3i")
+(PROG-test #f string->number "3I")
+(PROG-test #f string->number "33i")
+(PROG-test #f string->number "33I")
+(PROG-test #f string->number "3.3i")
+(PROG-test #f string->number "3.3I")
+(PROG-test #f string->number "-")
+(PROG-test #f string->number "+")
+(PROG-SECTION 6 6)
+(PROG-test #t eqv? '#\space #\space)
+(PROG-test #t eqv? #\space '#\space)
+(PROG-test #t char? #\a)
+(PROG-test #t char? #\()
+(PROG-test #t char? #\space)
+(PROG-test #t char? '#\newline)
+(PROG-test #f char=? #\A #\B)
+(PROG-test #f char=? #\a #\b)
+(PROG-test #f char=? #\9 #\0)
+(PROG-test #t char=? #\A #\A)
+(PROG-test #t char<? #\A #\B)
+(PROG-test #t char<? #\a #\b)
+(PROG-test #f char<? #\9 #\0)
+(PROG-test #f char<? #\A #\A)
+(PROG-test #f char>? #\A #\B)
+(PROG-test #f char>? #\a #\b)
+(PROG-test #t char>? #\9 #\0)
+(PROG-test #f char>? #\A #\A)
+(PROG-test #t char<=? #\A #\B)
+(PROG-test #t char<=? #\a #\b)
+(PROG-test #f char<=? #\9 #\0)
+(PROG-test #t char<=? #\A #\A)
+(PROG-test #f char>=? #\A #\B)
+(PROG-test #f char>=? #\a #\b)
+(PROG-test #t char>=? #\9 #\0)
+(PROG-test #t char>=? #\A #\A)
+(PROG-test #f char-ci=? #\A #\B)
+(PROG-test #f char-ci=? #\a #\B)
+(PROG-test #f char-ci=? #\A #\b)
+(PROG-test #f char-ci=? #\a #\b)
+(PROG-test #f char-ci=? #\9 #\0)
+(PROG-test #t char-ci=? #\A #\A)
+(PROG-test #t char-ci=? #\A #\a)
+(PROG-test #t char-ci<? #\A #\B)
+(PROG-test #t char-ci<? #\a #\B)
+(PROG-test #t char-ci<? #\A #\b)
+(PROG-test #t char-ci<? #\a #\b)
+(PROG-test #f char-ci<? #\9 #\0)
+(PROG-test #f char-ci<? #\A #\A)
+(PROG-test #f char-ci<? #\A #\a)
+(PROG-test #f char-ci>? #\A #\B)
+(PROG-test #f char-ci>? #\a #\B)
+(PROG-test #f char-ci>? #\A #\b)
+(PROG-test #f char-ci>? #\a #\b)
+(PROG-test #t char-ci>? #\9 #\0)
+(PROG-test #f char-ci>? #\A #\A)
+(PROG-test #f char-ci>? #\A #\a)
+(PROG-test #t char-ci<=? #\A #\B)
+(PROG-test #t char-ci<=? #\a #\B)
+(PROG-test #t char-ci<=? #\A #\b)
+(PROG-test #t char-ci<=? #\a #\b)
+(PROG-test #f char-ci<=? #\9 #\0)
+(PROG-test #t char-ci<=? #\A #\A)
+(PROG-test #t char-ci<=? #\A #\a)
+(PROG-test #f char-ci>=? #\A #\B)
+(PROG-test #f char-ci>=? #\a #\B)
+(PROG-test #f char-ci>=? #\A #\b)
+(PROG-test #f char-ci>=? #\a #\b)
+(PROG-test #t char-ci>=? #\9 #\0)
+(PROG-test #t char-ci>=? #\A #\A)
+(PROG-test #t char-ci>=? #\A #\a)
+(PROG-test #t char-alphabetic? #\a)
+(PROG-test #t char-alphabetic? #\A)
+(PROG-test #t char-alphabetic? #\z)
+(PROG-test #t char-alphabetic? #\Z)
+(PROG-test #f char-alphabetic? #\0)
+(PROG-test #f char-alphabetic? #\9)
+(PROG-test #f char-alphabetic? #\space)
+(PROG-test #f char-alphabetic? #\;)
+(PROG-test #f char-numeric? #\a)
+(PROG-test #f char-numeric? #\A)
+(PROG-test #f char-numeric? #\z)
+(PROG-test #f char-numeric? #\Z)
+(PROG-test #t char-numeric? #\0)
+(PROG-test #t char-numeric? #\9)
+(PROG-test #f char-numeric? #\space)
+(PROG-test #f char-numeric? #\;)
+(PROG-test #f char-whitespace? #\a)
+(PROG-test #f char-whitespace? #\A)
+(PROG-test #f char-whitespace? #\z)
+(PROG-test #f char-whitespace? #\Z)
+(PROG-test #f char-whitespace? #\0)
+(PROG-test #f char-whitespace? #\9)
+(PROG-test #t char-whitespace? #\space)
+(PROG-test #f char-whitespace? #\;)
+(PROG-test #f char-upper-case? #\0)
+(PROG-test #f char-upper-case? #\9)
+(PROG-test #f char-upper-case? #\space)
+(PROG-test #f char-upper-case? #\;)
+(PROG-test #f char-lower-case? #\0)
+(PROG-test #f char-lower-case? #\9)
+(PROG-test #f char-lower-case? #\space)
+(PROG-test #f char-lower-case? #\;)
+(PROG-test #\. integer->char (char->integer #\.))
+(PROG-test #\A integer->char (char->integer #\A))
+(PROG-test #\a integer->char (char->integer #\a))
+(PROG-test #\A char-upcase #\A)
+(PROG-test #\A char-upcase #\a)
+(PROG-test #\a char-downcase #\A)
+(PROG-test #\a char-downcase #\a)
+(PROG-SECTION 6 7)
+(PROG-test
+  #t
+  string?
+  "The word \"recursion\\\" has many meanings.")
+(PROG-test #t string? "")
+(define PROG-f (make-string 3 #\*))
+(PROG-test
+  "?**"
+  'string-set!
+  (begin (string-set! PROG-f 0 #\?) PROG-f))
+(PROG-test "abc" string #\a #\b #\c)
+(PROG-test "" string)
+(PROG-test 3 string-length "abc")
+(PROG-test #\a string-ref "abc" 0)
+(PROG-test #\c string-ref "abc" 2)
+(PROG-test 0 string-length "")
+(PROG-test "" substring "ab" 0 0)
+(PROG-test "" substring "ab" 1 1)
+(PROG-test "" substring "ab" 2 2)
+(PROG-test "a" substring "ab" 0 1)
+(PROG-test "b" substring "ab" 1 2)
+(PROG-test "ab" substring "ab" 0 2)
+(PROG-test "foobar" string-append "foo" "bar")
+(PROG-test "foo" string-append "foo")
+(PROG-test "foo" string-append "foo" "")
+(PROG-test "foo" string-append "" "foo")
+(PROG-test "" string-append)
+(PROG-test "" make-string 0)
+(PROG-test #t string=? "" "")
+(PROG-test #f string<? "" "")
+(PROG-test #f string>? "" "")
+(PROG-test #t string<=? "" "")
+(PROG-test #t string>=? "" "")
+(PROG-test #t string-ci=? "" "")
+(PROG-test #f string-ci<? "" "")
+(PROG-test #f string-ci>? "" "")
+(PROG-test #t string-ci<=? "" "")
+(PROG-test #t string-ci>=? "" "")
+(PROG-test #f string=? "A" "B")
+(PROG-test #f string=? "a" "b")
+(PROG-test #f string=? "9" "0")
+(PROG-test #t string=? "A" "A")
+(PROG-test #t string<? "A" "B")
+(PROG-test #t string<? "a" "b")
+(PROG-test #f string<? "9" "0")
+(PROG-test #f string<? "A" "A")
+(PROG-test #f string>? "A" "B")
+(PROG-test #f string>? "a" "b")
+(PROG-test #t string>? "9" "0")
+(PROG-test #f string>? "A" "A")
+(PROG-test #t string<=? "A" "B")
+(PROG-test #t string<=? "a" "b")
+(PROG-test #f string<=? "9" "0")
+(PROG-test #t string<=? "A" "A")
+(PROG-test #f string>=? "A" "B")
+(PROG-test #f string>=? "a" "b")
+(PROG-test #t string>=? "9" "0")
+(PROG-test #t string>=? "A" "A")
+(PROG-test #f string-ci=? "A" "B")
+(PROG-test #f string-ci=? "a" "B")
+(PROG-test #f string-ci=? "A" "b")
+(PROG-test #f string-ci=? "a" "b")
+(PROG-test #f string-ci=? "9" "0")
+(PROG-test #t string-ci=? "A" "A")
+(PROG-test #t string-ci=? "A" "a")
+(PROG-test #t string-ci<? "A" "B")
+(PROG-test #t string-ci<? "a" "B")
+(PROG-test #t string-ci<? "A" "b")
+(PROG-test #t string-ci<? "a" "b")
+(PROG-test #f string-ci<? "9" "0")
+(PROG-test #f string-ci<? "A" "A")
+(PROG-test #f string-ci<? "A" "a")
+(PROG-test #f string-ci>? "A" "B")
+(PROG-test #f string-ci>? "a" "B")
+(PROG-test #f string-ci>? "A" "b")
+(PROG-test #f string-ci>? "a" "b")
+(PROG-test #t string-ci>? "9" "0")
+(PROG-test #f string-ci>? "A" "A")
+(PROG-test #f string-ci>? "A" "a")
+(PROG-test #t string-ci<=? "A" "B")
+(PROG-test #t string-ci<=? "a" "B")
+(PROG-test #t string-ci<=? "A" "b")
+(PROG-test #t string-ci<=? "a" "b")
+(PROG-test #f string-ci<=? "9" "0")
+(PROG-test #t string-ci<=? "A" "A")
+(PROG-test #t string-ci<=? "A" "a")
+(PROG-test #f string-ci>=? "A" "B")
+(PROG-test #f string-ci>=? "a" "B")
+(PROG-test #f string-ci>=? "A" "b")
+(PROG-test #f string-ci>=? "a" "b")
+(PROG-test #t string-ci>=? "9" "0")
+(PROG-test #t string-ci>=? "A" "A")
+(PROG-test #t string-ci>=? "A" "a")
+(PROG-SECTION 6 8)
+(PROG-test #t vector? '#(0 (2 2 2 2) "Anna"))
+(PROG-test #t vector? '#())
+(PROG-test '#(a b c) vector 'a 'b 'c)
+(PROG-test '#() vector)
+(PROG-test
+  3
+  vector-length
+  '#(0 (2 2 2 2) "Anna"))
+(PROG-test 0 vector-length '#())
+(PROG-test 8 vector-ref '#(1 1 2 3 5 8 13 21) 5)
+(PROG-test
+  '#(0 ("Sue" "Sue") "Anna")
+  'vector-set
+  ((lambda (GENSYM-vec-1991)
+     (begin
+       (vector-set! GENSYM-vec-1991 1 '("Sue" "Sue"))
+       GENSYM-vec-1991))
+   (vector 0 '(2 2 2 2) "Anna")))
+(PROG-test '#(hi hi) make-vector 2 'hi)
+(PROG-test '#() make-vector 0)
+(PROG-test '#() make-vector 0 'a)
+(PROG-SECTION 6 9)
+(PROG-test #t procedure? car)
+(PROG-test #f procedure? 'car)
+(PROG-test
+  #t
+  procedure?
+  (lambda (GENSYM-x-1992)
+    (* GENSYM-x-1992 GENSYM-x-1992)))
+(PROG-test #f procedure? '(lambda (x) (* x x)))
+(PROG-test
+  #t
+  call-with-current-continuation
+  procedure?)
+(PROG-test 7 apply PROG-+ (list 3 4))
+(PROG-test
+  7
+  apply
+  (lambda (GENSYM-a-1993 GENSYM-b-1994)
+    (PROG-+ GENSYM-a-1993 GENSYM-b-1994))
+  (list 3 4))
+(PROG-test 17 apply PROG-+ 10 (list 3 4))
+(PROG-test '() apply list '())
+(define PROG-compose
+  (lambda (GENSYM-f-1995 GENSYM-g-1996)
+    (lambda GENSYM-args-1997
+      (GENSYM-f-1995
+        (apply GENSYM-g-1996 GENSYM-args-1997)))))
+(PROG-test 30 (PROG-compose PROG-sqt *) 12 75)
+(PROG-test
+  '(b e h)
+  map
+  cadr
+  '((a b) (d e) (g h)))
+(PROG-test '(5 7 9) map PROG-+ '(1 2 3) '(4 5 6))
+(PROG-test
+  '#(0 1 4 9 16)
+  'for-each
+  ((lambda (GENSYM-v-1998)
+     (begin
+       (for-each
+         (lambda (GENSYM-i-1999)
+           (vector-set!
+             GENSYM-v-1998
+             GENSYM-i-1999
+             (* GENSYM-i-1999 GENSYM-i-1999)))
+         '(0 1 2 3 4))
+       GENSYM-v-1998))
+   (make-vector 5)))
+(PROG-test
+  -3
+  call-with-current-continuation
+  (lambda (GENSYM-exit-2000)
+    (begin
+      (for-each
+        (lambda (GENSYM-x-2001)
+          (if (negative? GENSYM-x-2001)
+            (GENSYM-exit-2000 GENSYM-x-2001)
+            #f))
+        '(54 0 37 -3 245 19))
+      #t)))
+(define PROG-list-length
+  (lambda (GENSYM-obj-2002)
+    (call-with-current-continuation
+      (lambda (GENSYM-return-2003)
+        (letrec*
+          ((GENSYM-r-2004
+             (lambda (GENSYM-obj-2005)
+               (if (null? GENSYM-obj-2005)
+                 0
+                 (if (pair? GENSYM-obj-2005)
+                   (PROG-+ (GENSYM-r-2004 (cdr GENSYM-obj-2005)) 1)
+                   (GENSYM-return-2003 #f))))))
+          (GENSYM-r-2004 GENSYM-obj-2002))))))
+(PROG-test 4 PROG-list-length '(1 2 3 4))
+(PROG-test #f PROG-list-length '(a b . c))
+(PROG-test '() map cadr '())
+(define PROG-next-leaf-generator
+  (lambda (GENSYM-obj-2006 GENSYM-eot-2007)
+    (letrec*
+      ((GENSYM-return-2008 #f)
+       (GENSYM-cont-2009
+         (lambda (GENSYM-x-2012)
+           (begin
+             (GENSYM-recur-2010 GENSYM-obj-2006)
+             (set! GENSYM-cont-2009
+               (lambda (GENSYM-x-2013)
+                 (GENSYM-return-2008 GENSYM-eot-2007)))
+             (GENSYM-cont-2009 #f))))
+       (GENSYM-recur-2010
+         (lambda (GENSYM-obj-2014)
+           (if (pair? GENSYM-obj-2014)
+             (for-each GENSYM-recur-2010 GENSYM-obj-2014)
+             (call-with-current-continuation
+               (lambda (GENSYM-c-2015)
+                 (begin
+                   (set! GENSYM-cont-2009 GENSYM-c-2015)
+                   (GENSYM-return-2008 GENSYM-obj-2014))))))))
+      (lambda ()
+        (call-with-current-continuation
+          (lambda (GENSYM-ret-2011)
+            (begin
+              (set! GENSYM-return-2008 GENSYM-ret-2011)
+              (GENSYM-cont-2009 #f))))))))
+(define PROG-leaf-eq?
+  (lambda (GENSYM-x-2016 GENSYM-y-2017)
+    ((lambda (GENSYM-eot-2018)
+       ((lambda (GENSYM-xf-2019)
+          ((lambda (GENSYM-yf-2020)
+             (letrec*
+               ((GENSYM-loop-2021
+                  (lambda (GENSYM-x-2022 GENSYM-y-2023)
+                    (if (not (eq? GENSYM-x-2022 GENSYM-y-2023))
+                      #f
+                      (if (eq? GENSYM-eot-2018 GENSYM-x-2022)
+                        #t
+                        (GENSYM-loop-2021
+                          (GENSYM-xf-2019)
+                          (GENSYM-yf-2020)))))))
+               (GENSYM-loop-2021
+                 (GENSYM-xf-2019)
+                 (GENSYM-yf-2020))))
+           (PROG-next-leaf-generator
+             GENSYM-y-2017
+             GENSYM-eot-2018)))
+        (PROG-next-leaf-generator
+          GENSYM-x-2016
+          GENSYM-eot-2018)))
+     (list 'eot))))
+(define PROG-test-cont
+  (lambda ()
+    (begin
+      (newline)
+      (display ";testing continuations; ")
+      (newline)
+      (PROG-SECTION 6 9)
+      (PROG-test
+        #t
+        PROG-leaf-eq?
+        '(a (b (c)))
+        '((a) b c))
+      (PROG-test
+        #f
+        PROG-leaf-eq?
+        '(a (b (c)))
+        '((a) b c d))
+      (PROG-report-errs))))
+(define PROG-test-delay
+  (lambda ()
+    (begin
+      (newline)
+      (display ";testing DELAY and FORCE; ")
+      (newline)
+      (PROG-SECTION 6 9)
+      (PROG-test 3 'delay (force (delay (PROG-+ 1 2))))
+      (PROG-test
+        '(3 3)
+        'delay
+        ((lambda (GENSYM-p-2024)
+           (list (force GENSYM-p-2024)
+                 (force GENSYM-p-2024)))
+         (delay (PROG-+ 1 2))))
+      (PROG-test
+        2
+        'delay
+        (letrec*
+          ((GENSYM-a-stream-2025
+             (letrec*
+               ((GENSYM-next-2028
+                  (lambda (GENSYM-n-2029)
+                    (cons GENSYM-n-2029
+                          (delay (GENSYM-next-2028
+                                   (PROG-+ GENSYM-n-2029 1)))))))
+               (GENSYM-next-2028 0)))
+           (GENSYM-head-2026 car)
+           (GENSYM-tail-2027
+             (lambda (GENSYM-stream-2030)
+               (force (cdr GENSYM-stream-2030)))))
+          (GENSYM-head-2026
+            (GENSYM-tail-2027
+              (GENSYM-tail-2027 GENSYM-a-stream-2025)))))
+      (letrec*
+        ((GENSYM-count-2031 0)
+         (GENSYM-p-2032
+           (delay (begin
+                    (set! GENSYM-count-2031
+                      (PROG-+ GENSYM-count-2031 1))
+                    (if (> GENSYM-count-2031 GENSYM-x-2033)
+                      GENSYM-count-2031
+                      (force GENSYM-p-2032)))))
+         (GENSYM-x-2033 5))
+        (begin
+          (PROG-test 6 force GENSYM-p-2032)
+          (set! GENSYM-x-2033 10)
+          (PROG-test 6 force GENSYM-p-2032)))
+      (PROG-test
+        3
+        'force
+        (letrec*
+          ((GENSYM-p-2034
+             (delay (if GENSYM-c-2035
+                      3
+                      (begin
+                        (set! GENSYM-c-2035 #t)
+                        (PROG-+ (force GENSYM-p-2034) 1)))))
+           (GENSYM-c-2035 #f))
+          (force GENSYM-p-2034)))
+      (PROG-report-errs))))
+(PROG-SECTION 6 10 1)
+(PROG-test #t input-port? (current-input-port))
+(PROG-test #t output-port? (current-output-port))
+(PROG-test
+  #t
+  call-with-input-file
+  "r4rstest.scm"
+  input-port?)
+(define PROG-this-file
+  (open-input-file "r4rstest.scm"))
+(PROG-test #t input-port? PROG-this-file)
+(PROG-SECTION 6 10 2)
+(PROG-test #\; peek-char PROG-this-file)
+(PROG-test #\; read-char PROG-this-file)
+(read PROG-this-file)
+(PROG-test
+  '(define cur-section '())
+  read
+  PROG-this-file)
+(PROG-test #\( peek-char PROG-this-file)
+(PROG-test
+  '(define errs '())
+  read
+  PROG-this-file)
+(close-input-port PROG-this-file)
+(close-input-port PROG-this-file)
+(define PROG-check-test-file
+  (lambda (GENSYM-name-2036)
+    (letrec*
+      ((GENSYM-test-file-2037
+         (open-input-file GENSYM-name-2036)))
+      (begin
+        (PROG-test
+          #t
+          'input-port?
+          (call-with-input-file
+            GENSYM-name-2036
+            (lambda (GENSYM-test-file-2038)
+              (begin
+                (PROG-test
+                  PROG-load-test-obj
+                  read
+                  GENSYM-test-file-2038)
+                (PROG-test
+                  #t
+                  eof-object?
+                  (peek-char GENSYM-test-file-2038))
+                (PROG-test
+                  #t
+                  eof-object?
+                  (read-char GENSYM-test-file-2038))
+                (input-port? GENSYM-test-file-2038)))))
+        (PROG-test #\; read-char GENSYM-test-file-2037)
+        (PROG-test
+          PROG-display-test-obj
+          read
+          GENSYM-test-file-2037)
+        (PROG-test
+          PROG-load-test-obj
+          read
+          GENSYM-test-file-2037)
+        (close-input-port GENSYM-test-file-2037)))))
+(PROG-SECTION 6 10 3)
+(define PROG-write-test-obj
+  '(#t
+    #f
+    #\a
+    ()
+    9739
+    -3
+    .
+    #((test) "te \" \" st" "" test #() b c)))
+(define PROG-display-test-obj
+  '(#t
+    #f
+    a
+    ()
+    9739
+    -3
+    .
+    #((test) te " " st test #() b c)))
+(define PROG-load-test-obj
+  (list 'define
+        'foo
+        (list 'quote PROG-write-test-obj)))
+(PROG-test
+  #t
+  call-with-output-file
+  "tmp1"
+  (lambda (GENSYM-test-file-2039)
+    (begin
+      (write-char #\; GENSYM-test-file-2039)
+      (display
+        PROG-write-test-obj
+        GENSYM-test-file-2039)
+      (newline GENSYM-test-file-2039)
+      (write PROG-load-test-obj GENSYM-test-file-2039)
+      (output-port? GENSYM-test-file-2039))))
+(PROG-check-test-file "tmp1")
+(define PROG-test-file (open-output-file "tmp2"))
+(write-char #\; PROG-test-file)
+(display PROG-write-test-obj PROG-test-file)
+(newline PROG-test-file)
+(write PROG-load-test-obj PROG-test-file)
+(PROG-test #t output-port? PROG-test-file)
+(close-output-port PROG-test-file)
+(PROG-check-test-file "tmp2")
+(define PROG-test-sc4
+  (lambda ()
+    (begin
+      (newline)
+      (display ";testing scheme 4 functions; ")
+      (newline)
+      (PROG-SECTION 6 7)
+      (PROG-test '(#\P #\space #\l) string->list "P l")
+      (PROG-test '() string->list "")
+      (PROG-test "1\\\"" list->string '(#\1 #\\ #\"))
+      (PROG-test "" list->string '())
+      (PROG-SECTION 6 8)
+      (PROG-test
+        '(dah dah didah)
+        vector->list
+        '#(dah dah didah))
+      (PROG-test '() vector->list '#())
+      (PROG-test
+        '#(dididit dah)
+        list->vector
+        '(dididit dah))
+      (PROG-test '#() list->vector '())
+      (PROG-SECTION 6 10 4)
+      (load "tmp1")
+      (PROG-test PROG-write-test-obj 'load PROG-foo)
+      (PROG-report-errs))))
+(PROG-report-errs)
+(if (if (string->number "0.0")
+      (inexact? (string->number "0.0"))
+      #f)
+  (PROG-test-inexact)
+  #f)
+((lambda (GENSYM-n-2040)
+   (if (if GENSYM-n-2040 (exact? GENSYM-n-2040) #f)
+     (PROG-test-bignum)
+     #f))
+ (string->number "281474976710655325431"))
+(newline)
+(display
+  "To fully test continuations, Scheme 4, and DELAY/FORCE do:")
+(newline)
+(display "(test-cont) (test-sc4) (test-delay)")
+(newline)
+"last item in file"
+(PROG-test-cont)
+(PROG-test-delay)

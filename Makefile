@@ -28,7 +28,9 @@ clean:
 cloc:
 	cloc --by-file-by-lang ${SRCS} ${SCM_SRCS}
 
-TESTS = $(addsuffix .test, $(basename $(wildcard test/*.scm))) $(addsuffix .test, $(basename $(wildcard test/bench/*.scm)))
+TESTS = $(addsuffix .test, $(basename $(wildcard test/*.scm))) \
+	$(addsuffix .test, $(basename $(wildcard test/bench/*.scm))) \
+	$(addsuffix .test, $(basename $(wildcard test/macros/*.scm)))
 
 .PHONY: test %.test
 

@@ -8,7 +8,6 @@
 	* record? bits should be in type header?
 
 # full r7rs / safety / tests
-  * macro tests - work!, import them.
   * port tests
   * copyish tests
   
