@@ -2221,6 +2221,8 @@ gc_obj SCM_FOLDCASE(gc_obj ch) {
 
 int SCM_MAIN();
 
+#include <sys/resource.h>
+
 int main(int argc_in, char* argv_in[]) {
   // grab the stack top: this is used for both callcc
   // stack replacement, *and* GC conservative collection.
@@ -2228,6 +2230,12 @@ int main(int argc_in, char* argv_in[]) {
   // Save command line args for get-command-line
   argc = argc_in;
   argv = argv_in;
+
+  auto lim = (struct rlimit){RLIM_INFINITY, RLIM_INFINITY};
+  auto res = setrlimit(RLIMIT_STACK,&lim);
+  if (res) {
+    perror("Setrlimit error");
+  }
   gc_init(fp);
   SCM_MAIN();
 }

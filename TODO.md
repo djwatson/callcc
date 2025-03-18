@@ -3,7 +3,6 @@
 # plan
   * install - fix dirs
 
-	 
 # full r7rs / safety / tests
   * macro tests - work!, import them.
   * port tests
@@ -26,8 +25,6 @@
   * faster with single-shot continuations: ctak fibc
   * faster with float type: fft fibfp mbrot pnpoly simplex sumfp. some might need inlining?
   * faster with list/int typecheck removal: quicksort primes puzzle array1
-  
-  * stack size check: earley, divrec.  maybe call ulimit?
 
 # CLEANUP
 
