@@ -5,8 +5,6 @@
 
 	 
 # full r7rs / safety / tests
-  * r7rs test - asin, acos - basically all the arithmetic should work on ratnum and compnum too.
-  
   * macro tests - work!, import them.
   * port tests
   * copyish tests

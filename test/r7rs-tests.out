@@ -5,8 +5,6 @@ Test begin: (4.3 Macros)
 Test begin: (5 Program structure)
 Test begin: (6.1 Equivalence Predicates)
 Test begin: (6.2 Numbers)
-FAIL: (asin 0+0.0i): expected #f but got 4.94066e-324
-FAIL: (acos 0+0.0i): expected 1.5708+0.0i but got 1.5708
 Test begin: (6.3 Booleans)
 Test begin: (6.4 Lists)
 Test begin: (6.5 Symbols)

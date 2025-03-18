@@ -74,7 +74,7 @@
 
 (define gen-sym
   ;; TODO fuckin' hack - gensyms need to be unique because of serialization. FUCK
-  (let ((n (cond-expand (callcc 100000) (else 0))))
+  (let ((n (cond-expand (callcc 1000000) (else 0))))
     (lambda (a)
       (set! n (+ n 1))
       (string->symbol

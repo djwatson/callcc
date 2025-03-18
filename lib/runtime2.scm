@@ -1,7 +1,5 @@
 (import (scheme r5rs) (prefix (flow sys) sys:) (scheme case-lambda) (scheme base))
 
-(include "lib/memory_layout.scm")
-
 ;;;;;;;;math
 (define (negative? p)
   (< p 0))
@@ -29,9 +27,21 @@
 (define (cos f)
   (sys:FOREIGN_CALL "SCM_COS" (inexact f)))
 (define (asin f)
-  (sys:FOREIGN_CALL "SCM_ASIN" (inexact f)))
+  (cond
+   ((flonum? f)
+    (sys:FOREIGN_CALL "SCM_ASIN" f))
+   ((compnum? f)
+    (let* ((z (inexact f)))
+      (* -i (log (+ (* +i z)
+			 (sqrt (- 1 (expt z 2))))))))
+   (else (sys:FOREIGN_CALL "SCM_ASIN" (inexact f)))))
+
+(define pi/2 1.5707963267948966192313216916397514)
 (define (acos f)
-  (sys:FOREIGN_CALL "SCM_ACOS" (inexact f)))
+  (cond
+   ((compnum? f)
+    (- pi/2 (asin f)))
+   (else (sys:FOREIGN_CALL "SCM_ACOS" (inexact f)))))
 (define (tan f)
   (sys:FOREIGN_CALL "SCM_TAN" (inexact f)))
 (define atan
@@ -45,9 +55,13 @@
 	       (+ res 3.14159265358979))
 	   res)))))
 (define (sqrt x)
-  (if (negative? x)
-      (make-rectangular 0.0 (sqrt (abs x)))
-      (sys:FOREIGN_CALL "SCM_SQRT" (inexact x))))
+  (cond
+   ((compnum? x)
+    (make-polar (sqrt (magnitude x))
+		(/ (angle x) 2)))
+   ((negative? x)
+    (make-rectangular 0.0 (sqrt (abs x))))
+   (else (sys:FOREIGN_CALL "SCM_SQRT" (inexact x)))))
 (define (floor-quotient a b)
   (let ((q (/ a b))
 	(qq (quotient a b)))
@@ -149,9 +163,14 @@
 
 (define log
   (case-lambda
-    ((num) (sys:FOREIGN_CALL "SCM_LOG" (inexact num)))
-    ((num base) (/ (sys:FOREIGN_CALL "SCM_LOG" (inexact num))
-			 (sys:FOREIGN_CALL "SCM_LOG" (inexact base))))))
+    ((num)
+     (cond
+      ((compnum? num)
+       (+ (log (magnitude num))
+	  (* +i (angle num))))
+      (else (sys:FOREIGN_CALL "SCM_LOG" (inexact num)))))
+    ((num base) (/ (log num) (log base)))))
+
 (define (reducer f init args)
   (let loop ((init init) (args args))
     (if (pair? args)
@@ -1672,13 +1691,15 @@
 	       (sys:FOREIGN_CALL "SCM_FLONUM_STR" num))))
 	    ((bignum? num) (sys:FOREIGN_CALL "SCM_BIGNUM_STR" num))
 	    ((ratnum? num) (sys:FOREIGN_CALL "SCM_RATNUM_STR" num))
-	    ((compnum? num) (string-append
-			     (number->string (real-part num))
-			     (if (not (or (negative? (imag-part num))
-					  (nan? (imag-part num))
-					  (infinite? (imag-part num))))
-				 "+" "")
-			     (number->string (imag-part num)) "i"))
+	    ((compnum? num)
+	     (let* ((real (number->string (real-part num)))
+		    (comp (number->string (imag-part num)))
+		    (first (string-ref comp 0))
+		    (sign (if (or (eq? first #\-)
+				  (eq? first #\+))
+			      ""
+			      "+")))
+	       (string-append real sign comp "i")))
 	    ((eq? num 0) "0")
 	    (else
 	     (let ((neg (negative? num)))
