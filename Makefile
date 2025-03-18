@@ -45,6 +45,11 @@ install: callcc
 	install callcc ${PREFIX}/bin/
 	install -d ${PREFIX}/bin/lib
 	install libcallcc.a ${PREFIX}/bin/lib
+	install lib/bc.* ${PREFIX}/bin/lib
+	install lib/passes.* ${PREFIX}/bin/lib
+	install lib/fix-letrec.scm ${PREFIX}/bin/lib
+	install lib/qq.scm ${PREFIX}/bin/lib
+	install lib/sua.scm ${PREFIX}/bin/lib
 	install lib/runtime2.scm ${PREFIX}/bin/lib
 	install lib/eval.scm ${PREFIX}/bin/lib
 	install lib/memory_layout.scm ${PREFIX}/bin/lib
@@ -52,6 +57,7 @@ install: callcc
 	install lib/read.scm ${PREFIX}/bin/lib
 	install lib/hashtable.scm ${PREFIX}/bin/lib
 	install lib/equal.scm ${PREFIX}/bin/lib
+	install lib/eval.scm ${PREFIX}/bin/lib
 	install lib/expand.* ${PREFIX}/bin/lib
 	install lib/library-manager.* ${PREFIX}/bin/lib
 	install lib/format.* ${PREFIX}/bin/lib
