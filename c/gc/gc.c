@@ -16,8 +16,8 @@
 
 #include "alloc_table.h"
 #include "gc.h"
-#include "kvec.h"
-#include "list.h"
+#include "util/kvec.h"
+#include "util/list.h"
 
 #define likely(x) __builtin_expect(x, 1)
 #define unlikely(x) __builtin_expect(x, 0)
