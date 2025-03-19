@@ -80,3 +80,7 @@ install: bin/callcc
 	install -m644 compiler/headers/scheme/* ${PREFIX}/lib/callcc/compiler/headers/scheme
 	install -d ${PREFIX}/lib/callcc/lib/srfi
 	install -m644 lib/srfi2/srfi/* ${PREFIX}/lib/callcc/lib/srfi
+
+uninstall:
+	rm -f ${PREFIX}/bin/callcc
+	rm -rf ${PREFIX}/lib/callcc
