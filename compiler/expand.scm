@@ -391,11 +391,6 @@ TODO: also maybe go back to pre-resolving idents? only internal
     (parameterize ((base-ellipsis new-ellipsis))
       (let* ((sexp (gen-sym 'sexp))
              (matcher `(lambda (,sexp) ,(gen-matcher sexp macro rules))))
-	;; (dlog "Macro ~a\n" (macro-name macro))
-	;; (display "RULES:\n")
-	;; (pretty-print rules)
-	;; (display "MACRO:\n")
-	;; (pretty-print matcher)
 	(set-macro-matcher! macro matcher)))))
 
 ;; Also TODO, symbols should keep namespace separate somehow?
@@ -705,7 +700,6 @@ TODO: also maybe go back to pre-resolving idents? only internal
 
 (define (parse-define-syntax sexp)
   (define code (expand-body (cdr sexp)))
-  ;(define unused (begin (display "Genned:") (pretty-print code) (newline)))
   (define evaled (expand-eval code))
   (define name (first sexp))
   (define transformer (make-transformer evaled code))
@@ -719,7 +713,6 @@ TODO: also maybe go back to pre-resolving idents? only internal
       v
       bind
       (define code (expand-any (second v)))
-      ;(define unused (begin (display "Genned:") (pretty-print code) (newline)))
       (define evaled (expand-eval code))
       (make-transformer evaled code)))
   ;;(dlog "Let-syntax ~a\n" bind)
@@ -785,8 +778,8 @@ TODO: also maybe go back to pre-resolving idents? only internal
        (let-values (((head tail depth) (split-segment rule)))
 	 (let-values (((head-match head-maps) (expand-syntax head can-ellipsis (cons '() maps))))
 	   (when (null? (car head-maps))
-	     (pretty-print head-match)
-	     (pretty-print head-maps)
+	     (display head-match)
+	     (display head-maps)
 	     (error "Too many ellipsis for pattern vars:" head))
 	   (let* ((new-map (car head-maps))
 		  (var-names (map cdr new-map))

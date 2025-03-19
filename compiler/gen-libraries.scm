@@ -1,4 +1,7 @@
-(import (scheme base) (scheme write) (third-party pp) (scheme file) (srfi 1) (util))
+(import (scheme base) (scheme write) (scheme file) (srfi 1) (util))
+
+;; If you want to make it pretty, do it here.
+(define pretty-print write)
 
 ;; List of primitives that the code generator knows about, and will emit
 ;; raw asm for.

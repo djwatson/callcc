@@ -131,8 +131,9 @@
 (define (find-label-for-case nlambda argcnt var)
   (let loop ((cases (cddr nlambda)) (i 0))
     (if (null? cases)
-	(begin (display (format "Warning: Can't find case for call:~a cnt ~a\n"
-				 var argcnt) (current-error-port))
+	(begin
+	  ;; (display (format "Warning: Can't find case for call:~a cnt ~a\n"
+	  ;; 		   var argcnt) (current-error-port))
 	       var)
 	(let* ((case (car cases))
 	       (arglist (second case)))
@@ -481,10 +482,8 @@
       (push! consts (format "@bvec~a = private unnamed_addr constant {i64, i64, [~a x i8]} {i64 ~a, i64 ~a, [~a x i8] [~a]}, align 8\n"
 			    id len bytevector-tag (* 8 len) len val-str ))
       (format "add (i64 ~a, i64 ptrtoint (ptr @bvec~a to i64))"
-	      ptr-tag id))
-    )
-   (else (display (format "WARNING: Unknown Const: ~a\n" c) (current-error-port))
-	 0)))
+	      ptr-tag id)))
+   (else (error "Unknown Const: " c))))
 
 (define (emit-header)
   (display
@@ -632,8 +631,9 @@ attributes #0 = { returns_twice}
   (let* ((path (get-compile-path))
 	 (libman (make-libman path))
 	 (unused (set! library-search-paths (cons (string-append path "lib/srfi2") library-search-paths)))
-	 (unused (set! library-search-paths (cons (string-append path "lib/headers") library-search-paths)))
+	 (unused (set! library-search-paths (cons (string-append path "compiler/headers") library-search-paths)))
 	 (unused (set! library-search-paths (cons (string-append path "lib") library-search-paths)))
+	 (unused (set! library-search-paths (cons (string-append path "compiler") library-search-paths)))
 	 (runtime-input (with-input-from-file (string-append path "lib/runtime2.scm") read-file))
 	 (eval-input (with-input-from-file (string-append path "lib/eval.scm") read-file))
 

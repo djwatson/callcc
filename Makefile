@@ -78,5 +78,3 @@ install: callcc
 	install compiler/headers/scheme/* ${PREFIX}/bin/compiler/headers/scheme
 	install -d ${PREFIX}/bin/lib/srfi
 	install lib/srfi2/srfi/* ${PREFIX}/bin/lib/srfi
-	install -d ${PREFIX}/bin/compiler/third-party
-	install compiler/third-party/* ${PREFIX}/bin/compiler/third-party

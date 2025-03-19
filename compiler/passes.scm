@@ -767,7 +767,7 @@ TODO: boxes could be passed down through funcs
 	 `(call (lookup ,global) ,args ___)))))
 
 (define (debug-print x)
-  (pretty-print x)
+  (display x)
   x)
 
 ;; This pass mutates the input, let's make sure we have a fresh copy.
@@ -804,7 +804,6 @@ TODO: boxes could be passed down through funcs
 
       find-global-labels
       programify
-      ;;debug-print
       
 ;      storage-use-analysis
       ))

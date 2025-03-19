@@ -15,7 +15,6 @@
 	    (only (srfi 1) alist-cons first second any third fourth filter cons* every)
 	    (srfi 69)
 	    (format)
-	    (third-party pp)
 	    (util)
 	    (scheme repl)
 	    (scheme eval)

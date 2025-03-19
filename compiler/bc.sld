@@ -1,6 +1,6 @@
 (define-library
     (bc)
-  (import (scheme base) (scheme write) (scheme file) (expand) (library-manager) (third-party pp)
+  (import (scheme base) (scheme write) (scheme file) (expand) (library-manager)
 	  (scheme process-context)
 	  (util) (match)
 	  (passes)
@@ -18,6 +18,7 @@
 		      (let ((p (open-input-string (get-output-string p))))
 			(read-u64 p))))
 		  (define (link output output-file opts)
+		    ;; Bootstrap does not link, must run the command yourself.
 		    #f)))
 	       (callcc
 		(import (prefix (flow sys) sys:)
