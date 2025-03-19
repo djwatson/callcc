@@ -5,15 +5,16 @@ LIBS = -lm -lgmp -lutf8proc
 SRCS = c/gc/alloc_table.c c/gc/gc.c c/runtime.c c/util/list.c c/callcc.S
 OBJECTS = $(patsubst %, %.o, $(basename $(SRCS)))
 SCM_LIB_SRCS = lib/runtime2.scm lib/eval.scm lib/read.scm lib/equal.scm lib/hashtable.scm lib/str2num.scm  
-SCM_COMPILER_SRCS = compiler/bc.scm compiler/expand.scm compiler/fix-letrec.scm compiler/library-manager.scm compiler/match.scm compiler/memory_layout.scm compiler/passes.scm compiler/qq.scm compiler/sua.scm compiler/util.scm compiler/gen-libraries.scm callcc.scm
+SCM_COMPILER_SRCS = compiler/bc.scm compiler/expand.scm compiler/fix-letrec.scm compiler/library-manager.scm compiler/match.scm compiler/memory_layout.scm compiler/passes.scm compiler/qq.scm compiler/sua.scm compiler/util.scm compiler/gen-libraries.scm compiler/callcc.scm
 SCM_SRCS = ${SCM_LIB_SRCS} ${SCM_COMPILER_SRCS}
 SRFI_SRCS = lib/srfi2/srfi/*.scm
 PREFIX ?= /usr
 
-all: callcc
+all: bin/callcc
 
-callcc: callcc.scm.ll libcallcc.a
-	${CC} ${CFLAGS} -o $@ callcc.scm.ll libcallcc.a ${LIBS}
+bin/callcc: compiler/callcc.scm.ll libcallcc.a
+	mkdir -p bin
+	${CC} ${CFLAGS} -o $@ compiler/callcc.scm.ll libcallcc.a ${LIBS}
 
 libcallcc.a: ${OBJECTS}
 	ar rcs $@ $^
@@ -21,11 +22,13 @@ libcallcc.a: ${OBJECTS}
 compiler/headers:
 	cd compiler; mkdir -p headers/flow; mkdir -p headers/scheme; gosh -I. gen-libraries.scm
 
-callcc.scm.ll: ${SCM_SRCS} compiler/headers ${SRFI_SRCS}
-	gosh -Ilib -Icompiler callcc.scm --exe callcc.scm -I compiler/headers -Ilib -Icompiler
+compiler/callcc.scm.ll: ${SCM_SRCS} compiler/headers ${SRFI_SRCS}
+# Fake install dir location, only used for bootstrap.
+	ln -s .. lib/callcc 
+	cd compiler; gosh -I. callcc.scm --exe callcc.scm 
 
 clean:
-	rm -rf callcc compiler/headers  c/*.o c/gc/*.o libcallcc.a
+	rm -rf bin/callcc compiler/headers  c/*.o c/gc/*.o libcallcc.a
 
 cloc:
 	cloc --by-file ${SRCS} 
@@ -47,34 +50,33 @@ test: $(TESTS)
 format:
 	clang-format -i *.c
 
-install: callcc
+install: bin/callcc
 	install -d ${PREFIX}/bin
-	install callcc ${PREFIX}/bin/
-	install -d ${PREFIX}/bin/lib
-	install -d ${PREFIX}/bin/compiler
-	install libcallcc.a ${PREFIX}/bin/lib
-	install compiler/bc.* ${PREFIX}/bin/compiler
-	install compiler/passes.* ${PREFIX}/bin/compiler
-	install compiler/fix-letrec.scm ${PREFIX}/bin/compiler
-	install compiler/qq.scm ${PREFIX}/bin/compiler
-	install compiler/sua.scm ${PREFIX}/bin/compiler
-	install lib/runtime2.scm ${PREFIX}/bin/lib
-	install lib/eval.scm ${PREFIX}/bin/lib
-	install compiler/memory_layout.scm ${PREFIX}/bin/compiler
-	install lib/str2num.scm ${PREFIX}/bin/lib
-	install lib/read.scm ${PREFIX}/bin/lib
-	install lib/hashtable.scm ${PREFIX}/bin/lib
-	install lib/equal.scm ${PREFIX}/bin/lib
-	install compiler/expand.* ${PREFIX}/bin/compiler
-	install compiler/library-manager.* ${PREFIX}/bin/compiler
-	install compiler/format.* ${PREFIX}/bin/compiler
-	install compiler/util.* ${PREFIX}/bin/compiler
-	install compiler/match.* ${PREFIX}/bin/compiler
-	install compiler/stdlib.scm ${PREFIX}/bin/compiler
-	install libcallcc.a ${PREFIX}/bin/
-	install -d ${PREFIX}/bin/compiler/headers/flow
-	install compiler/headers/flow/* ${PREFIX}/bin/compiler/headers/flow
-	install -d ${PREFIX}/bin/compiler/headers/scheme
-	install compiler/headers/scheme/* ${PREFIX}/bin/compiler/headers/scheme
-	install -d ${PREFIX}/bin/lib/srfi
-	install lib/srfi2/srfi/* ${PREFIX}/bin/lib/srfi
+	install bin/callcc ${PREFIX}/bin/
+	install -d ${PREFIX}/lib/callcc/lib
+	install -d ${PREFIX}/lib/callcc/compiler
+	install libcallcc.a ${PREFIX}/lib/callcc/
+	install -m644 compiler/bc.* ${PREFIX}/lib/callcc/compiler
+	install -m644 compiler/passes.* ${PREFIX}/lib/callcc/compiler
+	install -m644 compiler/fix-letrec.scm ${PREFIX}/lib/callcc/compiler
+	install -m644 compiler/qq.scm ${PREFIX}/lib/callcc/compiler
+	install -m644 compiler/sua.scm ${PREFIX}/lib/callcc/compiler
+	install -m644 lib/runtime2.scm ${PREFIX}/lib/callcc/lib
+	install -m644 lib/eval.scm ${PREFIX}/lib/callcc/lib
+	install -m644 compiler/memory_layout.scm ${PREFIX}/lib/callcc/compiler
+	install -m644 lib/str2num.scm ${PREFIX}/lib/callcc/lib
+	install -m644 lib/read.scm ${PREFIX}/lib/callcc/lib
+	install -m644 lib/hashtable.scm ${PREFIX}/lib/callcc/lib
+	install -m644 lib/equal.scm ${PREFIX}/lib/callcc/lib
+	install -m644 compiler/expand.* ${PREFIX}/lib/callcc/compiler
+	install -m644 compiler/library-manager.* ${PREFIX}/lib/callcc/compiler
+	install -m644 compiler/format.* ${PREFIX}/lib/callcc/compiler
+	install -m644 compiler/util.* ${PREFIX}/lib/callcc/compiler
+	install -m644 compiler/match.* ${PREFIX}/lib/callcc/compiler
+	install -m644 compiler/stdlib.scm ${PREFIX}/lib/callcc/compiler
+	install -d ${PREFIX}/lib/callcc/compiler/headers/flow
+	install -m644 compiler/headers/flow/* ${PREFIX}/lib/callcc/compiler/headers/flow
+	install -d ${PREFIX}/lib/callcc/compiler/headers/scheme
+	install -m644 compiler/headers/scheme/* ${PREFIX}/lib/callcc/compiler/headers/scheme
+	install -d ${PREFIX}/lib/callcc/lib/srfi
+	install -m644 lib/srfi2/srfi/* ${PREFIX}/lib/callcc/lib/srfi
