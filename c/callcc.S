@@ -1,3 +1,16 @@
+// Implementation for SCM_CALLCC_ONESHOT, and bits for SCM_CALLCC if required.
+
+	.globl cur_link
+	.globl ccresthunk
+	.globl rcimmix_alloc
+	.globl need_more_frames
+	.globl argcnt
+	.globl ccresthunk_oneshot
+	.globl SCM_CALLCC_ONESHOT
+	.text
+#if defined(__x86_64__)
+
+	.intel_syntax noprefix
 // About need_more_frames:
 // Unfortunately on x86, the return registers and first arg registers
 // are not equivalent.  In some cases (-coverage), llvm/clang will
@@ -13,17 +26,6 @@
 // asm.
 
 	
-	.globl cur_link
-	.globl ccresthunk
-	.globl rcimmix_alloc
-	.globl need_more_frames
-	.globl argcnt
-	.globl ccresthunk_oneshot
-	.globl SCM_CALLCC_ONESHOT
-	.text
-#if defined(__x86_64__)
-
-	.intel_syntax noprefix
 need_more_frames:
 	mov rsi, rax // Why we need a thunk: return value needs to move to second arg
 	mov rdi, cur_link[rip] // move global (or TODO thread-local) link to first arg
