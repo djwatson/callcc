@@ -39,7 +39,7 @@ $ make test -j12 -k
 Basic usage for the interpreter is to use -s or --script to run a scm file:
 
 ```
-$ ./callcc -s hello_world.scm
+$ ./bin/callcc -s hello_world.scm
 $ cat hello_world.scm
 (display "Hello World!\n")
 ```
@@ -47,7 +47,7 @@ $ cat hello_world.scm
 Usage for the compiler is via --exe, and optionally -o:
 
 ```
-$ ./callcc --exe hello_world.scm
+$ ./bin/callcc --exe hello_world.scm
 $ ./hello_world
 ```
 
@@ -60,24 +60,26 @@ This trims the executable size and build time substantially.
 
 For maximum performance, the following C flags are recommended:
 ```
-$ ./callcc -fno-eval --cc "-O3 -flto" --exe whatever.scm
+$ ./bin/callcc -fno-eval --cc "-O3 -flto" --exe whatever.scm
 ```
 
 For even greater performance, PGO (profile guided optimization) can be
 used.  For example:
 
 ```
-$ ./callcc -fno-eval --cc "-O3 -flto -fprofile-generate" --exe wc.scm
+$ ./bin/callcc -fno-eval --cc "-O3 -flto -fprofile-generate" --exe wc.scm
 $ LLVM_PROFILE_FILE=a.profraw ./wc
 $ llvm-profdata merge -output=a.profdata a.profraw
-$ ./callcc -fno-eval --cc "-O3 -flto -fprofile-use=a.profdata" --exe wc.scm
+$ ./bin/callcc -fno-eval --cc "-O3 -flto -fprofile-use=a.profdata" --exe wc.scm
 $ time ./wc
 ```
 
 # Platforms
 
-* aarch64/linux, aarch64/termux
+Tested and known to work:
+
 * x86_64/linux
+* aarch64/linux, aarch64/termux
 
 There are ~50 lines of asm required for each platform, entirely for
 fast call/cc support.  Everything else is relatively portable C/posix

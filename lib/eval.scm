@@ -60,8 +60,9 @@
 	"./")))
 (define path (get-compile-path))
 (set! library-search-paths (cons (string-append path "lib/srfi2") library-search-paths))
-(set! library-search-paths (cons (string-append path "lib/headers") library-search-paths))
+(set! library-search-paths (cons (string-append path "compiler/headers") library-search-paths))
 (set! library-search-paths (cons (string-append path "lib") library-search-paths))
+(set! library-search-paths (cons (string-append path "compiler") library-search-paths))
 
 ;; A simple ast-walking interpreter.  It is very slow.
 ;; It directly parses what comes out of the expander.

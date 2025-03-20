@@ -24,6 +24,7 @@ compiler/headers:
 
 compiler/callcc.scm.ll: ${SCM_SRCS} compiler/headers ${SRFI_SRCS}
 # Fake install dir location, only used for bootstrap.
+	rm -f lib/callcc
 	ln -s .. lib/callcc 
 	cd compiler; gosh -I. callcc.scm --exe callcc.scm 
 

@@ -511,9 +511,6 @@ NOINLINE _Noreturn static void scm_runtime_error0(char *msg) {
   S_error(UNDEFINED, from_c_str(msg), UNDEFINED);
 }
 NOINLINE gc_obj SCM_LOAD_GLOBAL_FAIL(gc_obj a) {
-  auto str = to_string(to_symbol(a)->name);
-  printf("Attempting to load undefined sym: %.*s\n", (int)to_fixnum(str->bytes),
-         str->strdata);
   scm_runtime_error1("Attempting to load undefined sym:", a);
 }
 INLINE gc_obj SCM_LOAD_GLOBAL(gc_obj a) {

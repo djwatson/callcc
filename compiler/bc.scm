@@ -622,11 +622,8 @@ attributes #0 = { returns_twice}
 "))
 
 (define (get-compile-path)
-  (string-append
-   (let ((slash (memq #\/ (reverse (string->list (car (command-line)))))))
-     (if slash (list->string (reverse slash))
-	 "./"))
-   "../lib/callcc/"))
+  (let ((path (get-exe-path)))
+    (string-append (if path path ".") "/../lib/callcc/")))
 
 (define (compile file verbose include-eval)
   (set! functions '())

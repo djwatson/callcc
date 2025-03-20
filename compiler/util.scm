@@ -84,3 +84,26 @@
   (unless (bytevector? bv) (error "Not a bytevector:" bv))
   (do ((i 0 (+ i 1)) (lst '() (cons (bytevector-u8-ref bv i) lst)))
       ((= i (bytevector-length bv)) (reverse lst))))
+
+(define (str-split str sep)
+  (let loop ((i 0) (res '()) (last 0))
+    (if (eqv? i (string-length str))
+	(reverse (cons (substring str last i) res))
+	(if (eq? (string-ref str i) sep)
+	    (loop (+ i 1) (cons (substring str last i) res) (+ i 1))
+	    (loop (+ i 1) res last)))))
+
+;; If it is a relative or absolute path, return.
+;; Otherwise, search through $PATH, trying to find it.
+(define (get-exe-path)
+  (let* ((exe (car (command-line)))
+	 (slash (memq #\/ (reverse (string->list exe)))))
+    (if slash
+	(list->string (reverse slash))
+	(let ((paths (str-split (cdr (assoc "PATH" (get-environment-variables))) #\:)))
+	  (let loop ((paths paths))
+	    (if (null? paths)
+		#f
+		(if (file-exists? (string-append (car paths) "/" exe))
+		    (car paths)
+		    (loop (cdr paths)))))))))

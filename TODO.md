@@ -1,7 +1,6 @@
 # known bugs:
 
 # plan
-  * install - fix dirs
   * records need record check
     * can remove port? check in places
 	* needs to be fast-ish somehow.
@@ -38,6 +37,8 @@
 
 # CLEANUP
 
+* cleanup library paths (instead of usage of -I or -A, use full path)
+  * can remove junk extra paths from bc.scm and eval.scm
 * gc fd's.
 * figure out strategy for intrinsics????
   * we can auto-gen the header for llvm (excepting like SCM_CALL_CC that need extra flags)
