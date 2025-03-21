@@ -1,4 +1,5 @@
 # known bugs:
+* Some of the math routines don't support complex numbers correctly 
 
 # plan
   * records need record check
@@ -15,25 +16,24 @@
 * Cleanup the GC roots, some should be in types, add_root unused currently.
 * Remove the radix tree: just use pre-allocated virtual space.
 
-* cleanup vector sizing: just use another header for large similar to small logbits?
-  * large could always use markbits, but it doesn't show up in any tests currently.
-* And do same thing for static symbols?
-
-# benchmarks / perf improvements:
-  * faster with single-shot continuations: ctak fibc
-  * faster with float type: fft fibfp mbrot pnpoly simplex sumfp. some might need inlining?
-  * faster with list/int typecheck removal: quicksort primes puzzle array1
-
 # CLEANUP
 
 * lint all C
 * get a scm formatter
 * scm lint as much as possible
 
+* website? package? manpage?
+* make tidy, make format
+
 ----------------------------------------
 
 
 # Long term:	 
+
+# benchmarks / perf improvements:
+  * faster with single-shot continuations: ctak fibc
+  * faster with float type: fft fibfp mbrot pnpoly simplex sumfp. some might need inlining?
+  * faster with list/int typecheck removal: quicksort primes puzzle array1
 
 # CLEANUP
 
@@ -66,6 +66,13 @@
 * Long term: Could do precise GC, using LLVM's stackmaps + non-integral pointer types. 
      This will probably break some optimizations based on type: Would need
 	 a typecheck-removal pass
+	 
+# gc
+  * cleanup vector sizing: just use another header for large similar to small logbits?
+    * large could always use markbits, but it doesn't show up in any tests currently.
+  * And do same thing for static symbols?
+
+
 	 
 # call/cc
   * call/cc: figure out valgrind or address santizer workings?

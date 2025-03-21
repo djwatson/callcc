@@ -48,7 +48,6 @@ int main() {
 #ifndef AC_KVEC_H
 #define AC_KVEC_H
 
-#include <gc.h>
 #include <stdlib.h>
 
 #define kv_roundup32(x)                                                        \
