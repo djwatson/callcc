@@ -2,7 +2,7 @@
 CC = clang
 CFLAGS = -O3 -flto=full -DNDEBUG -g  -std=gnu23 -Wall  -march=native -mtune=native -ffat-lto-objects -Wextra -Wnull-dereference  -Wshadow -Wno-unused-parameter -I./c
 LIBS = -lm -lgmp -lutf8proc
-SRCS = c/gc/alloc_table.c c/gc/gc.c c/runtime.c c/util/list.c c/callcc.S
+SRCS = c/gc/alloc_table.c c/gc/gc.c c/runtime.c c/util/list.c c/util/bitset.c c/callcc.S
 OBJECTS = $(patsubst %, %.o, $(basename $(SRCS)))
 SCM_LIB_SRCS = lib/runtime2.scm lib/eval.scm lib/read.scm lib/equal.scm lib/hashtable.scm lib/str2num.scm  
 SCM_COMPILER_SRCS = compiler/bc.scm compiler/expand.scm compiler/fix-letrec.scm compiler/library-manager.scm compiler/match.scm compiler/memory_layout.scm compiler/passes.scm compiler/qq.scm compiler/sua.scm compiler/util.scm compiler/gen-libraries.scm compiler/callcc.scm
@@ -43,7 +43,7 @@ TESTS = $(addsuffix .test, $(basename $(wildcard test/*.scm))) \
 
 .PHONY: test %.test
 
-%.test : %.scm callcc
+%.test : %.scm bin/callcc
 	cd test; bash cmp.sh ../$<
 
 test: $(TESTS)

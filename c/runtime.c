@@ -1285,7 +1285,13 @@ INLINE void SCM_WRITE_SHADOW_STACK(gc_obj pos, gc_obj obj) {
     if (shadow_stack_size == 0) {
       shadow_stack_size = 64;
     }
+    for(int64_t i = shadow_stack_size; i > 0; i--) {
+      gc_pop_root((uint64_t*)&shadow_stack[i-1]);
+    }
     shadow_stack = realloc(shadow_stack, shadow_stack_size * sizeof(gc_obj));
+    for(int64_t i = 0; i < shadow_stack_size; i++) {
+      gc_add_root((uint64_t*)&shadow_stack[i]);
+    }
     assert(shadow_stack);
   }
   assert(to_fixnum(pos) < shadow_stack_size);
@@ -2233,6 +2239,9 @@ int SCM_MAIN();
 
 #include <sys/resource.h>
 
+extern uint64_t *complex_constants[];
+extern uint64_t complex_constants_len;
+
 int main(int argc_in, char *argv_in[]) {
   // grab the stack top: this is used for both callcc
   // stack replacement, *and* GC conservative collection.
@@ -2247,5 +2256,21 @@ int main(int argc_in, char *argv_in[]) {
     perror("Setrlimit error");
   }
   gc_init(fp);
+  // Add the static GC roots.
+
+  // Symbol table
+  auto vec = to_vector(symbol_table);
+  for(int64_t i = 0; i < to_fixnum(vec->len); i++) {
+    auto sym = to_symbol(vec->v[i]);
+    gc_add_root((uint64_t*)&sym->name);
+    gc_add_root((uint64_t*)&sym->val);
+  }
+  // stack call/cc link.
+  gc_add_root((uint64_t*)&cur_link);
+  // static complex constants
+  for (uint64_t i = 0; i < complex_constants_len; i++) {
+    gc_add_root((uint64_t*)complex_constants[i]);
+  }
+
   SCM_MAIN();
 }

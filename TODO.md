@@ -13,7 +13,6 @@
   
 # GC stuff:
 
-* Cleanup the GC roots, some should be in types, add_root unused currently.
 * Remove the radix tree: just use pre-allocated virtual space.
 
 # CLEANUP

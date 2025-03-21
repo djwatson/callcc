@@ -18,6 +18,7 @@
 #include "gc.h"
 #include "util/kvec.h"
 #include "util/list.h"
+#include "util/bitset.h"
 
 #define likely(x) __builtin_expect(x, 1)
 #define unlikely(x) __builtin_expect(x, 0)
@@ -57,30 +58,8 @@ typedef struct freelist_s {
   slab_info *slab;
 } freelist_s;
 
-extern int64_t symbol_table;
-extern uint64_t *complex_constants[];
-extern uint64_t complex_constants_len;
-extern int64_t shadow_stack_size;
-extern int64_t *shadow_stack;
-
 static uintptr_t align(uintptr_t val, uintptr_t alignment) {
   return (val + alignment - 1) & ~(alignment - 1);
-}
-
-static void bts(uint64_t *bits, uint64_t bit) {
-  auto word = bit / 64;
-  auto b = bit % 64;
-  bits[word] |= 1UL << b;
-}
-static void btr(uint64_t *bits, uint64_t bit) {
-  auto word = bit / 64;
-  auto b = bit % 64;
-  bits[word] &= ~(1UL << b);
-}
-static bool bt(uint64_t const *bits, uint64_t bit) {
-  auto word = bit / 64;
-  auto b = bit % 64;
-  return bits[word] & (1UL << b);
 }
 
 static freelist_s freelist[size_classes];
@@ -113,83 +92,32 @@ static uint64_t sz_to_page_class(uint64_t sz, bool check) {
   return class;
 }
 
-bool find_next_bit(uint64_t const *bits, uint64_t maxbit, uint64_t bit,
-                   bool invert, uint64_t *result) {
-  auto word = bit / 64;
-  int64_t b = bit % 64;
-  /* printf("find_next_bit word %li b %li\n", word, b); */
-
-  if (bit >= maxbit) {
-    return false;
-  }
-
-  uint64_t search = bits[word] >> b;
-  if (invert) {
-    search = ~search;
-  }
-
-  auto res = __builtin_ffsll(search);
-  if (res && res <= (64 - b)) {
-    bit += res - 1;
-    if (invert) {
-      assert(!bt(bits, bit));
-    } else {
-      assert(bt(bits, bit));
-    }
-    if (bit >= maxbit) {
-      return false;
-    }
-    *result = bit;
-    return true;
-  }
-  bit += 64 - b;
-  assert((bit % 64) == 0);
-  [[clang::musttail]] return find_next_bit(bits, maxbit, bit, invert, result);
-}
-
 bool get_partial_range(uint64_t sz_class, freelist_s *fl) {
   auto slab = fl->slab;
-  /* if (sz_class != 6) { */
-  /*   return false; */
-  /* } */
-  // return false;
 again:
   int64_t end_index = -1;
   if (!slab || fl->end_ptr >= (uint64_t)slab->end) {
     if (kv_size(partials[sz_class]) > 0) {
       slab = kv_pop(partials[sz_class]);
-      // printf("New slab %i %p %p\n", slab->marked, slab->start, slab->end);
       assert(slab->class == sz_class);
       fl->slab = slab;
     } else {
       return false;
     }
   } else {
-    // assert(fl->start_ptr >= slab->start && fl->end_ptr <= slab->end);
     end_index = ((fl->end_ptr - (uint64_t)slab->start)) / (slab->class * 8);
-    /* printf("Cont slab end_indx %li\n", end_index); */
   }
-  /* printf("CHECKING for partial %lx\n", slab->markbits[(end_index+1)/64]); */
   uint64_t maxbit = ((slab->end - slab->start)) / (slab->class * 8);
   uint64_t new_start;
   if (!find_next_bit(slab->markbits, maxbit, end_index + 1, true, &new_start)) {
     slab = nullptr;
-    /* printf("No free start\n"); */
     goto again;
   }
-  /* if (new_start > 0 && new_start < maxbit-1) { */
-  /*   printf("New start %li %i %i %i\n", new_start, bt(slab->markbits,
-   * new_start-1), */
-  /* 	   bt(slab->markbits, new_start), */
-  /* 	   bt(slab->markbits, new_start+1)); */
-  /* } */
   uint64_t new_end = maxbit - 1;
   find_next_bit(slab->markbits, maxbit, new_start + 1, false, &new_end);
   for (uint64_t i = new_start; i < new_end; i++) {
     assert(!bt(slab->markbits, i));
   }
-  // printf("End index was %li, new start %li, new end %li\n", end_index,
-  // new_start, new_end);
   fl->start_ptr = (uint64_t)slab->start + new_start * slab->class * 8;
   fl->end_ptr = (uint64_t)slab->start + new_end * slab->class * 8;
   assert((uintptr_t)fl->start_ptr >= (uintptr_t)fl->slab->start);
@@ -249,7 +177,6 @@ static kvec_t(range) markstack;
 static void mark() {
   while (kv_size(markstack) > 0) {
     range r = kv_pop(markstack);
-    // printf("RANGE %p %p\n", r.start, r.end);
     //  Double check it is aligned.
     assert(((int64_t)r.start & 0x7) == 0);
     assert(((int64_t)r.end & 0x7) == 0);
@@ -271,7 +198,6 @@ static void mark() {
           totsize += slab->class * 8;
           slab->marked += slab->class * 8;
           bts(slab->markbits, index);
-          // printf("Marking %p cls %i\n", base_ptr, slab->class);
           kv_push(markstack,
                   ((range){(uint64_t *)base_ptr,
                            (uint64_t *)(base_ptr + slab->class * 8)}));
@@ -393,8 +319,7 @@ __attribute__((noinline, preserve_none)) static void rcimmix_collect() {
     kv_clear(partials[i]);
   }
 
-  // Mark C roots
-  // TODO: unnecessary with conservative collection.
+  // Mark static roots
   for (uint64_t i = 0; i < kv_size(roots); i++) {
     auto root = kv_A(roots, i);
     kv_push(markstack, ((range){root, root + 1}));
@@ -404,24 +329,6 @@ __attribute__((noinline, preserve_none)) static void rcimmix_collect() {
   uint64_t *sp = (uint64_t *)__builtin_frame_address(0);
   kv_push(markstack, ((range){sp, stacktop}));
 
-  // Mark symbol table: TODO cleaup types
-  uint64_t *v = (uint64_t *)(symbol_table & ~7);
-  auto len = (*v) >> 3;
-  for (uint64_t i = 0; i < len; i++) {
-    uint64_t *symbol = (uint64_t *)(v[2 + i] & ~7);
-    kv_push(markstack, ((range){&symbol[1], &symbol[3]}));
-  }
-  // TODO: fix shadow stack size
-  kv_push(markstack, ((range){(uint64_t *)&shadow_stack[0],
-                              (uint64_t *)&shadow_stack[shadow_stack_size]}));
-
-  kv_push(markstack,
-          ((range){(uint64_t *)&cur_link, (uint64_t *)(&cur_link + 8)}));
-
-  for (uint64_t i = 0; i < complex_constants_len; i++) {
-    uint64_t *ptr = complex_constants[i];
-    kv_push(markstack, ((range){ptr, ptr + 1}));
-  }
 
   // Run mark loop.
   mark();
