@@ -139,7 +139,16 @@ static void *rcimmix_realloc_align(void *p, size_t old_sz, size_t new_sz) {
 }
 static void rcimmix_free(void *, size_t) {}
 
+static intptr_t memstart;
+static intptr_t memend;
+
 void gc_init(void *stacktop_in) {
+  memstart = (intptr_t)mmap(nullptr, PAGE_SIZE*PAGE_SIZE*120, PROT_READ | PROT_WRITE, MAP_PRIVATE|MAP_ANON, -1, 0);
+  if (memstart == -1) {
+    abort();
+  }
+  memend = memstart + PAGE_SIZE*PAGE_SIZE*120;
+  alloc_table_init(&atable, memstart, memend);
   stacktop = stacktop_in;
   // Set defaults so we don't have to check for wrapping in
   // the fastpath.
@@ -401,7 +410,7 @@ __attribute__((noinline, preserve_none)) static void rcimmix_collect() {
 
 static slab_info *alloc_slab(uint64_t sz_class) {
   auto sz = sz_class < size_classes ? default_slab_size
-                                    : align(sz_class * 8, PAGE_SIZE);
+                                    : align(sz_class * 8, default_slab_size);
   // Find page class: Choose next largest class to ensure we have enough room.
   // TODO: no need to increment if perfect size.
   auto page_class = sz_to_page_class(sz, false);
@@ -424,11 +433,23 @@ static slab_info *alloc_slab(uint64_t sz_class) {
     // printf("Allocing slab: %li\n", sz_class*8);
   }
 
+  static uint64_t tot_size = 0;
+  tot_size += sizeof(slab_info);
   slab_info *free = calloc(1, sizeof(slab_info));
   free->class = sz_class;
   init_list_head(&free->link);
 
-  posix_memalign((void **)&free->start, default_slab_size, sz);
+  tot_size += sz;
+  //printf("Tot size %li\n", tot_size);
+  free->start = (uint8_t*)memstart;
+  memstart += sz;
+  if (memstart >= memend) {
+    abort();
+  }
+  if ((uint64_t)free->start & (default_slab_size - 1)) {
+    abort();
+  }
+  //posix_memalign((void **)&free->start, default_slab_size, sz);
   memset(free->start, 0, sz);
   free->end = free->start + sz;
   list_add(&free->link, &live_slabs);

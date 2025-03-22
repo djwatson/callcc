@@ -14,10 +14,11 @@ typedef struct alloc_table {
   uint64_t min;
   uint64_t max;
 
-  void ***map[ind_sz]; // Types are awesome.
+  void** table;
 
 } alloc_table;
 
 bool alloc_table_lookup(alloc_table *table, void *p, void **slab);
 void alloc_table_set_range(alloc_table *table, void *val, void *p,
                            uint64_t range);
+void alloc_table_init(alloc_table *table, uintptr_t start, uintptr_t end);
