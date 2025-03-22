@@ -433,14 +433,10 @@ static slab_info *alloc_slab(uint64_t sz_class) {
     // printf("Allocing slab: %li\n", sz_class*8);
   }
 
-  static uint64_t tot_size = 0;
-  tot_size += sizeof(slab_info);
   slab_info *free = calloc(1, sizeof(slab_info));
   free->class = sz_class;
   init_list_head(&free->link);
 
-  tot_size += sz;
-  //printf("Tot size %li\n", tot_size);
   free->start = (uint8_t*)memstart;
   memstart += sz;
   if (memstart >= memend) {
@@ -458,12 +454,12 @@ static slab_info *alloc_slab(uint64_t sz_class) {
   return free;
 }
 
-NOINLINE __attribute__((preserve_most)) static alloc_result
+NOINLINE __attribute__((preserve_most)) static void*
 rcimmix_alloc_slow(uint64_t sz) {
   if (collect_cnt >= next_collect) {
     collect_cnt = 0;
     rcimmix_collect();
-    return rcimmix_alloc_with_slab(sz);
+    return rcimmix_alloc(sz);
   }
   assert((sz & 0x7) == 0);
 
@@ -472,7 +468,7 @@ rcimmix_alloc_slow(uint64_t sz) {
   if (sz_class >= size_classes) {
     auto slab = alloc_slab(sz_class);
     collect_cnt += sz;
-    return (alloc_result){slab->start, slab};
+    return slab->start;
   }
   // It's in a small slab.
   //  assert(freelist[sz_class].start_ptr >= freelist[sz_class].end_ptr);
@@ -489,10 +485,10 @@ rcimmix_alloc_slow(uint64_t sz) {
     freelist[sz_class].slab = slab;
     collect_cnt += freelist[sz_class].end_ptr - freelist[sz_class].start_ptr;
   }
-  return rcimmix_alloc_with_slab(sz);
+  return rcimmix_alloc(sz);
 }
 
-alloc_result rcimmix_alloc_with_slab(uint64_t sz) {
+void* rcimmix_alloc(uint64_t sz) {
   assert((sz & 0x7) == 0);
   uint64_t sz_class = sz / 8;
   if (unlikely(sz_class >= size_classes)) {
@@ -507,10 +503,8 @@ alloc_result rcimmix_alloc_with_slab(uint64_t sz) {
   }
 
   fl->start_ptr = start;
-  return (alloc_result){(void *)s, fl->slab};
+  return (void*)s;
 }
-
-void *rcimmix_alloc(uint64_t sz) { return rcimmix_alloc_with_slab(sz).p; }
 
 bool gc_is_small(uint64_t sz) {
   uint64_t sz_class = sz / 8;
@@ -540,22 +534,6 @@ NOINLINE void gc_log(uint64_t a) {
   }
 
   if (likely(slab->class < size_classes)) {
-    uint64_t *logbits = (uint64_t *)(a & ~(default_slab_size - 1));
-    uint64_t addr = a & (default_slab_size - 1);
-    bts(logbits, (addr / 8));
-  } else {
-    if (bt(slab->markbits, 0)) {
-      bts(slab->markbits, 1);
-    }
-  }
-#endif
-}
-
-void gc_log_with_slab(uint64_t a, void *sp) {
-#ifdef GENGC
-  slab_info *slab = sp;
-  assert(slab);
-  if (slab->class < size_classes) {
     uint64_t *logbits = (uint64_t *)(a & ~(default_slab_size - 1));
     uint64_t addr = a & (default_slab_size - 1);
     bts(logbits, (addr / 8));

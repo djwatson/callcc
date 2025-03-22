@@ -106,7 +106,6 @@ typedef struct symbol {
 
 typedef struct vector_s {
   gc_obj len;
-  void *slab;
   gc_obj v[];
 } vector_s;
 
@@ -1022,10 +1021,8 @@ INLINE gc_obj SCM_GUARD(gc_obj a, int64_t type) {
 }
 
 INLINE gc_obj SCM_MAKE_VECTOR(gc_obj obj) {
-  auto res = rcimmix_alloc_with_slab(sizeof(vector_s) +
+  vector_s *v = rcimmix_alloc(sizeof(vector_s) +
                                      to_fixnum(obj) * sizeof(gc_obj));
-  vector_s *v = res.p;
-  v->slab = res.slab;
   v->len = obj;
   return tag_vector(v);
 }
@@ -1076,7 +1073,7 @@ INLINE gc_obj SCM_VECTOR_SET(gc_obj vec, gc_obj idx, gc_obj val) {
   v->v[i] = val;
 
   if (has_ptr_tag(val)) {
-    gc_log_with_slab((uint64_t)&v->v[i], v->slab);
+    gc_log((uint64_t)&v->v[i]);
   }
 
   return UNDEFINED;

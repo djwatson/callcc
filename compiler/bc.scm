@@ -458,14 +458,14 @@
 	      ptr-tag id)))
    ((vector? c)
     ;; Prepend the length & nullptr for slab ptr
-    (let* ((vals (append (list (* 8 (vector-length c)) 0)
+    (let* ((vals (cons (* 8 (vector-length c))
 			 (omap val (vector->list c) (emit-const val))))
 	   (val-str (join ", " (omap val vals (format "i64 ~a" val))))
 	   (id (next-id)))
       (push! consts (format "@vec~a = private unnamed_addr constant [~a x i64] [~a], align 8\n"
-			    id (+ 2 (vector-length c)) val-str ))
-      (format "add (i64 ~a, i64 ptrtoint ([~a x i64]* @vec~a to i64))"
-	      vector-tag (+ 2 (vector-length c)) id)))
+			    id (+ 1 (vector-length c)) val-str ))
+      (format "add (i64 ~a, i64 ptrtoint (ptr @vec~a to i64))"
+	      vector-tag  id)))
    ((pair? c)
     (let* ((id (next-id))
 	   (a (emit-const (car c)))
