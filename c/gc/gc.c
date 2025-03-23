@@ -506,26 +506,7 @@ void* rcimmix_alloc(uint64_t sz) {
   return (void*)s;
 }
 
-bool gc_is_small(uint64_t sz) {
-  uint64_t sz_class = sz / 8;
-  return likely(sz_class < size_classes);
-}
-
-// Assumes a is a small allocation.
-void gc_log_fast(uint64_t a) {
-#ifdef GENGC
-#ifndef NDEBUG
-  slab_info *slab;
-  assert(alloc_table_lookup(&atable, (void *)a, (void **)&slab));
-#endif
-  uint64_t *logbits = (uint64_t *)(a & ~(default_slab_size - 1));
-
-  uint64_t addr = a & (default_slab_size - 1);
-  bts(logbits, (addr / 8));
-#endif
-}
-
-NOINLINE void gc_log(uint64_t a) {
+void gc_log(uint64_t a) {
 #ifdef GENGC
   slab_info *slab;
   if (!alloc_table_lookup(&atable, (void *)a, (void **)&slab)) {

@@ -526,6 +526,8 @@ INLINE gc_obj SCM_LOAD_GLOBAL(gc_obj a) {
 #endif
 }
 
+// Quick check to determine if we need to gc_log a field: If it is not
+// a pointer field, don't log (logging can be slow).
 #define PTR_TAG_SET ((1 << 2) | (1 << 3) | (1 << 7))
 static bool has_ptr_tag(gc_obj n) {
   return (((uint32_t)1 << (n.value & 0x1f)) &
@@ -973,7 +975,7 @@ INLINE gc_obj SCM_SETCAR(gc_obj obj, gc_obj val) {
   c->a = val;
   //  printf("log setcar\n");
   if (has_ptr_tag(val)) {
-    gc_log_fast((uint64_t)&c->a);
+    gc_log((uint64_t)&c->a);
   }
   return UNDEFINED;
 }
@@ -988,7 +990,7 @@ INLINE gc_obj SCM_SETCDR(gc_obj obj, gc_obj val) {
   c->b = val;
   //  printf("log setcdr\n");
   if (has_ptr_tag(val)) {
-    gc_log_fast((uint64_t)&c->b);
+    gc_log((uint64_t)&c->b);
   }
   return UNDEFINED;
 }
@@ -1088,7 +1090,6 @@ INLINE gc_obj SCM_VECTOR_SET_FAST(gc_obj vec, gc_obj idx, gc_obj val) {
 
 INLINE gc_obj SCM_CLOSURE(gc_obj p, uint64_t len) {
   //  printf("make closure %li\n", len);
-  assert(gc_is_small(sizeof(closure_s) + ((len + 1) * sizeof(gc_obj))));
   closure_s *clo =
       rcimmix_alloc(sizeof(closure_s) + (len + 1) * sizeof(gc_obj));
   clo->type = CLOSURE_TAG;
@@ -1103,8 +1104,7 @@ INLINE void SCM_CLOSURE_SET(gc_obj clo, gc_obj obj, gc_obj idx) {
   auto c = to_closure(clo);
   c->v[i + 1] = obj;
   /* printf("log closure\n"); */
-  // Non-fast closure sets are always other closures, no need to check is_ptr
-  gc_log_fast((uint64_t)&c->v[i + 1]);
+  gc_log((uint64_t)&c->v[i + 1]);
 }
 
 INLINE void SCM_CLOSURE_SET_FAST(gc_obj clo, gc_obj obj, uint64_t i) {
@@ -1589,7 +1589,6 @@ INLINE gc_obj SCM_MAKE_SYMBOL(gc_obj str) {
 
 ////// records
 INLINE gc_obj SCM_MAKE_RECORD(gc_obj sz) {
-  assert(gc_is_small(sizeof(record_s) + (to_fixnum(sz) * sizeof(gc_obj))));
   record_s *r =
       rcimmix_alloc(sizeof(record_s) + (to_fixnum(sz) * sizeof(gc_obj)));
   r->type = RECORD_TAG;
@@ -1607,7 +1606,7 @@ INLINE gc_obj SCM_RECORD_SET(gc_obj r, gc_obj idx, gc_obj val) {
   rec->v[i] = val;
   // printf("log record\n");
   if (has_ptr_tag(val)) {
-    gc_log_fast((uint64_t)&rec->v[i]);
+    gc_log((uint64_t)&rec->v[i]);
   }
   return UNDEFINED;
 }

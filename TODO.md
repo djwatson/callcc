@@ -11,10 +11,6 @@
   * port tests
   * copyish tests
   
-# GC stuff:
-
-* Remove the radix tree: just use pre-allocated virtual space.
-
 # CLEANUP
 
 * lint all C
@@ -29,7 +25,7 @@
 
 # Long term:	 
 
-# benchmarks / perf improvements:
+# global analysis perf improvements :
   * faster with single-shot continuations: ctak fibc
   * faster with float type: fft fibfp mbrot pnpoly simplex sumfp. some might need inlining?
   * faster with list/int typecheck removal: quicksort primes puzzle array1
