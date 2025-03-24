@@ -1,9 +1,11 @@
+# known bugs
+  * define-record-type doesn't work at repl?
+
 # plan
+  * not needed for GCbench, just custom-do the records in runtime
   * ugh records really require cp0
     * records need record check
-      * can remove port? check in places
   	  * needs to be fast-ish somehow.
-  	  * record? bits should be in type header?
 
 # full r7rs / safety / tests
   * port tests
