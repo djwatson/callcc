@@ -1775,6 +1775,7 @@
     (let* ((buf (port-buf port))
 	   (new-buf (make-string (* 2 (string-length buf)))))
       (string-copy! new-buf 0 buf 0 (port-pos port))
+      (port-len-set! port (string-length new-buf))
       (port-buf-set! port new-buf))))
 
 (define (port-bytevector-flush port)
@@ -1782,20 +1783,20 @@
     (let* ((buf (port-buf port))
 	   (new-buf (make-bytevector (* 2 (bytevector-length buf)))))
       (bytevector-copy! new-buf 0 buf 0 (port-pos port))
+      (port-len-set! port (bytevector-length new-buf))
       (port-buf-set! port new-buf))))
 
 (define flush-output-port
   (case-lambda
    (() (flush-output-port (current-output-port)))
    ((port)
-    ;(unless (port? port) (error "not a port:" port))
     ((port-fillflush port) port))))
 
 (define port-buffer-size 512)
 
 (define current-input-port (make-parameter (make-port #t #t #t #f 0 0 0 (make-string port-buffer-size) port-fd-fill)))
 (define current-output-port (make-parameter (make-port #f #t #t #f 1 0 port-buffer-size (make-string port-buffer-size) port-fd-flush)))
-(define current-error-port (make-parameter (make-port #f #t #t #f 2 0 0 (make-string port-buffer-size) port-fd-flush)))
+(define current-error-port (make-parameter (make-port #f #t #t #f 2 0 port-buffer-size (make-string port-buffer-size) port-fd-flush)))
 
 (define (binary-port? port) (not (textual-port? port)))
 (define (open-input-file file)
@@ -1882,6 +1883,9 @@
    (() (read-char (current-input-port)))
    ((port)
     (if (eq? #t (port-open? port))
+	;; LLVM isn't able to remove the record? calls,
+	;; so just hand-call SCM_RECORD_REF (which doesn't do port? checks)
+	;; TODO: Would be fixed by cp0 inliner + type removal.
 	(let ((pos (sys:FOREIGN_CALL "SCM_RECORD_REF" port 6))
 	      (len (sys:FOREIGN_CALL "SCM_RECORD_REF" port 7))
 	      (buf (sys:FOREIGN_CALL "SCM_RECORD_REF" port 8)))
@@ -1970,12 +1974,19 @@
    ((ch) (write-char ch (current-output-port)))
    ((ch port)
     (unless (port-open? port) (error "Port not open"))
-    (when (>= (port-pos port) (port-len port))
-      ((port-fillflush port) port))
-    (sys:FOREIGN_CALL "SCM_STRING_SET_FAST" (port-buf port) (port-pos port) ch)
-    (port-pos-set! port (+ 1 (port-pos port)))
-    (when (eq? #\newline ch)
-      ((port-fillflush port) port)))))
+    (let ((pos (sys:FOREIGN_CALL "SCM_RECORD_REF" port 6))
+	  (len (sys:FOREIGN_CALL "SCM_RECORD_REF" port 7))
+	  (buf (sys:FOREIGN_CALL "SCM_RECORD_REF" port 8)))
+	(if (>= pos len)
+	    (begin
+	      ((port-fillflush port) port)
+	      ;; re-read len/pos etc.
+	      (write-char ch port))
+	    (begin
+	      (sys:FOREIGN_CALL "SCM_STRING_SET_FAST" buf pos ch)
+	      (sys:FOREIGN_CALL "SCM_RECORD_SET_FAST" port 6 (+ 1 pos))
+	      (when (eq? #\newline ch)
+		((port-fillflush port) port))))))))
 
 (define write-u8
   (case-lambda
