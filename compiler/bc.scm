@@ -690,12 +690,14 @@ attributes #0 = { returns_twice}
 	   (push! debug-strings
 		  (format "!~a = !DILocation(line:1, scope: !~a)" debug-loc-id debug-id))
 	   
-	   (display (format "define ~a i64 @\"~a\"(~a) #0 !dbg !~a {\n" 
+	   (display (format "define ~a i64 @\"~a\"(~a) ~a #0 !dbg !~a {\n" 
 			    (if (or (equal? (fun-name func) "SCM_MAIN")
 				    (equal? (fun-name func) "S_error"))
 				"" "internal")
 			    (fun-name func)
 			    (reg-args-to-param-list reg-args)
+			    (if (equal? (fun-name func) "S_error")
+				"noreturn" "")
 			    (fun-debug-id func)))
 	   (display (format " entry:\n"))
 	   (for (arg i) (stack-args (iota (length stack-args)))

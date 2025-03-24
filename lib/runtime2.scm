@@ -1788,7 +1788,7 @@
   (case-lambda
    (() (flush-output-port (current-output-port)))
    ((port)
-    (unless (port? port) (error "not a port:" port))
+    ;(unless (port? port) (error "not a port:" port))
     ((port-fillflush port) port))))
 
 (define port-buffer-size 512)
@@ -1864,7 +1864,7 @@
   (case-lambda
    (() (peek-char (current-input-port)))
    ((port)
-    (unless (port? port) (error "display: not a port" port))
+    ;(unless (port? port) (error "display: not a port" port))
     (if (eq? #t (port-open? port))
 	(if (< (port-pos port) (port-len port))
 	    (string-ref (port-buf port) (port-pos port))
@@ -1900,7 +1900,7 @@
   (case-lambda
    (() (read-u8 (current-input-port)))
    ((port)
-    (unless (port? port) (error "display: not a port" port))
+    ;(unless (port? port) (error "display: not a port" port))
     (unless (port-open? port) (error "Port not open"))
     (if (< (port-pos port) (port-len port))
 	(let ((res (bytevector-u8-ref (port-buf port) (port-pos port))))
@@ -1916,14 +1916,14 @@
   (case-lambda
    (() (char-ready? (current-input-port)))
    ((port)
-    (unless (port? port) (error "display: not a port" port))
+    ;(unless (port? port) (error "display: not a port" port))
     (< (port-pos port) (port-len port)))))
 
 (define u8-ready?
   (case-lambda
    (() (u8-ready? (current-input-port)))
    ((port)
-    (unless (port? port) (error "display: not a port" port))
+    ;(unless (port? port) (error "display: not a port" port))
     (< (port-pos port) (port-len port)))))
 
 (define read-string
@@ -1970,7 +1970,7 @@
   (case-lambda
    ((ch) (write-char ch (current-output-port)))
    ((ch port)
-    (unless (port? port) (error "display: not a port" port))
+    ;(unless (port? port) (error "display: not a port" port))
     (unless (port-open? port) (error "Port not open"))
     (when (>= (port-pos port) (port-len port))
       ((port-fillflush port) port))

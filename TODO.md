@@ -2,10 +2,11 @@
 * Some of the math routines don't support complex numbers correctly 
 
 # plan
-  * records need record check
-    * can remove port? check in places
-	* needs to be fast-ish somehow.
-	* record? bits should be in type header?
+  * ugh records really require cp0
+    * records need record check
+      * can remove port? check in places
+  	  * needs to be fast-ish somehow.
+  	  * record? bits should be in type header?
 
 # full r7rs / safety / tests
   * port tests
@@ -54,7 +55,7 @@
 * better control of inlining, read-char/peek-char should be inlined fastpath.
 * S_error should have noreturn
 * fixup writing w-out going through write-char if possible?: doesn't seem to affect perf much.
-* gcbench: ratnums are too slow.  Doh.  Hand-roll ratnums?
+* ratnums are too slow.  Doh.  Hand-roll ratnums? (gcbench is slow because of this)
 
 * fast globals, a.la chez
 
