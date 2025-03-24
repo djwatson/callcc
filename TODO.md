@@ -1,6 +1,3 @@
-# known bugs:
-* Some of the math routines don't support complex numbers correctly 
-
 # plan
   * ugh records really require cp0
     * records need record check
@@ -11,6 +8,7 @@
 # full r7rs / safety / tests
   * port tests
   * copyish tests
+  * list? tests for things on lists
   
 # CLEANUP
 
@@ -22,9 +20,11 @@
 * make tidy, make format
 
 ----------------------------------------
+# POST-first-release
 
+# library
+* Some of the math routines don't support complex numbers correctly 
 
-# Long term:	 
 
 # global analysis perf improvements :
   * faster with single-shot continuations: ctak fibc

@@ -1278,12 +1278,12 @@ gc_obj *shadow_stack = nullptr;
 // the shadow stack size.
 INLINE void SCM_WRITE_SHADOW_STACK(gc_obj pos, gc_obj obj) {
   while (unlikely(to_fixnum(pos) >= shadow_stack_size)) {
+    for(int64_t i = shadow_stack_size; i > 0; i--) {
+      gc_pop_root((uint64_t*)&shadow_stack[i-1]);
+    }
     shadow_stack_size *= 2;
     if (shadow_stack_size == 0) {
       shadow_stack_size = 64;
-    }
-    for(int64_t i = shadow_stack_size; i > 0; i--) {
-      gc_pop_root((uint64_t*)&shadow_stack[i-1]);
     }
     shadow_stack = realloc(shadow_stack, shadow_stack_size * sizeof(gc_obj));
     for(int64_t i = 0; i < shadow_stack_size; i++) {
@@ -1604,10 +1604,18 @@ INLINE gc_obj SCM_RECORD_SET(gc_obj r, gc_obj idx, gc_obj val) {
   auto rec = to_record(r);
   auto i = to_fixnum(idx);
   rec->v[i] = val;
-  // printf("log record\n");
+
   if (has_ptr_tag(val)) {
     gc_log((uint64_t)&rec->v[i]);
   }
+  return UNDEFINED;
+}
+
+INLINE gc_obj SCM_RECORD_SET_FAST(gc_obj r, gc_obj idx, gc_obj val) {
+  auto rec = to_record(r);
+  auto i = to_fixnum(idx);
+  rec->v[i] = val;
+
   return UNDEFINED;
 }
 

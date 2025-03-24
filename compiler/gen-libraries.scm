@@ -969,8 +969,8 @@
 		 (make-record-type 'type '(field-tag ...)))
 	       (define (constructor constructor-tag ...)
 		 (let ((r (make-record (+ (length '(field-tag ...)) 1))))
-		   (record-set! r 0 type)
-		   (record-set! r index constructor-tag) ...
+		   (sys:FOREIGN_CALL "SCM_RECORD_SET_FAST" r 0 type)
+		   (sys:FOREIGN_CALL "SCM_RECORD_SET_FAST" r index constructor-tag) ...
 		   r))
 	       (define (predicate thing)
 		 (and (record? thing)
