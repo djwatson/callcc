@@ -2,7 +2,6 @@
 
 # full r7rs / safety / tests
   * port tests
-  * copyish tests
   
 # CLEANUP
 
