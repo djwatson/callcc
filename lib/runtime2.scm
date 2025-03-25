@@ -1542,11 +1542,12 @@
     (string-copy! c 0 str start end)
     c))
 ;;;;;; Records
+;; Used for constructor, where we know we have a record.
+(define (record-set-fast! record index value)
+  (sys:FOREIGN_CALL "SCM_RECORD_SET_FAST" record index value))
 (define (record-set! record index value)
-  ;(unless (record? record) (error "record-set!: not a record" record))
   (sys:FOREIGN_CALL "SCM_RECORD_SET" record index value))
 (define (record-ref record index)
-  ;(unless (record? record) (error "record-ref: not a record" record))
   (sys:FOREIGN_CALL "SCM_RECORD_REF" record index))
 (define (make-record sz)
   (sys:FOREIGN_CALL "SCM_MAKE_RECORD" sz))

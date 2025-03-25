@@ -514,6 +514,7 @@
     (record? int)
     (record-ref int)
     (record-set! int)
+    (record-set-fast! int)
     (record-accessor int)
     (record-constructor int)
     (make-record int)
@@ -962,15 +963,27 @@
 			   (let f ((i 1) (ids (syntax (field-tag ...))))
 			     (if (null? ids)
 				 '()
-				 (cons i (f (+ i 1) (cdr ids)))))))
+				 (cons i (f (+ i 1) (cdr ids))))))
+			 ((constructor-index ...)
+			  (let ((fields (syntax (field-tag ...)))
+				 (constructors (syntax (constructor-tag ...))))
+			    (map (lambda (c)
+				   (let loop ((i 1) (ids fields))
+				     (if (null? ids)
+					 (error "Can't find constructor tag:" c)
+					 (if (eq? (car ids) c)
+					     i
+					     (loop (+ 1 i) (cdr ids))))))
+				 constructors))))
 	    (syntax
 	     (begin
 	       (define type
 		 (make-record-type 'type '(field-tag ...)))
+
 	       (define (constructor constructor-tag ...)
 		 (let ((r (make-record (+ (length '(field-tag ...)) 1))))
-		   (sys:FOREIGN_CALL "SCM_RECORD_SET_FAST" r 0 type)
-		   (sys:FOREIGN_CALL "SCM_RECORD_SET_FAST" r index constructor-tag) ...
+		   (record-set-fast! r 0 type)
+		   (record-set-fast! r constructor-index constructor-tag) ...
 		   r))
 	       (define (predicate thing)
 		 (and (record? thing)

@@ -1,5 +1,4 @@
 # known bugs
-  * define-record-type doesn't work at repl?
 
 # full r7rs / safety / tests
   * port tests
@@ -26,6 +25,10 @@
   * faster with single-shot continuations: ctak fibc
   * faster with float type: fft fibfp mbrot pnpoly simplex sumfp. some might need inlining?
   * faster with list/int typecheck removal: quicksort primes puzzle array1
+  * faster with custom ratnum (non libgmp): gcbench
+  * faster with buffer management directly: read-line (vs. repeated read-char)
+     * Some sort of simd looking for newline?
+  * faster with custom inliner: graphs (and probably others), read-char, write-char
 
 # CLEANUP
 
@@ -42,6 +45,7 @@
      * I think this is caused by needing to 'expand' symbols inserted by 
 	   syntax-case, and by the macro serializer.
   * The whole expander needs to be re-written a-la chez with wrappers instead.
+    * syntax-case is halfassed and doesn't work sometimes (especially library paths)
 
 # PERF
 * Needs inliner to remove alloc: graphs
@@ -51,7 +55,6 @@
 * better control of inlining, read-char/peek-char should be inlined fastpath.
 * S_error should have noreturn
 * fixup writing w-out going through write-char if possible?: doesn't seem to affect perf much.
-* ratnums are too slow.  Doh.  Hand-roll ratnums? (gcbench is slow because of this)
 
 * fast globals, a.la chez
 

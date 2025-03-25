@@ -787,7 +787,7 @@ TODO: also maybe go back to pre-resolving idents? only internal
 			  `(map (lambda ,var-names ,head-match) ,@var-values)
 			  `(if (= ,@(map (lambda (var) `(length ,var)) var-values))
 			       (map (lambda ,var-names ,head-match) ,@var-values)
-			       (error "Pattern variables with unequal length in ellipses")))))
+			       (error "Pattern variables with unequal length in ellipses" ',var-names ,@var-values)))))
 	    (let-values (((tail-match tail-maps) (expand-syntax tail can-ellipsis (cdr head-maps))))
               (values `(append ,(if (= depth 0)
 				    gen
