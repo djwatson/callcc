@@ -396,10 +396,8 @@
 (define (call/cc x) (call-with-current-continuation x))
 
 (define (car a)
-  ;;(unless (pair? a) (error "Trying to car not a pair" a))
   (sys:FOREIGN_CALL "SCM_CAR" a))
 (define (cdr a)
-  ;;(unless (pair? a) (error "Trying to cdr not a pair" a))
   (sys:FOREIGN_CALL "SCM_CDR" a))
 (define (cddr a)
   (cdr (cdr a)))
@@ -689,8 +687,6 @@
 	 (newstr (make-string (+ lena lenb))))
     (sys:FOREIGN_CALL "SCM_STRING_CPY" newstr 0 a 0 lena)
     (sys:FOREIGN_CALL "SCM_STRING_CPY" newstr lena b 0 lenb)
-    ;; (string-copy! newstr 0 a 0 lena)
-    ;; (string-copy! newstr lena b 0 lenb)
     newstr))
 
 (define string-append
@@ -705,14 +701,10 @@
 	    (let* ((cur_str (car strs))
  		   (cur_len (string-length cur_str)))
 	      (sys:FOREIGN_CALL "SCM_STRING_CPY" newstr place (car strs) 0 cur_len)
-	      ;(string-copy! newstr place (car strs) 0 cur_len)
 	      (loop (cdr strs) (+ place cur_len)))))
       newstr))))
 
-;; ;;; IO
-
-
-;; ;;; types
+;;; types
 (define (boolean? x) (boolean? x))
 (define (char? x) (char? x))
 (define (null? x) (null? x))
@@ -994,19 +986,6 @@
 
 
 
-;; r5rs-equal?
-(define (equal? a b)
-  (cond
-   ((eqv? a b) #t)
-   ((and (null? a) (null? b)) #t)
-   ((and (string? a) (string? b)) (string=? a b))
-   ((and (bytevector? a) (bytevector? b)) (bytevector=? a b))
-   ((and (symbol? a) (symbol? b)) (string=? (symbol->string a) (symbol->string b)))
-   ((and (vector? a) (vector? b)) (equal? (vector->list a) (vector->list b)))
-   ((and (pair? a) (pair? b)
-	 (equal? (car a) (car b))
-	 (equal? (cdr a) (cdr b))) #t)
-   (else #f)))
 (define (eqv? a b)
   (eqv? a b))
 
@@ -1870,6 +1849,9 @@
     (parameterize ((current-output-port file))
       (thunk))))
 
+(define (call-with-port port proc)
+  (dynamic-wind (lambda () #f) (lambda () (proc port)) (lambda () (close-port port))))
+
 (define (close-input-port p)
   (close-port p))
 (define (close-output-port p)
@@ -1902,23 +1884,6 @@
 (define (eof-object? x) (sys:FOREIGN_CALL "SCM_IS_EOF" x))
 (define (eof-object) (sys:FOREIGN_CALL "SCM_EOF"))
 
-(define peek-char
-  (case-lambda
-   (() (peek-char (current-input-port)))
-   ((port)
-    ;(unless (port? port) (error "display: not a port" port))
-    (if (eq? #t (port-open? port))
-	(if (< (port-pos port) (port-len port))
-	    (string-ref (port-buf port) (port-pos port))
-	    (begin
-	      ((port-fillflush port) port)
-	      (if (< (port-pos port) (port-len port))
-		  (peek-char port)
-		  (eof-object))))
-	(if (port-open? port)
-	    (eof-object)
-	    (error "Port not open"))))))
-
 (define read-char
   (case-lambda
    (() (read-char (current-input-port)))
@@ -1929,7 +1894,10 @@
 	;; TODO: Would be fixed by cp0 inliner + type removal.
 	(let ((pos (sys:FOREIGN_CALL "SCM_RECORD_REF" port 6))
 	      (len (sys:FOREIGN_CALL "SCM_RECORD_REF" port 7))
-	      (buf (sys:FOREIGN_CALL "SCM_RECORD_REF" port 8)))
+	      (buf (sys:FOREIGN_CALL "SCM_RECORD_REF" port 8))
+	      (input (sys:FOREIGN_CALL "SCM_RECORD_REF" port 1))
+	      (textual (sys:FOREIGN_CALL "SCM_RECORD_REF" port 2)))
+	  (unless (and (eq? input #t) (eq? textual #t)) (error "Invalid read-char:" port))
 	  (if (< pos len)
 	      (let ((res (sys:FOREIGN_CALL "SCM_STRING_REF_FAST" buf pos)))
 		(sys:FOREIGN_CALL "SCM_RECORD_SET_FAST"  port 6 (+ 1 pos))
@@ -1938,6 +1906,31 @@
 		((port-fillflush port) port)
 		(if (< (port-pos port) (port-len port))
 		    (read-char port)
+		    (eof-object)))))
+	(if (port-open? port)
+	    (eof-object)
+	    (error "Port not open"))))))
+
+(define peek-char
+  (case-lambda
+   (() (peek-char (current-input-port)))
+   ((port)
+    (if (eq? #t (port-open? port))
+	;; LLVM isn't able to remove the record? calls,
+	;; so just hand-call SCM_RECORD_REF (which doesn't do port? checks)
+	;; TODO: Would be fixed by cp0 inliner + type removal.
+	(let ((pos (sys:FOREIGN_CALL "SCM_RECORD_REF" port 6))
+	      (len (sys:FOREIGN_CALL "SCM_RECORD_REF" port 7))
+	      (buf (sys:FOREIGN_CALL "SCM_RECORD_REF" port 8))
+	      (input (sys:FOREIGN_CALL "SCM_RECORD_REF" port 1))
+	      (textual (sys:FOREIGN_CALL "SCM_RECORD_REF" port 2)))
+	  (unless (and (eq? input #t) (eq? textual #t)) (error "Invalid peek-char:" port))
+	  (if (< pos len)
+	      (sys:FOREIGN_CALL "SCM_STRING_REF_FAST" buf pos)
+	      (begin
+		((port-fillflush port) port)
+		(if (< (port-pos port) (port-len port))
+		    (peek-char port)
 		    (eof-object)))))
 	(if (port-open? port)
 	    (eof-object)
@@ -2017,17 +2010,20 @@
     (unless (port-open? port) (error "Port not open"))
     (let ((pos (sys:FOREIGN_CALL "SCM_RECORD_REF" port 6))
 	  (len (sys:FOREIGN_CALL "SCM_RECORD_REF" port 7))
-	  (buf (sys:FOREIGN_CALL "SCM_RECORD_REF" port 8)))
-	(if (>= pos len)
-	    (begin
-	      ((port-fillflush port) port)
-	      ;; re-read len/pos etc.
-	      (write-char ch port))
-	    (begin
-	      (sys:FOREIGN_CALL "SCM_STRING_SET_FAST" buf pos ch)
-	      (sys:FOREIGN_CALL "SCM_RECORD_SET_FAST" port 6 (+ 1 pos))
-	      (when (eq? #\newline ch)
-		((port-fillflush port) port))))))))
+	  (buf (sys:FOREIGN_CALL "SCM_RECORD_REF" port 8))
+	  (input (sys:FOREIGN_CALL "SCM_RECORD_REF" port 1))
+	  (textual (sys:FOREIGN_CALL "SCM_RECORD_REF" port 2)))
+      (unless (and (eq? input #f) (eq? textual #t)) (error "Invalid write-char" port))
+      (if (>= pos len)
+	  (begin
+	    ((port-fillflush port) port)
+	    ;; re-read len/pos etc.
+	    (write-char ch port))
+	  (begin
+	    (sys:FOREIGN_CALL "SCM_STRING_SET_FAST" buf pos ch)
+	    (sys:FOREIGN_CALL "SCM_RECORD_SET_FAST" port 6 (+ 1 pos))
+	    (when (eq? #\newline ch)
+	      ((port-fillflush port) port))))))))
 
 (define write-u8
   (case-lambda
