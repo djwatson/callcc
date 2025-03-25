@@ -3,7 +3,6 @@
 # full r7rs / safety / tests
   * port tests
   * copyish tests
-  * list? tests for things on lists
   
 # CLEANUP
 
