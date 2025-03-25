@@ -1,17 +1,22 @@
 (import (scheme r5rs))
-(define-syntax foo
-  (syntax-rules ()
-    ((_ (a ...) (b ...) ...) '((a  (b ...) ) ...))))
 
-(display (foo (1 2 3) (4 4) (5 5) ))
-(newline)
+;; Unequal ellipses
 
-(define-syntax foo
-  (syntax-rules ()
-    ((_ (a b ...) ...) '(((a  b ) ...) ...))))
+;; (define-syntax foo
+;;   (syntax-rules ()
+;;     ((_ (a ...) (b ...) ...) '((a  (b ...) ) ...))))
 
-(display (foo ((1 2 3) (4 4) (5 5)) ))
-(newline)
+;; (display (foo (1 2 3) (4 4) (5 5) ))
+;; (newline)
+
+;; Unequal ellipses
+
+;; (define-syntax foo
+;;   (syntax-rules ()
+;;     ((_ (a b ...) ...) '(((a  b ) ...) ...))))
+
+;; (display (foo ((1 2 3) (4 4) (5 5)) ))
+;; (newline)
 
 (define-syntax foo
   (syntax-rules ()

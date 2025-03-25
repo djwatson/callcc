@@ -1,12 +1,6 @@
 # known bugs
   * define-record-type doesn't work at repl?
 
-# plan
-  * not needed for GCbench, just custom-do the records in runtime
-  * ugh records really require cp0
-    * records need record check
-  	  * needs to be fast-ish somehow.
-
 # full r7rs / safety / tests
   * port tests
   * copyish tests
