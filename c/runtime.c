@@ -16,6 +16,9 @@
 #define NOINLINE __attribute__((noinline))
 #define INLINE __attribute__((always_inline))
 
+static uintptr_t align(uintptr_t val, uintptr_t alignment) {
+  return (val + alignment - 1) & ~(alignment - 1);
+}
 #define LOW_TAGS                                                               \
   X(FIXNUM, 0)                                                                 \
   X(FLONUM1, 1)                                                                \
@@ -2246,6 +2249,21 @@ int SCM_MAIN();
 extern uint64_t *complex_constants[];
 extern uint64_t complex_constants_len;
 
+static void *gmp_alloc_align(size_t sz) {
+  return rcimmix_alloc(align(sz, sizeof(void *)));
+}
+static void *gmp_realloc_align(void *p, size_t old_sz, size_t new_sz) {
+  auto res = gmp_alloc_align(new_sz);
+  auto copy_sz = old_sz;
+  if (new_sz < old_sz) {
+    copy_sz = new_sz;
+  }
+  memcpy(res, p, copy_sz);
+  return res;
+}
+
+static void gmp_free(void *ptr, size_t sz) {}
+
 int main(int argc_in, char *argv_in[]) {
   // grab the stack top: this is used for both callcc
   // stack replacement, *and* GC conservative collection.
@@ -2275,6 +2293,9 @@ int main(int argc_in, char *argv_in[]) {
   for (uint64_t i = 0; i < complex_constants_len; i++) {
     gc_add_root((uint64_t *)complex_constants[i]);
   }
+
+  // Set up memory functions for gmp
+  mp_set_memory_functions(gmp_alloc_align, gmp_realloc_align, gmp_free);
 
   SCM_MAIN();
 }

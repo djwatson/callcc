@@ -67,8 +67,16 @@ int main() {
 #define kv_clear(v) ((v).n = 0)
 #define kv_max(v) ((v).m)
 
+static inline void* tested_realloc(void * ptr, size_t size) {
+  auto res = realloc(ptr, size);
+  if (res == nullptr) {
+    abort();
+  }
+  return res;
+}
+
 #define kv_resize(type, v, s)                                                  \
-  ((v).m = (s), (v).a = (type *)realloc((v).a, sizeof(type) * (v).m))
+  ((v).m = (s), (v).a = (type *)tested_realloc((v).a, sizeof(type) * (v).m))
 
 #define kv_copy(type, v1, v0)                                                  \
   do {                                                                         \
@@ -82,7 +90,7 @@ int main() {
   do {                                                                         \
     if ((v).n == (v).m) {                                                      \
       (v).m = (v).m ? (v).m << 1 : 2;                                          \
-      (v).a = (typeof(*v.a) *)realloc((v).a, sizeof(typeof(*v.a)) * (v).m);    \
+      (v).a = (typeof(*v.a) *)tested_realloc((v).a, sizeof(typeof(*v.a)) * (v).m);    \
     }                                                                          \
     (v).a[(v).n++] = (x);                                                      \
   } while (0)
@@ -90,14 +98,14 @@ int main() {
 #define kv_pushp(type, v)                                                      \
   (((v).n == (v).m)                                                            \
        ? ((v).m = ((v).m ? (v).m << 1 : 2),                                    \
-          (v).a = (type *)realloc((v).a, sizeof(type) * (v).m), 0)             \
+          (v).a = (type *)tested_realloc((v).a, sizeof(type) * (v).m), 0)             \
        : 0),                                                                   \
       ((v).a + ((v).n++))
 
 #define kv_a(type, v, i)                                                       \
   (((v).m <= (size_t)(i)                                                       \
         ? ((v).m = (v).n = (i) + 1, kv_roundup32((v).m),                       \
-           (v).a = (type *)realloc((v).a, sizeof(type) * (v).m), 0)            \
+           (v).a = (type *)tested_realloc((v).a, sizeof(type) * (v).m), 0) \
     : (v).n <= (size_t)(i) ? (v).n = (i) + 1                                   \
                            : 0),                                               \
    (v).a[(i)])
