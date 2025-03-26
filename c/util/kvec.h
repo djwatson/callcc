@@ -57,7 +57,7 @@ int main() {
 #define kvec_t(type)                                                           \
   struct {                                                                     \
     size_t n, m;                                                               \
-    type *a;                                                                   \
+    type *a;								\
   }
 #define kv_init(v) ((v).n = (v).m = 0, (v).a = 0)
 #define kv_destroy(v) free((v).a)
@@ -90,7 +90,7 @@ static inline void* tested_realloc(void * ptr, size_t size) {
   do {                                                                         \
     if ((v).n == (v).m) {                                                      \
       (v).m = (v).m ? (v).m << 1 : 2;                                          \
-      (v).a = (typeof(*v.a) *)tested_realloc((v).a, sizeof(typeof(*v.a)) * (v).m);    \
+      (v).a = (typeof(*(v).a) *)tested_realloc((v).a, sizeof(typeof(*(v).a)) * (v).m); \
     }                                                                          \
     (v).a[(v).n++] = (x);                                                      \
   } while (0)

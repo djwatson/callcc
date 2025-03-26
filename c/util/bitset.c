@@ -5,7 +5,7 @@
 bool find_next_bit(uint64_t const *bits, uint64_t maxbit, uint64_t bit,
                    bool invert, uint64_t *result) {
   auto word = bit / 64;
-  int64_t b = bit % 64;
+  int64_t b = (int64_t)bit % 64;
   /* printf("find_next_bit word %li b %li\n", word, b); */
 
   if (bit >= maxbit) {
@@ -17,7 +17,7 @@ bool find_next_bit(uint64_t const *bits, uint64_t maxbit, uint64_t bit,
     search = ~search;
   }
 
-  auto res = __builtin_ffsll(search);
+  auto res = __builtin_ffsll((int64_t)search);
   if (res && res <= (64 - b)) {
     bit += res - 1;
     if (invert) {

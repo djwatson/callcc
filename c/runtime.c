@@ -1026,8 +1026,7 @@ INLINE gc_obj SCM_GUARD(gc_obj a, int64_t type) {
 }
 
 INLINE gc_obj SCM_MAKE_VECTOR(gc_obj obj) {
-  vector_s *v =
-      gc_alloc(sizeof(vector_s) + to_fixnum(obj) * sizeof(gc_obj));
+  vector_s *v = gc_alloc(sizeof(vector_s) + to_fixnum(obj) * sizeof(gc_obj));
   v->len = obj;
   return tag_vector(v);
 }
@@ -1093,8 +1092,7 @@ INLINE gc_obj SCM_VECTOR_SET_FAST(gc_obj vec, gc_obj idx, gc_obj val) {
 
 INLINE gc_obj SCM_CLOSURE(gc_obj p, uint64_t len) {
   //  printf("make closure %li\n", len);
-  closure_s *clo =
-      gc_alloc(sizeof(closure_s) + (len + 1) * sizeof(gc_obj));
+  closure_s *clo = gc_alloc(sizeof(closure_s) + (len + 1) * sizeof(gc_obj));
   clo->type = CLOSURE_TAG;
   clo->v[0] = p;
   return tag_closure(clo);
@@ -1592,8 +1590,7 @@ INLINE gc_obj SCM_MAKE_SYMBOL(gc_obj str) {
 
 ////// records
 INLINE gc_obj SCM_MAKE_RECORD(gc_obj sz) {
-  record_s *r =
-      gc_alloc(sizeof(record_s) + (to_fixnum(sz) * sizeof(gc_obj)));
+  record_s *r = gc_alloc(sizeof(record_s) + (to_fixnum(sz) * sizeof(gc_obj)));
   r->type = RECORD_TAG;
 
   return tag_ptr(r);

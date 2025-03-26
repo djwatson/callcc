@@ -37,4 +37,4 @@ static inline int list_is_head(const struct list_head *list,
   return list == head;
 }
 #define list_for_each(pos, head)                                               \
-  for (pos = (head)->next; !list_is_head(pos, (head)); pos = pos->next)
+  for ((pos) = (head)->next; !list_is_head(pos, (head)); (pos) = (pos)->next)

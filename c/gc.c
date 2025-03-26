@@ -94,7 +94,7 @@ static uint64_t sz_to_page_class(uint64_t sz) {
 
 bool get_partial_range(uint64_t sz_class, freelist_s *fl) {
   auto slab = fl->slab;
-again:
+
   int64_t end_index = -1;
   if (!slab || fl->end_ptr >= (uint64_t)slab->end) {
     if (kv_size(partials[sz_class]) > 0) {
@@ -111,8 +111,8 @@ again:
   uint64_t maxbit = ((slab->end - slab->start)) / slab_sz(slab);
   uint64_t new_start;
   if (!find_next_bit(slab->markbits, maxbit, end_index + 1, true, &new_start)) {
-    slab = nullptr;
-    goto again;
+    fl->slab = nullptr;
+    [[clang::musttail]] return get_partial_range(sz_class, fl);
   }
   uint64_t new_end = maxbit - 1;
   find_next_bit(slab->markbits, maxbit, new_start + 1, false, &new_end);
@@ -135,9 +135,8 @@ void gc_init(void *stacktop_in) {
   if (gc_space_env) {
     gc_virtual_space = atoll(gc_space_env);
   }
-  memstart =
-      (intptr_t)mmap(nullptr, gc_virtual_space,
-                     PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
+  memstart = (intptr_t)mmap(nullptr, gc_virtual_space, PROT_READ | PROT_WRITE,
+                            MAP_PRIVATE | MAP_ANON, -1, 0);
   if ((intptr_t)memstart == -1) {
     printf("Can't alloc virtual space: %li\n", gc_virtual_space);
     abort();
@@ -413,7 +412,8 @@ static slab_info *alloc_slab(uint64_t sz_class) {
   free->start = (uint8_t *)memstart;
   memstart += sz;
   if (memstart >= memend) {
-    printf("Out of memory.  Set virtual space explicitly with GC_SPACE env var\n");
+    printf(
+        "Out of memory.  Set virtual space explicitly with GC_SPACE env var\n");
     abort();
   }
   assert(0 == ((uint64_t)free->start & (default_slab_size - 1)));
