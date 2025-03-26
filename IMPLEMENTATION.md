@@ -85,9 +85,6 @@ more often.
 For small size classes, we allocate in slabs: i.e. each slab holds
 only a single size: we can easily detect interior pointers this way.
 
-Allocated regions are resolved to slabs via a radix table: The
-allocated address space need not be contiguous.
-
 preserve_none is used to dump callee-save registers before
 conservatively walking the stack, so no ASM is necessary in the GC at all.
 

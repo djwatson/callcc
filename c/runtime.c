@@ -9,7 +9,7 @@
 
 #include <utf8proc.h>
 
-#include "gc/gc.h"
+#include "gc.h"
 
 #define likely(x) __builtin_expect(x, 1)
 #define unlikely(x) __builtin_expect(x, 0)
@@ -1023,8 +1023,8 @@ INLINE gc_obj SCM_GUARD(gc_obj a, int64_t type) {
 }
 
 INLINE gc_obj SCM_MAKE_VECTOR(gc_obj obj) {
-  vector_s *v = rcimmix_alloc(sizeof(vector_s) +
-                                     to_fixnum(obj) * sizeof(gc_obj));
+  vector_s *v =
+      rcimmix_alloc(sizeof(vector_s) + to_fixnum(obj) * sizeof(gc_obj));
   v->len = obj;
   return tag_vector(v);
 }
@@ -1278,16 +1278,16 @@ gc_obj *shadow_stack = nullptr;
 // the shadow stack size.
 INLINE void SCM_WRITE_SHADOW_STACK(gc_obj pos, gc_obj obj) {
   while (unlikely(to_fixnum(pos) >= shadow_stack_size)) {
-    for(int64_t i = shadow_stack_size; i > 0; i--) {
-      gc_pop_root((uint64_t*)&shadow_stack[i-1]);
+    for (int64_t i = shadow_stack_size; i > 0; i--) {
+      gc_pop_root((uint64_t *)&shadow_stack[i - 1]);
     }
     shadow_stack_size *= 2;
     if (shadow_stack_size == 0) {
       shadow_stack_size = 64;
     }
     shadow_stack = realloc(shadow_stack, shadow_stack_size * sizeof(gc_obj));
-    for(int64_t i = 0; i < shadow_stack_size; i++) {
-      gc_add_root((uint64_t*)&shadow_stack[i]);
+    for (int64_t i = 0; i < shadow_stack_size; i++) {
+      gc_add_root((uint64_t *)&shadow_stack[i]);
     }
     assert(shadow_stack);
   }
@@ -1422,7 +1422,7 @@ gc_obj SCM_MAKE_STRING(gc_obj len, gc_obj fill) {
   // won't promote str from young to old gen).
   auto data = rcimmix_alloc(totallen);
   string_s *str = rcimmix_alloc(sizeof(string_s));
-  str->strdata = data; 
+  str->strdata = data;
   str->type = STRING_TAG;
   str->len = len;
   str->bytes = tag_fixnum(bytecnt * to_fixnum(len));
@@ -2264,16 +2264,16 @@ int main(int argc_in, char *argv_in[]) {
 
   // Symbol table
   auto vec = to_vector(symbol_table);
-  for(int64_t i = 0; i < to_fixnum(vec->len); i++) {
+  for (int64_t i = 0; i < to_fixnum(vec->len); i++) {
     auto sym = to_symbol(vec->v[i]);
-    gc_add_root((uint64_t*)&sym->name);
-    gc_add_root((uint64_t*)&sym->val);
+    gc_add_root((uint64_t *)&sym->name);
+    gc_add_root((uint64_t *)&sym->val);
   }
   // stack call/cc link.
-  gc_add_root((uint64_t*)&cur_link);
+  gc_add_root((uint64_t *)&cur_link);
   // static complex constants
   for (uint64_t i = 0; i < complex_constants_len; i++) {
-    gc_add_root((uint64_t*)complex_constants[i]);
+    gc_add_root((uint64_t *)complex_constants[i]);
   }
 
   SCM_MAIN();

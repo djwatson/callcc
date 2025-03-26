@@ -16,9 +16,9 @@
 
 #include "alloc_table.h"
 #include "gc.h"
+#include "util/bitset.h"
 #include "util/kvec.h"
 #include "util/list.h"
-#include "util/bitset.h"
 
 #define likely(x) __builtin_expect(x, 1)
 #define unlikely(x) __builtin_expect(x, 0)
@@ -143,11 +143,13 @@ static intptr_t memstart;
 static intptr_t memend;
 
 void gc_init(void *stacktop_in) {
-  memstart = (intptr_t)mmap(nullptr, PAGE_SIZE*PAGE_SIZE*120, PROT_READ | PROT_WRITE, MAP_PRIVATE|MAP_ANON, -1, 0);
+  memstart =
+      (intptr_t)mmap(nullptr, PAGE_SIZE * PAGE_SIZE * 120,
+                     PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
   if (memstart == -1) {
     abort();
   }
-  memend = memstart + PAGE_SIZE*PAGE_SIZE*120;
+  memend = memstart + PAGE_SIZE * PAGE_SIZE * 120;
   alloc_table_init(&atable, memstart, memend);
   stacktop = stacktop_in;
   // Set defaults so we don't have to check for wrapping in
@@ -338,7 +340,6 @@ __attribute__((noinline, preserve_none)) static void rcimmix_collect() {
   uint64_t *sp = (uint64_t *)__builtin_frame_address(0);
   kv_push(markstack, ((range){sp, stacktop}));
 
-
   // Run mark loop.
   mark();
 
@@ -437,7 +438,7 @@ static slab_info *alloc_slab(uint64_t sz_class) {
   free->class = sz_class;
   init_list_head(&free->link);
 
-  free->start = (uint8_t*)memstart;
+  free->start = (uint8_t *)memstart;
   memstart += sz;
   if (memstart >= memend) {
     abort();
@@ -445,7 +446,7 @@ static slab_info *alloc_slab(uint64_t sz_class) {
   if ((uint64_t)free->start & (default_slab_size - 1)) {
     abort();
   }
-  //posix_memalign((void **)&free->start, default_slab_size, sz);
+  // posix_memalign((void **)&free->start, default_slab_size, sz);
   memset(free->start, 0, sz);
   free->end = free->start + sz;
   list_add(&free->link, &live_slabs);
@@ -454,7 +455,7 @@ static slab_info *alloc_slab(uint64_t sz_class) {
   return free;
 }
 
-NOINLINE __attribute__((preserve_most)) static void*
+NOINLINE __attribute__((preserve_most)) static void *
 rcimmix_alloc_slow(uint64_t sz) {
   if (collect_cnt >= next_collect) {
     collect_cnt = 0;
@@ -488,7 +489,7 @@ rcimmix_alloc_slow(uint64_t sz) {
   return rcimmix_alloc(sz);
 }
 
-void* rcimmix_alloc(uint64_t sz) {
+void *rcimmix_alloc(uint64_t sz) {
   assert((sz & 0x7) == 0);
   uint64_t sz_class = sz / 8;
   if (unlikely(sz_class >= size_classes)) {
@@ -503,7 +504,7 @@ void* rcimmix_alloc(uint64_t sz) {
   }
 
   fl->start_ptr = start;
-  return (void*)s;
+  return (void *)s;
 }
 
 void gc_log(uint64_t a) {

@@ -4,18 +4,15 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-// A mapping from arbitrary void* to T* base address lookup, using a radix
-// table.
 static constexpr uint64_t shift = 12;
 static constexpr uint64_t ind_sz = 1 << shift;
 static constexpr uint64_t ind_mask = (ind_sz - 1);
 
 typedef struct alloc_table {
   uint64_t min;
-  uint64_t max;
+  uint64_t size;
 
-  void** table;
-
+  void **table;
 } alloc_table;
 
 bool alloc_table_lookup(alloc_table *table, void *p, void **slab);
