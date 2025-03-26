@@ -51,6 +51,9 @@ test: $(TESTS)
 format:
 	clang-format -i c/*.c c/*.h
 
+tidy:
+	clang-tidy --extra-arg="-std=gnu23" c/*.c c/util/*.c
+
 install: bin/callcc
 	install -d ${PREFIX}/bin
 	install bin/callcc ${PREFIX}/bin/

@@ -1,4 +1,6 @@
 #include <assert.h>
+#include <errno.h>
+#include <fcntl.h>
 #include <gmp.h>
 #include <math.h>
 #include <stdbool.h>
@@ -6,6 +8,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/resource.h>
+#include <time.h>
+#include <unistd.h>
 
 #include <utf8proc.h>
 
@@ -19,44 +24,38 @@
 static uintptr_t align(uintptr_t val, uintptr_t alignment) {
   return (val + alignment - 1) & ~(alignment - 1);
 }
-#define LOW_TAGS                                                               \
-  X(FIXNUM, 0)                                                                 \
-  X(FLONUM1, 1)                                                                \
-  X(PTR, 2)                                                                    \
-  X(CONS, 3)                                                                   \
-  X(FLONUM2, 4)                                                                \
-  X(FLONUM3, 5)                                                                \
-  X(LITERAL, 6)                                                                \
-  X(VECTOR, 7)
 
-#define PTR_TAGS                                                               \
-  X(STRING, 0x2)                                                               \
-  X(RECORD, 0xa)                                                               \
-  X(CLOSURE, 0x12)                                                             \
-  X(SYMBOL, 0x1a)                                                              \
-  X(BYTEVECTOR, 0x22)                                                          \
-  X(NUMBER, 0x2a)                                                              \
-  X(FLONUM, 0x2a)                                                              \
-  X(BIGNUM, 0x12a)                                                             \
-  X(RATNUM, 0x22a)                                                             \
-  X(COMPNUM, 0x32a)
+enum : int64_t {
+  // Low bit tags for gc_obj
+  FIXNUM_TAG = 0,
+  FLONUM1_TAG = 1,
+  PTR_TAG = 2,
+  CONS_TAG = 3,
+  FLONUM2_TAG = 4,
+  FLONUM3_TAG = 5,
+  LITERAL_TAG = 6,
+  VECTOR_TAG = 7,
 
-#define IMMEDIATE_TAGS                                                         \
-  X(BOOL, 0x6)                                                                 \
-  X(CHAR, 0x0e)                                                                \
-  X(NIL, 0x16)                                                                 \
-  X(EOF, 0x1e)                                                                 \
-  X(UNDEFINED, 0x26)
+  // ptr tags, used only in PTR_TAG types.
+  STRING_TAG = 0x2,
+  RECORD_TAG = 0xa,
+  CLOSURE_TAG = 0x12,
+  SYMBOL_TAG = 0x1a,
+  BYTEVECTOR_TAG = 0x22,
+  NUMBER_TAG = 0x2a,
+  FLONUM_TAG = 0x2a,
+  BIGNUM_TAG = 0x12a,
+  RATNUM_TAG = 0x22a,
+  COMPNUM_TAG = 0x32a,
 
-extern char *low_tag_names[];
-extern char *ptr_tag_names[];
-extern char *immediate_tag_names[];
+  // Literal tags, used only for LITERAL_TAG types
+  BOOL_TAG = 0x6,
+  CHAR_TAG = 0x0e,
+  NIL_TAG = 0x16,
+  EOF_TAG = 0x1e,
+  UNDEFINED_TAG = 0x26,
 
-enum : uint64_t {
-#define X(name, num) name##_TAG = (num),
-  LOW_TAGS IMMEDIATE_TAGS PTR_TAGS
-#undef X
-      TAG_MASK = 0x7,
+  TAG_MASK = 0x7,
   IMMEDIATE_MASK = 0xff,
 };
 
@@ -163,7 +162,7 @@ static closure_s *to_closure(gc_obj obj) {
 static bytevector_s *to_bytevector(gc_obj obj) {
   return (bytevector_s *)(obj.value - PTR_TAG);
 }
-static uint32_t to_char(gc_obj obj) { return (uint32_t)(obj.value >> 8); }
+static int32_t to_char(gc_obj obj) { return (int32_t)(obj.value >> 8); }
 
 static uint8_t get_tag(gc_obj obj) { return obj.value & TAG_MASK; }
 static uint8_t get_imm_tag(gc_obj obj) { return obj.value & IMMEDIATE_MASK; }
@@ -236,8 +235,9 @@ static gc_obj tag_ptr(void *s) {
   return (gc_obj){.value = ((int64_t)s + PTR_TAG)};
 }
 
-#define TAG_SET2 ((1 << 5) | (1 << 4) | (1 << 1))
-static bool has_tag_5_or_4_or_1(int64_t n) {
+enum : uint64_t { TAG_SET2 = ((1 << 5) | (1 << 4) | (1 << 1)) };
+
+static bool has_tag_5_or_4_or_1(uint64_t n) {
   // Note that unlike the paper, we need to explictly ensure n is
   // masked to 5 bits: shifting by more than 32 bits here is undefined
   // behavior, and clang will happily optimize everything out.
@@ -300,7 +300,7 @@ static bool double_to_gc(double d, gc_obj *res) {
   di = __builtin_rotateleft64(di, 4);
   di++; // Offset by one, so that we keep fixnum as 0 tag.
   if (has_tag_5_or_4_or_1(di)) {
-    *res = (gc_obj){.value = di};
+    *res = (gc_obj){.value = (int64_t)di};
     return true;
   }
   return false;
@@ -312,7 +312,7 @@ static gc_obj double_to_gc_slow(double d) {
   di = __builtin_rotateleft64(di, 4);
   di++; // Offset by one, so that we keep fixnum as 0 tag.
   if (has_tag_5_or_4_or_1(di)) {
-    return (gc_obj){.value = di};
+    return (gc_obj){.value = (int64_t)di};
   }
   flonum_s *f = gc_alloc(sizeof(flonum_s));
   f->type = FLONUM_TAG;
@@ -531,7 +531,8 @@ INLINE gc_obj SCM_LOAD_GLOBAL(gc_obj a) {
 
 // Quick check to determine if we need to gc_log a field: If it is not
 // a pointer field, don't log (logging can be slow).
-#define PTR_TAG_SET ((1 << 2) | (1 << 3) | (1 << 7))
+enum : uint64_t { PTR_TAG_SET = ((1 << 2) | (1 << 3) | (1 << 7)) };
+
 static bool has_ptr_tag(gc_obj n) {
   return (((uint32_t)1 << (n.value & 0x1f)) &
           (~(uint32_t)0 / 0xff * PTR_TAG_SET)) != 0;
@@ -730,31 +731,41 @@ static gc_obj compnum_mul(gc_obj a, gc_obj b) {
       gc_obj a, gc_obj b) {                                                    \
     if (is_compnum(a) || is_compnum(b)) {                                      \
       return compnum_##OPLCNAME(a, b);                                         \
-    } else if (is_flonum(a) || is_flonum(b)) {                                 \
+    }                                                                          \
+    if (is_flonum(a) || is_flonum(b)) {                                        \
       return double_to_gc_slow(                                                \
           OP(to_double(SCM_INEXACT(a)), to_double(SCM_INEXACT(b))));           \
-    } else if (is_ratnum(a) || is_ratnum(b)) {                                 \
-      mpq_t ba, bb, res;                                                       \
+    }                                                                          \
+    if (is_ratnum(a) || is_ratnum(b)) {                                        \
+      mpq_t ba;                                                                \
+      mpq_t bb;                                                                \
+      mpq_t res;                                                               \
       mpq_init(res);                                                           \
       get_ratnum(a, &ba);                                                      \
       get_ratnum(b, &bb);                                                      \
       mpq_##OPLCNAME(res, ba, bb);                                             \
       return tag_ratnum(res);                                                  \
-    } else if (is_bignum(a) || is_bignum(b)) {                                 \
-      mpz_t ba, bb, res;                                                       \
+    }                                                                          \
+    if (is_bignum(a) || is_bignum(b)) {                                        \
+      mpz_t ba;                                                                \
+      mpz_t bb;                                                                \
+      mpz_t res;                                                               \
       mpz_init(res);                                                           \
       get_bignum(a, &ba);                                                      \
       get_bignum(b, &bb);                                                      \
       mpz_##OPLCNAME(res, ba, bb);                                             \
       return tag_bignum(res);                                                  \
-    } else if (is_fixnum(a) && is_fixnum(b)) {                                 \
+    }                                                                          \
+    if (is_fixnum(a) && is_fixnum(b)) {                                        \
       gc_obj res;                                                              \
       if (!__builtin_##OPLCNAME##_overflow(a.value, SHIFT(b.value),            \
                                            &res.value)) {                      \
         return res;                                                            \
       }                                                                        \
       /* make it a bignum, result overflowed */                                \
-      mpz_t ba, bb, bres;                                                      \
+      mpz_t ba;                                                                \
+      mpz_t bb;                                                                \
+      mpz_t bres;                                                              \
       mpz_init(bres);                                                          \
       get_bignum(a, &ba);                                                      \
       get_bignum(b, &bb);                                                      \
@@ -770,27 +781,24 @@ static gc_obj compnum_mul(gc_obj a, gc_obj b) {
       if (likely(!__builtin_##OPLCNAME##_overflow(a.value, SHIFT(b.value),     \
                                                   &res.value))) {              \
         return res;                                                            \
-      } else {                                                                 \
-        return SCM_##OPNAME##_SLOW(a, b);                                      \
       }                                                                        \
-    } else if (likely((is_flonum_fast(a) & is_flonum_fast(b)) == 1)) {         \
+      return SCM_##OPNAME##_SLOW(a, b);                                        \
+    }                                                                          \
+    if (likely((is_flonum_fast(a) & is_flonum_fast(b)) == 1)) {                \
       gc_obj res;                                                              \
       if (likely(                                                              \
               double_to_gc(OP(to_double_fast(a), to_double_fast(b)), &res))) { \
         return res;                                                            \
-      } else {                                                                 \
-        return SCM_##OPNAME##_SLOW(a, b);                                      \
       }                                                                        \
-    } else {                                                                   \
-      return SCM_##OPNAME##_SLOW(a, b);                                        \
     }                                                                          \
+    return SCM_##OPNAME##_SLOW(a, b);                                          \
   }
 
 #define MATH_ADD(a, b) ((a) + (b))
 #define MATH_SUB(a, b) ((a) - (b))
 #define MATH_MUL(a, b) ((a) * (b))
 #define NOSHIFT(a) (a)
-#define SHIFT(a) (a >> 3)
+#define SHIFT(a) ((a) >> 3)
 MATH_OVERFLOW_OP(ADD, add, MATH_ADD, NOSHIFT)
 MATH_OVERFLOW_OP(SUB, sub, MATH_SUB, NOSHIFT)
 MATH_OVERFLOW_OP(MUL, mul, MATH_MUL, SHIFT)
@@ -800,17 +808,22 @@ MATH_OVERFLOW_OP(MUL, mul, MATH_MUL, SHIFT)
   NOINLINE gc_obj SCM_##OPNAME##_SLOW(gc_obj a, gc_obj b) {                    \
     if (is_compnum(a) || is_compnum(b)) {                                      \
       scm_runtime_error0("Compnums not supported for " #OPNAME);               \
-    } else if (is_flonum(a) || is_flonum(b)) {                                 \
+    }                                                                          \
+    if (is_flonum(a) || is_flonum(b)) {                                        \
       return double_to_gc_slow(                                                \
           FPOP(to_double(SCM_INEXACT(a)), to_double(SCM_INEXACT(b))));         \
-    } else if (is_bignum(a) || is_bignum(b)) {                                 \
-      mpz_t ba, bb, res;                                                       \
+    }                                                                          \
+    if (is_bignum(a) || is_bignum(b)) {                                        \
+      mpz_t ba;                                                                \
+      mpz_t bb;                                                                \
+      mpz_t res;                                                               \
       mpz_init(res);                                                           \
       get_bignum(a, &ba);                                                      \
       get_bignum(b, &bb);                                                      \
       mpz_tdiv_##BIGOP(res, ba, bb);                                           \
       return tag_bignum(res);                                                  \
-    } else if (is_fixnum(a) && is_fixnum(b)) {                                 \
+    }                                                                          \
+    if (is_fixnum(a) && is_fixnum(b)) {                                        \
       return tag_fixnum(OP(to_fixnum(a), to_fixnum(b)));                       \
     }                                                                          \
     scm_runtime_error0("Invalid types in " #OPNAME);                           \
@@ -819,17 +832,15 @@ MATH_OVERFLOW_OP(MUL, mul, MATH_MUL, SHIFT)
   INLINE gc_obj SCM_##OPNAME(gc_obj a, gc_obj b) {                             \
     if (likely((is_fixnum(a) & is_fixnum(b)) == 1)) {                          \
       return tag_fixnum(OP(to_fixnum(a), to_fixnum(b)));                       \
-    } else if (likely((is_flonum_fast(a) & is_flonum_fast(b)) == 1)) {         \
+    }                                                                          \
+    if (likely((is_flonum_fast(a) & is_flonum_fast(b)) == 1)) {                \
       gc_obj res;                                                              \
       if (likely(double_to_gc(FPOP(to_double_fast(a), to_double_fast(b)),      \
                               &res))) {                                        \
         return res;                                                            \
-      } else {                                                                 \
-        [[clang::musttail]] return SCM_##OPNAME##_SLOW(a, b);                  \
       }                                                                        \
-    } else {                                                                   \
-      [[clang::musttail]] return SCM_##OPNAME##_SLOW(a, b);                    \
     }                                                                          \
+    [[clang::musttail]] return SCM_##OPNAME##_SLOW(a, b);                      \
   }
 
 #define MATH_DIV(a, b) ((a) / (b))
@@ -841,18 +852,19 @@ MATH_SIMPLE_OP(MOD, MATH_MOD, MATH_FPMOD, r)
 NOINLINE gc_obj SCM_DIV_SLOW(gc_obj a, gc_obj b) {
   if (is_compnum(a) || is_compnum(b)) {
     scm_runtime_error0("DIV does not support compnum");
-  } else if (is_flonum(a) || is_flonum(b)) {
+  }
+  if (is_flonum(a) || is_flonum(b)) {
     return double_to_gc_slow(to_double(SCM_INEXACT(a)) /
                              to_double(SCM_INEXACT(b)));
-  } else {
-    mpq_t ra, rb, rres;
-    mpq_init(rres);
-    get_ratnum(a, &ra);
-    get_ratnum(b, &rb);
-    mpq_div(rres, ra, rb);
-    return tag_ratnum(rres);
   }
-  scm_runtime_error0("Invalid type in div");
+  mpq_t ra;
+  mpq_t rb;
+  mpq_t rres;
+  mpq_init(rres);
+  get_ratnum(a, &ra);
+  get_ratnum(b, &rb);
+  mpq_div(rres, ra, rb);
+  return tag_ratnum(rres);
 }
 
 INLINE gc_obj SCM_DIV(gc_obj a, gc_obj b) {
@@ -860,12 +872,9 @@ INLINE gc_obj SCM_DIV(gc_obj a, gc_obj b) {
     gc_obj res;
     if (likely(double_to_gc(to_double_fast(a) / to_double_fast(b), &res))) {
       return res;
-    } else {
-      [[clang::musttail]] return SCM_DIV_SLOW(a, b);
     }
-  } else {
-    [[clang::musttail]] return SCM_DIV_SLOW(a, b);
   }
+  [[clang::musttail]] return SCM_DIV_SLOW(a, b);
 }
 
 #define MATH_COMPARE_OP(OPNAME, OP, COMPCMP)                                   \
@@ -877,12 +886,14 @@ INLINE gc_obj SCM_DIV(gc_obj a, gc_obj b) {
     } else if (is_flonum(a) || is_flonum(b)) {                                 \
       res = OP(to_double(SCM_INEXACT(a)), to_double(SCM_INEXACT(b)));          \
     } else if (is_ratnum(a) || is_ratnum(b)) {                                 \
-      mpq_t ba, bb;                                                            \
+      mpq_t ba;                                                                \
+      mpq_t bb;                                                                \
       get_ratnum(a, &ba);                                                      \
       get_ratnum(b, &bb);                                                      \
       res = OP(mpq_cmp(ba, bb), 0);                                            \
     } else if (is_bignum(a) || is_bignum(b)) {                                 \
-      mpz_t ba, bb;                                                            \
+      mpz_t ba;                                                                \
+      mpz_t bb;                                                                \
       get_bignum(a, &ba);                                                      \
       get_bignum(b, &bb);                                                      \
       res = OP(mpz_cmp(ba, bb), 0);                                            \
@@ -893,9 +904,8 @@ INLINE gc_obj SCM_DIV(gc_obj a, gc_obj b) {
     }                                                                          \
     if (res) {                                                                 \
       return TRUE_REP;                                                         \
-    } else {                                                                   \
-      return FALSE_REP;                                                        \
     }                                                                          \
+    return FALSE_REP;                                                          \
   }                                                                            \
                                                                                \
   INLINE gc_obj SCM_##OPNAME(gc_obj a, gc_obj b) {                             \
@@ -1026,7 +1036,7 @@ INLINE gc_obj SCM_GUARD(gc_obj a, int64_t type) {
 }
 
 INLINE gc_obj SCM_MAKE_VECTOR(gc_obj obj) {
-  vector_s *v = gc_alloc(sizeof(vector_s) + to_fixnum(obj) * sizeof(gc_obj));
+  vector_s *v = gc_alloc(sizeof(vector_s) + (to_fixnum(obj) * sizeof(gc_obj)));
   v->len = obj;
   return tag_vector(v);
 }
@@ -1092,7 +1102,7 @@ INLINE gc_obj SCM_VECTOR_SET_FAST(gc_obj vec, gc_obj idx, gc_obj val) {
 
 INLINE gc_obj SCM_CLOSURE(gc_obj p, uint64_t len) {
   //  printf("make closure %li\n", len);
-  closure_s *clo = gc_alloc(sizeof(closure_s) + (len + 1) * sizeof(gc_obj));
+  closure_s *clo = gc_alloc(sizeof(closure_s) + ((len + 1) * sizeof(gc_obj)));
   clo->type = CLOSURE_TAG;
   clo->v[0] = p;
   return tag_closure(clo);
@@ -1143,7 +1153,7 @@ gc_obj ccresthunk(gc_obj unused, gc_obj n) {
   ccsave *c = (ccsave *)to_closure(unused);
   cur_link = c->prev_link;
 
-  int64_t stack_bottom = (int64_t)get_stack_top() - c->sz;
+  int64_t stack_bottom = (int64_t)(get_stack_top() - c->sz);
   void *saved_stack = c->stack;
   size_t saved_sz = c->sz;
   uint64_t tmpstackalign = ((uint64_t)tmpstack + 100) & ~15;
@@ -1286,7 +1296,12 @@ INLINE void SCM_WRITE_SHADOW_STACK(gc_obj pos, gc_obj obj) {
     if (shadow_stack_size == 0) {
       shadow_stack_size = 64;
     }
-    shadow_stack = realloc(shadow_stack, shadow_stack_size * sizeof(gc_obj));
+    auto new_shadow_stack =
+        realloc(shadow_stack, shadow_stack_size * sizeof(gc_obj));
+    if (!new_shadow_stack) {
+      abort();
+    }
+    shadow_stack = new_shadow_stack;
     for (int64_t i = 0; i < shadow_stack_size; i++) {
       gc_add_root((uint64_t *)&shadow_stack[i]);
     }
@@ -1507,8 +1522,8 @@ INLINE gc_obj SCM_STRING_REF_FAST(gc_obj str, gc_obj pos) {
 
 NOINLINE gc_obj SCM_STRING_SET_SLOW(gc_obj str, gc_obj pos, gc_obj scm_ch) {
   auto s = to_string(str);
-  uint64_t i = to_fixnum(pos);
-  uint32_t c = to_char(scm_ch);
+  auto i = to_fixnum(pos);
+  auto c = to_char(scm_ch);
   uint8_t buf[4];
   auto bytecnt = utf8proc_encode_char(c, buf);
   assert(bytecnt != 0);
@@ -1516,7 +1531,7 @@ NOINLINE gc_obj SCM_STRING_SET_SLOW(gc_obj str, gc_obj pos, gc_obj scm_ch) {
   int32_t codepoint;
   uint32_t bytepos = 0;
   ssize_t res;
-  for (uint64_t ch = 0; ch <= i; ch++) {
+  for (int64_t ch = 0; ch <= i; ch++) {
     res = utf8proc_iterate((const unsigned char *)&s->strdata[bytepos],
                            to_fixnum(s->bytes), &codepoint);
     if (res < 0) {
@@ -1566,7 +1581,7 @@ INLINE gc_obj SCM_STRING_SET(gc_obj str, gc_obj pos, gc_obj scm_ch) {
   if (unlikely(s->len.value != s->bytes.value || c >= 128)) {
     [[clang::musttail]] return SCM_STRING_SET_SLOW(str, pos, scm_ch);
   }
-  s->strdata[i] = c;
+  s->strdata[i] = (char)c;
   return UNDEFINED;
 }
 INLINE gc_obj SCM_STRING_SET_FAST(gc_obj str, gc_obj pos, gc_obj scm_ch) {
@@ -1576,7 +1591,7 @@ INLINE gc_obj SCM_STRING_SET_FAST(gc_obj str, gc_obj pos, gc_obj scm_ch) {
   if (unlikely(s->len.value != s->bytes.value || c >= 128)) {
     [[clang::musttail]] return SCM_STRING_SET(str, pos, scm_ch);
   }
-  s->strdata[i] = c;
+  s->strdata[i] = (char)c;
   return UNDEFINED;
 }
 
@@ -1728,7 +1743,7 @@ gc_obj SCM_STRING_CPY(gc_obj tostr, gc_obj tostart, gc_obj fromstr,
   auto to = to_string(tostr);
   auto from = to_string(fromstr);
 
-  auto from_pos = to_fixnum(fromstart);
+  uint64_t from_pos = to_fixnum(fromstart);
   auto len = to_fixnum(fromend) - from_pos;
   // If either string  is non-ascii, run slowpath.
   if (from->bytes.value != from->len.value ||
@@ -1771,7 +1786,7 @@ gc_obj SCM_STRING_CPY(gc_obj tostr, gc_obj tostart, gc_obj fromstr,
     memcpy(new_strdata, to->strdata, bytepos);
     // Copy in new data.
     memcpy(&new_strdata[bytepos], &from->strdata[from_pos], len);
-    auto newend = bytepos + len;
+    uint64_t newend = bytepos + len;
     // Advance past dst
     auto len_in_chars = to_fixnum(fromend) - to_fixnum(fromstart);
     while (pos < (to_fixnum(tostart) + len_in_chars)) {
@@ -1788,7 +1803,7 @@ gc_obj SCM_STRING_CPY(gc_obj tostr, gc_obj tostart, gc_obj fromstr,
            to_fixnum(to->bytes) - bytepos);
     to->strdata = new_strdata;
     gc_log((uint64_t)&to->strdata);
-    to->bytes = tag_fixnum(newend + to_fixnum(to->bytes) - bytepos);
+    to->bytes = tag_fixnum((int64_t)(newend + to_fixnum(to->bytes) - bytepos));
 
     return UNDEFINED;
   }
@@ -1801,9 +1816,6 @@ INLINE gc_obj SCM_AND(gc_obj num, gc_obj mask) {
 }
 
 ////////////// IO
-
-#include <fcntl.h>
-#include <unistd.h>
 
 gc_obj SCM_OPEN_FD(gc_obj filename, gc_obj input) {
 
@@ -1898,7 +1910,7 @@ gc_obj SCM_READ_FD(gc_obj scmfd, gc_obj scmbuf) {
     printf("SCM_READ_FD error: %li\n", res);
     exit(-1);
   }
-  buf->bytes = tag_fixnum(res + remaining);
+  buf->bytes = tag_fixnum((int64_t)(res + remaining));
   auto len = count_utf8((uint8_t *)buf->strdata, to_fixnum(buf->bytes), false);
   buf->len = tag_fixnum(len);
 
@@ -1916,8 +1928,6 @@ gc_obj SCM_WRITE_FD(gc_obj scmfd, gc_obj scmbuf) {
   }
   return UNDEFINED;
 }
-
-#include <errno.h>
 
 gc_obj SCM_CLOSE_FD(gc_obj fd) {
   auto res = close((int)to_fixnum(fd));
@@ -1962,8 +1972,8 @@ gc_obj SCM_BIGNUM_STR(gc_obj b) {
   string_s *str = gc_alloc(sizeof(string_s));
   str->strdata = data;
   mpz_get_str(str->strdata, 10, bignum->x);
-  str->len = tag_fixnum(strlen(str->strdata));
-  str->bytes = tag_fixnum(strlen(str->strdata));
+  str->len = tag_fixnum((int64_t)strlen(str->strdata));
+  str->bytes = tag_fixnum((int64_t)strlen(str->strdata));
   str->type = STRING_TAG;
   return tag_string(str);
 }
@@ -1979,8 +1989,8 @@ gc_obj SCM_RATNUM_STR(gc_obj b) {
   string_s *str = gc_alloc(sizeof(string_s));
   str->strdata = data;
   mpq_get_str(str->strdata, 10, ratnum->x);
-  str->len = tag_fixnum(strlen(str->strdata));
-  str->bytes = tag_fixnum(strlen(str->strdata));
+  str->len = tag_fixnum((int64_t)strlen(str->strdata));
+  str->bytes = tag_fixnum((int64_t)strlen(str->strdata));
   str->type = STRING_TAG;
   return tag_string(str);
 }
@@ -2005,8 +2015,8 @@ gc_obj SCM_FLONUM_STR(gc_obj b) {
     str->strdata[len + 1] = '0';
     str->strdata[len + 2] = '\0';
   }
-  str->len = tag_fixnum(strlen(str->strdata));
-  str->bytes = tag_fixnum(strlen(str->strdata));
+  str->len = tag_fixnum((int64_t)strlen(str->strdata));
+  str->bytes = tag_fixnum((int64_t)strlen(str->strdata));
 
   return tag_string(str);
 }
@@ -2028,7 +2038,7 @@ static char **argv;
 // TODO: check utf8
 static gc_obj from_c_str(char *str) {
   auto len = strlen(str);
-  gc_obj res = SCM_MAKE_STRING(tag_fixnum(len), FALSE_REP);
+  gc_obj res = SCM_MAKE_STRING(tag_fixnum((int64_t)len), FALSE_REP);
 
   memcpy(to_string(res)->strdata, str, len);
   return res;
@@ -2041,7 +2051,7 @@ gc_obj SCM_COMMAND_LINE() {
   }
   return tail;
 }
-gc_obj SCM_EXIT(gc_obj code) { exit(to_fixnum(code)); }
+gc_obj SCM_EXIT(gc_obj code) { exit((int)to_fixnum(code)); }
 
 // TODO: check utf8
 gc_obj SCM_GET_ENV_VARS() {
@@ -2066,12 +2076,11 @@ gc_obj SCM_GET_ENV_VARS() {
   return tail;
 }
 //// time
-#include <time.h>
 
 gc_obj SCM_CURRENT_JIFFY() {
   struct timespec ts;
   clock_gettime(CLOCK_MONOTONIC, &ts);
-  uint64_t us = ts.tv_sec * 1000000 + ts.tv_nsec / 1000;
+  int64_t us = (ts.tv_sec * 1000000) + (ts.tv_nsec / 1000);
   return tag_fixnum(us);
 }
 
@@ -2079,7 +2088,7 @@ gc_obj SCM_CURRENT_SECOND() {
   struct timespec ts;
   clock_gettime(CLOCK_TAI, &ts);
   double offset = 37; // TODO should be based on leap seconds.
-  double f = ts.tv_sec + (double)ts.tv_nsec / 1000000000.0 + offset;
+  double f = (double)ts.tv_sec + ((double)ts.tv_nsec / 1000000000.0) + offset;
   return double_to_gc_slow(f);
 }
 
@@ -2240,8 +2249,6 @@ gc_obj SCM_FOLDCASE(gc_obj ch) {
 }
 
 int SCM_MAIN();
-
-#include <sys/resource.h>
 
 extern uint64_t *complex_constants[];
 extern uint64_t complex_constants_len;
