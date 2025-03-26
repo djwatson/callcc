@@ -1,9 +1,4 @@
-(define next-id
-  (let ((id 0))
-    (lambda ()
-      (let ((res id))
-	(set! id (+ id 1))
-	res))))
+(define next-id (make-counter 0))
 
 (define-record-type fun (%make-fun code name last-label args thunk debug-id debug-loc-id) fun?
 		    (code fun-code fun-code-set!)
@@ -14,11 +9,7 @@
 		    (debug-id fun-debug-id)
 		    (debug-loc-id fun-debug-loc-id))
 
-(define next-debug-id
-  (let ((id 5))
-    (lambda ()
-      (set! id (+ id 1))
-      id)))
+(define next-debug-id (make-counter 6))
 (define debug-strings '())
 
 (define (make-fun name)
@@ -36,12 +27,10 @@
 (define (emit-const c)
   (when (symbol? c)
     (push! symbol-table c))
-  (cond
-   ((hash-table-ref/default const-hash c #f))
-   (else
-    (let ((val (add-const c)))
-      (hash-table-set! const-hash  c val)
-      val))))
+  (or (hash-table-ref/default const-hash c #f)
+   (let ((val (add-const c)))
+     (hash-table-set! const-hash c val)
+     val)))
 
 (define-record-type loop-var (make-loop-var dest phis) loop-var?
 		    (dest loop-var-dest)
@@ -57,76 +46,75 @@
 (define (fun-to-label lam var)
   (if (hash-table-exists? global-fun-labels lam)
       (hash-table-ref/default global-fun-labels lam #f)
-      (begin
-	(if (hash-table-exists? global-fun-names (second lam))
-	    (begin
-	      (hash-table-set! global-fun-labels lam var)
-	      var)
-	    (let ((label (string-append "S_" (second lam))))
-	      (hash-table-set! global-fun-names (second lam) #t)
-	      (hash-table-set! global-fun-labels lam label)
-	      label)))))
-;; (define (fun-to-label lam var)
-;;   var)
-(define (emit-function fun nlambda var env)
-  (define name (second nlambda))
-  (define cases (cddr nlambda))
-  (define last-case (last cases))
-  (define last-case-jmp #f)
-  (fun-name-set! fun (fun-to-label nlambda var))
+      (if (hash-table-exists? global-fun-names (second lam))
+	  (begin
+	    (hash-table-set! global-fun-labels lam var)
+	    var)
+	  (let ((label (string-append "S_" (second lam))))
+	    (hash-table-set! global-fun-names (second lam) #t)
+	    (hash-table-set! global-fun-labels lam label)
+	    label))))
 
-  (when (hash-table-exists? escapes-table var)
-    (fun-thunk-set! fun #t)
-    (fun-args-set! fun default-param-list)
-    (push-instr! fun (format "%argcnt = load i64, ptr @argcnt"))
+(define (emit-function fun nlambda var env)
+  (let* ((name (second nlambda))
+	 (cases (cddr nlambda))
+	 (last-case (last cases))
+	 (last-case-jmp #f))
+    (fun-name-set! fun (fun-to-label nlambda var))
+
+    (when (hash-table-exists? escapes-table var)
+      (fun-thunk-set! fun #t)
+      (fun-args-set! fun default-param-list)
+      (push-instr! fun (format "%argcnt = load i64, ptr @argcnt"))
+      (for (case i) (cases (iota (length cases)))
+	   (let ((id (next-id))
+		 (call-res (next-id))
+		 (true-label (next-id))
+		 (false-label (next-id)))
+	     (if (list? (second case))
+		 (push-instr! fun (format "%v~a = icmp eq i64 %argcnt, ~a" id (length (second case))))
+		 (push-instr! fun (format "%v~a = icmp uge i64 %argcnt, ~a"
+					  id (- (length (to-proper (second case))) 1))))
+	     (push-instr! fun (format "br i1 %v~a, label %l~a, label %l~a" id true-label false-label))
+	     (push-instr! fun (format "l~a:" true-label))
+	     (let ((arglist
+		    (if (list? (second case))
+			default-param-list
+			(let* ((len (length (to-proper (second case))))
+			       (argpos (next-id)))
+			  (push-instr! fun (format "store i64 ~a, ptr @wanted_argcnt" (- len 1)))
+			  (push-instr! fun (format "%v~a = call i64 @consargs_stub(~a), !dbg !~a" argpos
+						   (join ", "
+							 (omap arg default-param-list
+							       (format "i64 ~a" arg)))
+						   (fun-debug-loc-id fun)))
+			  (if (> len max-reg-args)
+			      default-param-list
+			      (append (take default-param-list (- len 1)) (list (format "%v~a" argpos))))))))
+	       (push-instr! fun (format "%v~a = musttail call i64 @\"~a\"(~a), !dbg !~a"
+					call-res (format "~a_case~a" var i)
+					(reg-args-to-call-list arglist)
+					(fun-debug-loc-id fun))))
+	     (push-instr! fun (format "ret i64 %v~a" call-res))
+	     (push-instr! fun (format "l~a:" false-label)))))
+    (push-instr! fun (format "%res = call i64 @SCM_ARGCNT_FAIL(), !dbg !~a" (fun-debug-loc-id fun)))
+    (push-instr! fun (format "ret i64 %res"))
+    
     (for (case i) (cases (iota (length cases)))
-	 (let ((id (next-id))
-	       (call-res (next-id))
-	       (true-label (next-id))
-	       (false-label (next-id)))
-	   (if (list? (second case))
-	       (push-instr! fun (format "%v~a = icmp eq i64 %argcnt, ~a" id (length (second case))))
-	       (push-instr! fun (format "%v~a = icmp uge i64 %argcnt, ~a" id (- (length (to-proper (second case))) 1))))
-	   (push-instr! fun (format "br i1 %v~a, label %l~a, label %l~a" id true-label false-label))
-	   (push-instr! fun (format "l~a:" true-label))
-	   (let ((arglist
-		  (if (list? (second case))
-		      default-param-list
-		      (let* ((len (length (to-proper (second case))))
-			     (argpos (next-id)))
-			(push-instr! fun (format "store i64 ~a, ptr @wanted_argcnt" (- len 1)))
-			(push-instr! fun (format "%v~a = call i64 @consargs_stub(~a), !dbg !~a" argpos
-						 (join ", "
-						       (omap arg default-param-list
-							     (format "i64 ~a" arg)))
-						 (fun-debug-loc-id fun)))
-			(if (> len max-reg-args)
-			    default-param-list
-			    (append (take default-param-list (- len 1)) (list (format "%v~a" argpos))))))))
-	     (push-instr! fun (format "%v~a = musttail call i64 @\"~a\"(~a), !dbg !~a"
-				      call-res (format "~a_case~a" var i)
-				      (reg-args-to-call-list arglist)
-				      (fun-debug-loc-id fun))))
-	   (push-instr! fun (format "ret i64 %v~a" call-res))
-	   (push-instr! fun (format "l~a:" false-label)))))
-  (push-instr! fun (format "%res = call i64 @SCM_ARGCNT_FAIL(), !dbg !~a" (fun-debug-loc-id fun)))
-  (push-instr! fun (format "ret i64 %res"))
-  
-  (for (case i) (cases (iota (length cases)))
-       (define cfun (make-fun 1))
-       (define argcnt (length (to-proper (second case))))
-       (define args (to-proper (second case)))
-       (define arg-ids (omap arg args (format "%v~a" (next-id))))
-       (define v-type (list? (second case)))
-       (define case-label (format "~a_case~a" var i))
-       (fun-args-set! cfun arg-ids)
-       (fun-name-set! cfun case-label)
-       (push! functions cfun)
-       (emit (third case)
-	     (append (map cons (to-proper (second case)) arg-ids)
-		     env)
-	     cfun
-	     #t)))
+	 (define cfun (make-fun 1))
+	 (define argcnt (length (to-proper (second case))))
+	 (define args (to-proper (second case)))
+	 (define arg-ids (omap arg args (format "%v~a" (next-id))))
+	 (define v-type (list? (second case)))
+	 (define case-label (format "~a_case~a" var i))
+	 (fun-args-set! cfun arg-ids)
+	 (fun-name-set! cfun case-label)
+	 (push! functions cfun)
+	 (emit (third case)
+	       (append (map cons (to-proper (second case)) arg-ids)
+		       env)
+	       cfun
+	       #t))))
 
 (define (find-label-for-case nlambda argcnt var)
   (let loop ((cases (cddr nlambda)) (i 0))
@@ -134,7 +122,7 @@
 	(begin
 	  ;; (display (format "Warning: Can't find case for call:~a cnt ~a\n"
 	  ;; 		   var argcnt) (current-error-port))
-	       var)
+	  var)
 	(let* ((case (car cases))
 	       (arglist (second case)))
 	  (if (list? arglist)
@@ -145,8 +133,6 @@
 		  ;; TODO: package up varargs.  For now, return thunk.
 		  var
 		  (loop (cdr cases) (+ i 1))))))))
-
-
 
 ;;;;;;;;;; Arglist management
 
@@ -369,10 +355,6 @@
 	   (pid (next-id))
 	   (resid (next-id)))
        (push-instr! fun (format "%v~a = call i64 @SCM_LOAD_GLOBAL(i64 ~a), !dbg !~a" id sym (fun-debug-loc-id fun)))
-       ;; ;; Offset in to the global.
-       ;; (push-instr! fun (format "%v~a = add i64 ~a, ~a" id sym (+ (- ptr-tag) 16)))
-       ;; (push-instr! fun (format "%v~a = inttoptr i64 %v~a to i64*" pid id))
-       ;; (push-instr! fun (format "%v~a = load i64, i64* %v~a" resid pid))
        (finish (format "%v~a" id))))
     (,const
      (guard (const-label? const))
@@ -453,13 +435,14 @@
    ;; TODO use a record
    ((and (pair? c) (eq? '$const-closure (car c)))
     (let ((id (next-id)))
-      (push! consts (format "@clo~a = private unnamed_addr constant [2 x i64] [i64 ~a, i64 ptrtoint (ptr @\"~a\" to i64)], align 8" id closure-tag (second c)))
+      (push! consts (format "@clo~a = private unnamed_addr constant [2 x i64] [i64 ~a, i64 ptrtoint (ptr @\"~a\" to i64)], align 8"
+			    id closure-tag (second c)))
       (format "add (i64 ~a, i64 ptrtoint ([2 x i64]* @clo~a to i64))"
 	      ptr-tag id)))
    ((vector? c)
     ;; Prepend the length & nullptr for slab ptr
     (let* ((vals (cons (* 8 (vector-length c))
-			 (omap val (vector->list c) (emit-const val))))
+		       (omap val (vector->list c) (emit-const val))))
 	   (val-str (join ", " (omap val vals (format "i64 ~a" val))))
 	   (id (next-id)))
       (push! consts (format "@vec~a = private unnamed_addr constant [~a x i64] [~a], align 8\n"
@@ -656,10 +639,7 @@ attributes #0 = { returns_twice}
 					)))
 	 (main-fun (make-fun "SCM_MAIN")))
     (when verbose
-      (display (format "Compiling ~a\n" file) (current-error-port))
-      ;;(pretty-print lowered (current-error-port))
-      )
-    ;;(exit)
+      (display (format "Compiling ~a\n" file) (current-error-port)))
     (emit lowered '() main-fun #t)
     (emit-header)
 
@@ -714,6 +694,7 @@ attributes #0 = { returns_twice}
        (display line) (newline)))
 
 (define (get-link-command output output-file opts)
-  (let ((link (format "clang ~a -g -o ~a ~a ~alibcallcc.a -lm -lgmp -lutf8proc" opts output-file output (get-compile-path))))
+  (let ((link (format "clang ~a -g -o ~a ~a ~alibcallcc.a -lm -lgmp -lutf8proc"
+		      opts output-file output (get-compile-path))))
     (display (format "Running link: ~a\n" link) (current-error-port))
     link))

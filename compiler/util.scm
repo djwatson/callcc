@@ -107,3 +107,10 @@
 		(if (file-exists? (string-append (car paths) "/" exe))
 		    (car paths)
 		    (loop (cdr paths)))))))))
+
+(define (make-counter init)
+  (let ((counter init))
+    (lambda ()
+      (let ((res counter))
+	(set! counter (+ 1 counter))
+	res))))
