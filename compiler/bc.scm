@@ -634,7 +634,7 @@ attributes #0 = { returns_twice}
 	 (unused (set! library-search-paths (cons (string-append path "compiler/headers") library-search-paths)))
 	 (unused (set! library-search-paths (cons (string-append path "lib") library-search-paths)))
 	 (unused (set! library-search-paths (cons (string-append path "compiler") library-search-paths)))
-	 (runtime-input (with-input-from-file (string-append path "lib/runtime2.scm") read-file))
+	 (runtime-input (with-input-from-file (string-append path "lib/runtime.scm") read-file))
 	 (eval-input (with-input-from-file (string-append path "lib/eval.scm") read-file))
 
 	 (pre-input (with-input-from-file file read-file))

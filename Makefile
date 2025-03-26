@@ -4,7 +4,7 @@ CFLAGS = -O3 -flto=full -DNDEBUG -g  -std=gnu23 -Wall  -march=native -mtune=nati
 LIBS = -lm -lgmp -lutf8proc
 SRCS = c/alloc_table.c c/gc.c c/runtime.c c/util/list.c c/util/bitset.c c/callcc.S
 OBJECTS = $(patsubst %, %.o, $(basename $(SRCS)))
-SCM_LIB_SRCS = lib/runtime2.scm lib/eval.scm lib/read.scm lib/equal.scm lib/hashtable.scm lib/str2num.scm  
+SCM_LIB_SRCS = lib/runtime.scm lib/eval.scm lib/read.scm lib/equal.scm lib/hashtable.scm lib/str2num.scm  
 SCM_COMPILER_SRCS = compiler/bc.scm compiler/expand.scm compiler/fix-letrec.scm compiler/library-manager.scm compiler/match.scm compiler/memory_layout.scm compiler/passes.scm compiler/qq.scm compiler/sua.scm compiler/util.scm compiler/gen-libraries.scm compiler/callcc.scm
 SCM_SRCS = ${SCM_LIB_SRCS} ${SCM_COMPILER_SRCS}
 SRFI_SRCS = lib/srfi2/srfi/*.scm
