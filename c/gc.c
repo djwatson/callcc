@@ -130,22 +130,26 @@ static uintptr_t memstart;
 static uintptr_t memend;
 
 void gc_init(void *stacktop_in) {
+  uint64_t gc_virtual_space = PAGE_SIZE * PAGE_SIZE * 120;
+  auto gc_space_env = getenv("GC_SPACE");
+  if (gc_space_env) {
+    gc_virtual_space = atoll(gc_space_env);
+  }
   memstart =
-      (intptr_t)mmap(nullptr, PAGE_SIZE * PAGE_SIZE * 120,
+      (intptr_t)mmap(nullptr, gc_virtual_space,
                      PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON, -1, 0);
   if ((intptr_t)memstart == -1) {
+    printf("Can't alloc virtual space: %li\n", gc_virtual_space);
     abort();
   }
-  memend = memstart + PAGE_SIZE * PAGE_SIZE * 120;
+  memend = memstart + gc_virtual_space;
   alloc_table_init(&atable, memstart, memend);
   stacktop = stacktop_in;
 
   // Set defaults so we don't have to check for wrapping in
   // the fastpath.
   for (uint64_t i = 0; i < size_classes; i++) {
-    freelist[i].start_ptr = default_slab_size;
-    freelist[i].end_ptr = default_slab_size;
-    freelist[i].slab = nullptr;
+    freelist[i] = (freelist_s){default_slab_size, default_slab_size, nullptr};
     kv_init(partials[i]);
   }
   kv_init(roots);
@@ -226,7 +230,7 @@ static void merge_and_free_slab(slab_info *slab) {
 
 static uint64_t collect_big = 0;
 static bool next_force_full = false;
-__attribute__((noinline, preserve_none)) static void rcimmix_collect() {
+__attribute__((noinline, preserve_none)) static void gc_collect() {
   /* struct timespec start; */
   /* struct timespec end; */
   /* clock_gettime(CLOCK_MONOTONIC, &start); */
@@ -409,12 +413,10 @@ static slab_info *alloc_slab(uint64_t sz_class) {
   free->start = (uint8_t *)memstart;
   memstart += sz;
   if (memstart >= memend) {
-    printf("Out of memory\n");
+    printf("Out of memory.  Set virtual space explicitly with GC_SPACE env var\n");
     abort();
   }
-  if ((uint64_t)free->start & (default_slab_size - 1)) {
-    abort();
-  }
+  assert(0 == ((uint64_t)free->start & (default_slab_size - 1)));
 
   memset(free->start, 0, sz);
   free->end = free->start + sz;
@@ -425,11 +427,11 @@ static slab_info *alloc_slab(uint64_t sz_class) {
 }
 
 NOINLINE __attribute__((preserve_most)) static void *
-rcimmix_alloc_slow(uint64_t sz) {
+gc_alloc_slow(uint64_t sz) {
   if (collect_cnt >= next_collect) {
     collect_cnt = 0;
-    rcimmix_collect();
-    return rcimmix_alloc(sz);
+    gc_collect();
+    return gc_alloc(sz);
   }
   assert((sz & 0x7) == 0);
 
@@ -452,21 +454,21 @@ rcimmix_alloc_slow(uint64_t sz) {
     freelist[sz_class].slab = slab;
     collect_cnt += freelist[sz_class].end_ptr - freelist[sz_class].start_ptr;
   }
-  return rcimmix_alloc(sz);
+  return gc_alloc(sz);
 }
 
-void *rcimmix_alloc(uint64_t sz) {
+void *gc_alloc(uint64_t sz) {
   assert((sz & 0x7) == 0);
   uint64_t sz_class = sz / 8;
   if (unlikely(sz_class >= size_classes)) {
-    return rcimmix_alloc_slow(sz);
+    return gc_alloc_slow(sz);
   }
   auto fl = &freelist[sz_class];
 
   auto s = fl->start_ptr;
   auto start = fl->start_ptr + (sz_class * 8);
   if (unlikely(start > fl->end_ptr)) {
-    return rcimmix_alloc_slow(sz);
+    return gc_alloc_slow(sz);
   }
 
   fl->start_ptr = start;

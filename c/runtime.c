@@ -314,7 +314,7 @@ static gc_obj double_to_gc_slow(double d) {
   if (has_tag_5_or_4_or_1(di)) {
     return (gc_obj){.value = di};
   }
-  flonum_s *f = rcimmix_alloc(sizeof(flonum_s));
+  flonum_s *f = gc_alloc(sizeof(flonum_s));
   f->type = FLONUM_TAG;
   f->x = d;
   return tag_ptr(f);
@@ -574,7 +574,7 @@ static gc_obj tag_bignum(mpz_t a) {
       return tag_fixnum(sn);
     }
   }
-  bignum_s *res = rcimmix_alloc(sizeof(bignum_s));
+  bignum_s *res = gc_alloc(sizeof(bignum_s));
   res->type = BIGNUM_TAG;
   mpz_init_set(res->x, a);
   return tag_ptr(res);
@@ -592,7 +592,7 @@ static gc_obj tag_ratnum(mpq_t a) {
     mpq_get_num(num, a);
     return tag_bignum(num);
   }
-  ratnum_s *res = rcimmix_alloc(sizeof(ratnum_s));
+  ratnum_s *res = gc_alloc(sizeof(ratnum_s));
   res->type = RATNUM_TAG;
   mpq_init(res->x);
   mpq_set(res->x, a);
@@ -600,7 +600,7 @@ static gc_obj tag_ratnum(mpq_t a) {
 }
 
 gc_obj SCM_MAKE_RECTANGULAR(gc_obj real, gc_obj imag) {
-  compnum_s *r = rcimmix_alloc(sizeof(compnum_s));
+  compnum_s *r = gc_alloc(sizeof(compnum_s));
   r->type = COMPNUM_TAG;
   r->real = real;
   r->imag = imag;
@@ -998,7 +998,7 @@ INLINE gc_obj SCM_SETCDR(gc_obj obj, gc_obj val) {
   return UNDEFINED;
 }
 INLINE gc_obj SCM_CONS(gc_obj a, gc_obj b) {
-  cons_s *c = rcimmix_alloc(sizeof(cons_s));
+  cons_s *c = gc_alloc(sizeof(cons_s));
   c->a = a;
   c->b = b;
   return tag_cons(c);
@@ -1027,7 +1027,7 @@ INLINE gc_obj SCM_GUARD(gc_obj a, int64_t type) {
 
 INLINE gc_obj SCM_MAKE_VECTOR(gc_obj obj) {
   vector_s *v =
-      rcimmix_alloc(sizeof(vector_s) + to_fixnum(obj) * sizeof(gc_obj));
+      gc_alloc(sizeof(vector_s) + to_fixnum(obj) * sizeof(gc_obj));
   v->len = obj;
   return tag_vector(v);
 }
@@ -1094,7 +1094,7 @@ INLINE gc_obj SCM_VECTOR_SET_FAST(gc_obj vec, gc_obj idx, gc_obj val) {
 INLINE gc_obj SCM_CLOSURE(gc_obj p, uint64_t len) {
   //  printf("make closure %li\n", len);
   closure_s *clo =
-      rcimmix_alloc(sizeof(closure_s) + (len + 1) * sizeof(gc_obj));
+      gc_alloc(sizeof(closure_s) + (len + 1) * sizeof(gc_obj));
   clo->type = CLOSURE_TAG;
   clo->v[0] = p;
   return tag_closure(clo);
@@ -1139,7 +1139,7 @@ void *get_stack_top() {
   return (void *)((uintptr_t)gc_get_stack_top() & ~0x7);
 }
 
-ccsave *cur_link = NULL;
+ccsave *cur_link = nullptr;
 static uint8_t tmpstack[100];
 gc_obj ccresthunk(gc_obj unused, gc_obj n) {
   ccsave *c = (ccsave *)to_closure(unused);
@@ -1216,7 +1216,7 @@ SCM_CALLCC(gc_obj cont) {
   void *stacktop = get_stack_top();
 
   size_t stack_sz = stacktop - stack_bottom;
-  ccsave *stack = rcimmix_alloc(sizeof(ccsave) + stack_sz);
+  ccsave *stack = gc_alloc(sizeof(ccsave) + stack_sz);
   stack->sz = stack_sz;
   stack->type = CLOSURE_TAG;
   stack->v[0] = (gc_obj){.value = (int64_t)ccresthunk};
@@ -1421,10 +1421,10 @@ gc_obj SCM_MAKE_STRING(gc_obj len, gc_obj fill) {
   auto bytecnt = utf8proc_encode_char(to_char(fill), buf);
   auto totallen = strlen * bytecnt;
   // Note: Allocing data here first, so that modifications to
-  // str don't require gc_log (since the second rcimmix_alloc
+  // str don't require gc_log (since the second gc_alloc
   // won't promote str from young to old gen).
-  auto data = rcimmix_alloc(totallen);
-  string_s *str = rcimmix_alloc(sizeof(string_s));
+  auto data = gc_alloc(totallen);
+  string_s *str = gc_alloc(sizeof(string_s));
   str->strdata = data;
   str->type = STRING_TAG;
   str->len = len;
@@ -1533,7 +1533,7 @@ NOINLINE gc_obj SCM_STRING_SET_SLOW(gc_obj str, gc_obj pos, gc_obj scm_ch) {
     auto old_data = s->strdata;
     auto new_bytes = to_fixnum(s->bytes) + bytecnt - res;
     auto new_bytes_aligned = (new_bytes + 7) & ~7;
-    s->strdata = rcimmix_alloc(new_bytes_aligned);
+    s->strdata = gc_alloc(new_bytes_aligned);
     gc_log((uint64_t)&s->strdata);
     memcpy(s->strdata, old_data, bytepos);
     memcpy(&s->strdata[bytepos], buf, bytecnt);
@@ -1583,7 +1583,7 @@ INLINE gc_obj SCM_STRING_SET_FAST(gc_obj str, gc_obj pos, gc_obj scm_ch) {
 }
 
 INLINE gc_obj SCM_MAKE_SYMBOL(gc_obj str) {
-  symbol *sym = rcimmix_alloc(sizeof(symbol));
+  symbol *sym = gc_alloc(sizeof(symbol));
   sym->type = SYMBOL_TAG;
   sym->name = str;
   sym->val = UNDEFINED;
@@ -1593,7 +1593,7 @@ INLINE gc_obj SCM_MAKE_SYMBOL(gc_obj str) {
 ////// records
 INLINE gc_obj SCM_MAKE_RECORD(gc_obj sz) {
   record_s *r =
-      rcimmix_alloc(sizeof(record_s) + (to_fixnum(sz) * sizeof(gc_obj)));
+      gc_alloc(sizeof(record_s) + (to_fixnum(sz) * sizeof(gc_obj)));
   r->type = RECORD_TAG;
 
   return tag_ptr(r);
@@ -1757,7 +1757,7 @@ gc_obj SCM_STRING_CPY(gc_obj tostr, gc_obj tostart, gc_obj fromstr,
     // Conservatively allocate a large new string
     auto new_bytes = to_fixnum(to->bytes) + len;
     auto new_bytes_aligned = (new_bytes + 7) & ~7;
-    auto new_strdata = rcimmix_alloc(new_bytes_aligned);
+    auto new_strdata = gc_alloc(new_bytes_aligned);
     // Now iterate dst string, copying to new.
     pos = 0;
     bytepos = 0;
@@ -1961,8 +1961,8 @@ gc_obj SCM_BIGNUM_STR(gc_obj b) {
   auto len = mpz_sizeinbase(bignum->x, 10) + 2;
   // Align.
   len = (len + 7) & ~7;
-  auto data = rcimmix_alloc(len);
-  string_s *str = rcimmix_alloc(sizeof(string_s));
+  auto data = gc_alloc(len);
+  string_s *str = gc_alloc(sizeof(string_s));
   str->strdata = data;
   mpz_get_str(str->strdata, 10, bignum->x);
   str->len = tag_fixnum(strlen(str->strdata));
@@ -1978,8 +1978,8 @@ gc_obj SCM_RATNUM_STR(gc_obj b) {
              mpz_sizeinbase(mpq_denref(ratnum->x), 10) + 3;
   // Align.
   len = (len + 7) & ~7;
-  auto data = rcimmix_alloc(len);
-  string_s *str = rcimmix_alloc(sizeof(string_s));
+  auto data = gc_alloc(len);
+  string_s *str = gc_alloc(sizeof(string_s));
   str->strdata = data;
   mpq_get_str(str->strdata, 10, ratnum->x);
   str->len = tag_fixnum(strlen(str->strdata));
@@ -1996,8 +1996,8 @@ gc_obj SCM_BIGNUM_SQRT(gc_obj b) {
 }
 
 gc_obj SCM_FLONUM_STR(gc_obj b) {
-  auto data = rcimmix_alloc(40);
-  string_s *str = rcimmix_alloc(sizeof(string_s));
+  auto data = gc_alloc(40);
+  string_s *str = gc_alloc(sizeof(string_s));
   str->strdata = data;
   str->type = STRING_TAG;
   double d = to_double(b);
@@ -2091,7 +2091,7 @@ gc_obj SCM_SYSTEM(gc_obj strn) {
   auto str = to_string(strn);
   auto len = to_fixnum(str->len);
   auto align_len = (len + 1 + 7) & ~7;
-  char *tmp = rcimmix_alloc(align_len);
+  char *tmp = gc_alloc(align_len);
   tmp[len] = '\0';
   strncpy(tmp, str->strdata, len);
   int res = system(tmp);
@@ -2104,7 +2104,7 @@ gc_obj SCM_STRING_UTF8(gc_obj str) {
   }
   auto s = to_string(str);
   auto bytes_aligned = (to_fixnum(s->bytes) + 7) & ~7;
-  bytevector_s *utf8 = rcimmix_alloc(sizeof(bytevector_s) + bytes_aligned);
+  bytevector_s *utf8 = gc_alloc(sizeof(bytevector_s) + bytes_aligned);
   utf8->type = BYTEVECTOR_TAG;
   utf8->len = s->bytes;
   memcpy(utf8->v, s->strdata, to_fixnum(s->bytes));
@@ -2117,8 +2117,8 @@ gc_obj SCM_UTF8_STRING(gc_obj scm_bv) {
   }
   auto bv = to_bytevector(scm_bv);
   auto bytes_aligned = (to_fixnum(bv->len) + 7) & ~7;
-  auto data = rcimmix_alloc(bytes_aligned);
-  string_s *str = rcimmix_alloc(sizeof(string_s));
+  auto data = gc_alloc(bytes_aligned);
+  string_s *str = gc_alloc(sizeof(string_s));
   str->type = STRING_TAG;
   str->bytes = bv->len;
   str->strdata = data;
@@ -2173,7 +2173,7 @@ gc_obj SCM_BYTEVECTOR_LENGTH(gc_obj scm_bv) {
 gc_obj SCM_MAKE_BYTEVECTOR(gc_obj scm_len, gc_obj init) {
   auto len = to_fixnum(scm_len);
   auto len_aligned = (len + 7) & ~7;
-  bytevector_s *bv = rcimmix_alloc(sizeof(bytevector_s) + len_aligned);
+  bytevector_s *bv = gc_alloc(sizeof(bytevector_s) + len_aligned);
   bv->type = BYTEVECTOR_TAG;
   bv->len = scm_len;
   memset(bv->v, (uint8_t)to_fixnum(init), len);
@@ -2250,7 +2250,7 @@ extern uint64_t *complex_constants[];
 extern uint64_t complex_constants_len;
 
 static void *gmp_alloc_align(size_t sz) {
-  return rcimmix_alloc(align(sz, sizeof(void *)));
+  return gc_alloc(align(sz, sizeof(void *)));
 }
 static void *gmp_realloc_align(void *p, size_t old_sz, size_t new_sz) {
   auto res = gmp_alloc_align(new_sz);
@@ -2291,7 +2291,7 @@ int main(int argc_in, char *argv_in[]) {
   gc_add_root((uint64_t *)&cur_link);
   // static complex constants
   for (uint64_t i = 0; i < complex_constants_len; i++) {
-    gc_add_root((uint64_t *)complex_constants[i]);
+    gc_add_root(complex_constants[i]);
   }
 
   // Set up memory functions for gmp

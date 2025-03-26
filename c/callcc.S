@@ -2,7 +2,7 @@
 
 	.globl cur_link
 	.globl ccresthunk
-	.globl rcimmix_alloc
+	.globl gc_alloc
 	.globl need_more_frames
 	.globl argcnt
 	.globl ccresthunk_oneshot
@@ -40,7 +40,7 @@ SCM_CALLCC_ONESHOT:
 	mov r13, rbp
 	mov rdi, 32// size of ccsave_oneshot 4*8 = 32
 	push rbp // align stack
-	call rcimmix_alloc
+	call gc_alloc
 	pop rbp
 	mov QWORD PTR [rax], 0x12 // CLOSURE_TAG
 	lea rdi, [rip + ccresthunk_oneshot]
@@ -65,7 +65,7 @@ SCM_CALLCC_ONESHOT:
 	mov X21, FP
 	mov x0, 32 // Make a call, allocate 32-byte closure.
 	stp x29, x30, [sp, -16]!
-	bl rcimmix_alloc
+	bl gc_alloc
 	ldp x29, x30, [sp], 16
 	mov x1, #0x12 // setup closure tag, pointer, SP,FP saves.
 	str x1, [x0]
