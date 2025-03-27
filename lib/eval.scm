@@ -54,15 +54,6 @@
 		       (scheme r5rs)
 		       (scheme time))  env))
       env)))
-(define (get-compile-path)
-  (let ((slash (memq #\/ (reverse (string->list (car (command-line)))))))
-    (if slash (list->string (reverse slash))
-	"./")))
-(define path (get-compile-path))
-(set! library-search-paths (cons (string-append path "lib/srfi2") library-search-paths))
-(set! library-search-paths (cons (string-append path "compiler/headers") library-search-paths))
-(set! library-search-paths (cons (string-append path "lib") library-search-paths))
-(set! library-search-paths (cons (string-append path "compiler") library-search-paths))
 
 ;; A simple ast-walking interpreter.  It is very slow.
 ;; It directly parses what comes out of the expander.
@@ -109,10 +100,11 @@
     ((letrec* ((,vars ,inits) ___) ,body)
      (let* ((values (map (lambda (var) (cons var #f)) vars))
 	    (new-env (append values env)))
-       (let loop ((vars vars) (inits inits) (values values))
-	 (if (pair? vars)
-	     (begin (set-cdr! (car values) (base-eval (car inits) new-env))
-		    (loop (cdr vars) (cdr inits) (cdr values)))))
+       (do ((vars vars (cdr vars))
+	    (inits inits (cdr inits))
+	    (values values (cdr values)))
+	   ((not (pair? vars)))
+	 (set-cdr! (car values) (base-eval (car inits) new-env)))
        (base-eval body new-env)))
     ((begin ,exprs ___ ,expr)
      (for expr exprs
@@ -155,7 +147,7 @@
 	  (loop (cdr exprs) (base-eval (car exprs) '()))))))
       
 (define (load file)
-  (define input (with-input-from-file file (lambda () (read-file))))
+  (define input (with-input-from-file file read-file))
   (evals input (interaction-environment) #t))
 
 (define (scheme-report-environment version)

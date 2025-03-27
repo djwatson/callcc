@@ -39,30 +39,29 @@
 	   (values (reverse tmps) ...))))))
 
 (define (ilength lst)
-  (define (ilength lst cnt)
-    (if (pair? lst)
-	(ilength (cdr lst) (+ cnt 1))
-	cnt))
-  (ilength lst 0))
+  (do ((lst lst (cdr lst))
+       (cnt 0 (+ cnt 1)))
+      ((not (pair? lst)) cnt)))
+
 (define-syntax match/ellipsis
   ;; Slightly complicated here because ,var looks like a list,
   ;; even though we want it as the atomic last pattern.
   (syntax-rules (___)
-		((_ pat ,tail exp sk fk (ids cat-ids id-tmp) ...)
-		 (match/ellipsis "run" pat () ,tail exp sk fk (ids cat-ids id-tmp) ...))
-		((_ pat (tail ... . ,fin) exp sk fk (ids cat-ids id-tmp) ...)
-		 (match/ellipsis "run" pat (tail ...) (tail ... . ,fin) exp sk fk (ids cat-ids id-tmp) ...))
-		((_ pat tail exp sk fk (ids cat-ids id-tmp) ...)
-		 (match/ellipsis "run" pat tail tail exp sk fk (ids cat-ids id-tmp) ...))
-		((_ "run" pat tail tail-pattern exp sk fk (ids cat-ids id-tmp) ...)
-		 (let* ((tail-len (ilength 'tail))
-			(dot-len (- (ilength exp) tail-len)))
-		   (if (negative? dot-len) fk
-		       (let loop ((len dot-len) (exp exp) (id-tmp '()) ...)
-			 (if (= 0 len)
-			     (let ((ids (lambda () (multi-map cat-ids (lambda (x) (x)) (reverse id-tmp)))) ...)
-			       (match/clause tail-pattern exp sk fk))
-			     (match/clause pat (car exp) (loop (- len 1) (cdr exp) (cons ids id-tmp) ...) fk))))))))
+    ((_ pat ,tail exp sk fk (ids cat-ids id-tmp) ...)
+     (match/ellipsis "run" pat () ,tail exp sk fk (ids cat-ids id-tmp) ...))
+    ((_ pat (tail ... . ,fin) exp sk fk (ids cat-ids id-tmp) ...)
+     (match/ellipsis "run" pat (tail ...) (tail ... . ,fin) exp sk fk (ids cat-ids id-tmp) ...))
+    ((_ pat tail exp sk fk (ids cat-ids id-tmp) ...)
+     (match/ellipsis "run" pat tail tail exp sk fk (ids cat-ids id-tmp) ...))
+    ((_ "run" pat tail tail-pattern exp sk fk (ids cat-ids id-tmp) ...)
+     (let* ((tail-len (ilength 'tail))
+	    (dot-len (- (ilength exp) tail-len)))
+       (if (negative? dot-len) fk
+	   (let loop ((len dot-len) (exp exp) (id-tmp '()) ...)
+	     (if (= 0 len)
+		 (let ((ids (lambda () (multi-map cat-ids (lambda (x) (x)) (reverse id-tmp)))) ...)
+		   (match/clause tail-pattern exp sk fk))
+		 (match/clause pat (car exp) (loop (- len 1) (cdr exp) (cons ids id-tmp) ...) fk))))))))
 
 (define-syntax match/clause
   (syntax-rules (quote quasiquote unquote and ___)
@@ -102,7 +101,7 @@
   (syntax-rules ()
     ((_ sk (ids cat-ids id-tmp) ...)
      (let-values ((cat-ids (ids)) ...)
-	sk))))
+       sk))))
 
 (define-syntax match/evaluated
   (syntax-rules (guard)
@@ -121,7 +120,6 @@
 	(failure))))
     ((_ exp (pattern actions ...) . rest)
      (let ((failure (lambda () (match/evaluated exp . rest))))
-       ;;(display "CHecking patterm:") (display 'pattern) (newline)
        (match/clause
 	pattern
 	exp
@@ -134,34 +132,3 @@
      (let ((evaluated exp))
        (match/evaluated evaluated (pattern actions ... value) ...)))))
 
-;;;;;;;;;;;;; test
-
-;; (when #f
-;;   (let ()
-;;     (define (runner x)
-;;       (pass x
-;; 	    ((let ((,var ,(runner bind) ) ___) ,form . ,forms)
-;; 	     (let ((bind (map (lambda (e) (if (number? e) (+ e 1) e)) bind)))
-;; 	       `(letter ((,var ,bind ) ___) ,form . ,forms))
-;; 	     )))
-
-
-;;     (define (if-pass x)
-;;       (pass x
-;; 	    ((if ,(if-pass a) ,(if-pass b))
-;; 	     `(if ,a ,b #f))
-;; 	    ((if ,(if-pass a) ,(if-pass b) ,(if-pass c))
-;; 	     `(if ,a ,b ,c))
-;; 	    ((if ,a ___) (error "No match:" x))))
-
-;;     (define (lpass x)
-;;       (pass x
-;; 	    ((lambda (,args ___  . ,rest) . ,body)
-;; 	     `(1 "args" ,args  , "rest" ,rest))
-;; 	    ((lambda ,arg . ,body)
-;; 	     `(2 ,arg . ,body ))
-;; 	    ))
-;;     (pretty-print (if-pass '(if (if 1 2 3) (if 1 2) 3)))
-;;     (pretty-print (runner '(let ((x 10) (y (let ((z 20)) 'ok))) body stuff)))
-;;     (pretty-print (lpass '(lambda (a b c . d) 10)))
-;; ))

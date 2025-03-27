@@ -592,14 +592,16 @@ attributes #0 = { returns_twice}
   (let ((path (get-exe-path)))
     (string-append (if path path ".") "/../lib/callcc/")))
 
+(let ((path (get-compile-path)))
+  (set! library-search-paths (cons (string-append path "lib/srfi2") library-search-paths))
+  (set! library-search-paths (cons (string-append path "compiler/headers") library-search-paths))
+  (set! library-search-paths (cons (string-append path "lib") library-search-paths))
+  (set! library-search-paths (cons (string-append path "compiler") library-search-paths)))
+
 (define (compile file verbose include-eval)
   (set! functions '())
   (let* ((path (get-compile-path))
 	 (libman (make-libman path)))
-    (set! library-search-paths (cons (string-append path "lib/srfi2") library-search-paths))
-    (set! library-search-paths (cons (string-append path "compiler/headers") library-search-paths))
-    (set! library-search-paths (cons (string-append path "lib") library-search-paths))
-    (set! library-search-paths (cons (string-append path "compiler") library-search-paths))
     (expander-init libman)
     
     (let* ((runtime-input (with-input-from-file (string-append path "lib/runtime.scm") read-file))

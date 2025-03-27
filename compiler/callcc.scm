@@ -33,22 +33,23 @@
   (exit))
 
 (define (print-usage-and-exit . unused)
-  (display "Usage: callcc [options]\n")
-  (newline)
-  (display "Options:\n")
-  (display "  -v, --version              print the version and exit\n")
-  (display "  -I <directory>             prepend directory to list of library paths to search\n")
-  (display "  -A <directory>             append directory to list of library paths to search\n")
-  (display "  -D <identifier>            declare identifier as supported feature in (features) and cond-expand\n")
-  (display "  --cc <opts>                CC optimizations (consider -O3 -flto, or -g)\n")
-  (display "  -h, --help                 print this help and exit\n")
-  (display "  --exe <filename>           compile file to an executable\n")
-  (display "  -s, --script <filename>    run the script as if by (begin (load \"filename\")(exit)) \n")
-  (display "  -fno-eval                  don't include eval support in generated executable\n")
-  (display "  -o, <filename>             in conjunction with --exe, set the output filename\n")
-  (display "  --                         pass through remaining args\n")
-  (newline)
-  (display "If neither --exe nor -s is specified, enters a read/eval/print loop (REPL)\n")
+  (display "Usage: callcc [options]
+
+Options:
+  -v, --version              print the version and exit
+  -I <directory>             prepend directory to list of library paths to search
+  -A <directory>             append directory to list of library paths to search
+  -D <identifier>            declare identifier as supported feature in (features) and cond-expand
+  --cc <opts>                CC optimizations (consider -O3 -flto, or -g)
+  -h, --help                 print this help and exit
+  --exe <filename>           compile file to an executable
+  -s, --script <filename>    run the script as if by (begin (load \"filename\")(exit)) 
+  -fno-eval                  don't include eval support in generated executable
+  -o, <filename>             in conjunction with --exe, set the output filename
+  --                         pass through remaining args
+
+If neither --exe nor -s is specified, enters a read/eval/print loop (REPL)
+")
   (exit))
 
 (define (prepend-directory o n a s)
@@ -126,8 +127,7 @@
   (when (file-exists? output-file)
     (delete-file output-file))
   (compile-file))
- (script-file
-  (load script-file))
+ (script-file => load)
  (else
   (print-version)
   (repl)))
