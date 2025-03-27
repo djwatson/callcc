@@ -70,13 +70,7 @@
         (- qq 1)
         qq)))
 (define (floor-remainder a b)
-  (let ((div (floor (quotient a b))))
-    (- a (* b div))))
-(define (floor x)
-  (cond
-   ((flonum? x) (sys:FOREIGN_CALL "SCM_FLOOR" x))
-   ((ratnum? x) (floor-quotient (numerator x) (denominator x)))
-   (else x)))
+  (- a (* b (floor (quotient a b)))))
 (define (floor x)
   (cond
    ((flonum? x) (sys:FOREIGN_CALL "SCM_FLOOR" x))
@@ -219,9 +213,8 @@
 (define (comparer f args)
   (let loop ((args args))
     (if (and (pair? args) (pair? (cdr args)))
-	(if (f (car args) (cadr args))
-	    (loop (cdr args))
-	    #f)
+	(and (f (car args) (cadr args))
+	    (loop (cdr args)))
 	#t)))
 
 (define <
@@ -284,10 +277,10 @@
 	((4) (fun (car args) (cadr args) (caddr args) (cadddr args)))
 	(else
 	 (let ((stack-args (cddr (cdddr args))))
-	   (let loop ((stack-args stack-args) (i 0))
-	     (when (pair? stack-args)
-	       (sys:FOREIGN_CALL "SCM_WRITE_SHADOW_STACK" i (car stack-args))
-	       (loop (cdr stack-args) (+ i 1))))
+	   (do ((stack-args stack-args (cdr stack-args))
+		(i 0 (+ i 1)))
+               ((not (pair? stack-args)))
+	     (sys:FOREIGN_CALL "SCM_WRITE_SHADOW_STACK" i (car stack-args)))
 	   (sys:APPLY (+ 1 len) fun (car args) (cadr args) (caddr args) (cadddr args) (car (cddddr args))))))))
    ((fun . lst)
     (let* ((rlst (reverse lst))
@@ -314,9 +307,9 @@
 	  (if (= exp 0)
 	      ret
 	      (loop (if (odd? exp) (* ret num) ret) (* num num) (quotient exp 2))))
-	(let loop ((n start) (cnt exp))
-	  (if (= cnt 0) n
-	      (loop (/ n num) (+ cnt 1)))))))
+	(do ((n start (/ n num))
+             (cnt exp (+ cnt 1)))
+            ((= cnt 0) n)))))
 
 (define (square x) (* x x))
 
@@ -428,9 +421,8 @@
   (case-lambda
    ((n) (display n (current-output-port)))
    ((n port)
-    (let* ((shared (if (or (pair? n) (vector? n))
-		       (cons 0 (extract-shared-objects n #t))
-		       #f)))
+    (let ((shared (and (or (pair? n) (vector? n))
+			(cons 0 (extract-shared-objects n #t)))))
       (let display ((n n) (port port))
 	(cond
 	 ((string? n) (do ((i 0 (+ i 1)))
@@ -484,7 +476,7 @@
 		  (display "|" port)))))
 	 ((record? n) (display "#<record>" port))
 	 ((procedure? n) (display "#<closure>" port))
-	 ((boolean? n) (if n (display "#t" port) (display "#f" port)))
+	 ((boolean? n) (display (if n "#t" "#f") port))
 	 ((pair? n)
 	  (unless (and shared (check-shared? shared n port))
 	    (display "(" port)
@@ -522,8 +514,8 @@
   (let ((seen (make-hash-table eq?)))
     ;; find shared references
     (let find ((x x))
-      (cond ;; only interested in pairs, vectors and records
-       ((or (pair? x) (vector? x))
+      ;; only interested in pairs, vectors and records
+      (when (or (pair? x) (vector? x))
         ;; increment the count
         (hash-table-update!/default seen x (lambda (n) (+ n 1)) 0)
         ;; walk if this is the first time
@@ -539,7 +531,7 @@
         ;; delete if this shouldn't count as a shared reference
         (if (and cyclic-only?
                  (<= (hash-table-ref/default seen x 0) 1))
-	    (hash-table-delete! seen x)))))
+	    (hash-table-delete! seen x))))
     ;; extract shared references
     (let ((res (make-hash-table eq?)))
       (hash-table-walk
@@ -573,19 +565,19 @@
 	  (display "#" port)
 	  (write (vector->list arg) port)))
        ((char? arg)
-	(cond
-	 ((char=? #\newline arg) (display "#\\newline" port))
-	 ((char=? #\tab arg) (display "#\\tab" port))
-	 ((char=? #\space arg) (display "#\\space" port))
-	 ((char=? #\return arg) (display "#\\return" port))
+	(case arg
+	 ((#\newline) (display "#\\newline" port))
+	 ((#\tab) (display "#\\tab" port))
+	 ((#\space) (display "#\\space" port))
+	 ((#\return) (display "#\\return" port))
 	 (else (display "#\\" port) (display arg port))))
        ((string? arg)
 	(display "\"" port) 
 	(for-each 
 	 (lambda (chr) 
-	   (cond
-	    ((char=? #\" chr) (display "\\\"" port))
-	    ((char=? #\\ chr) (display "\\\\" port))
+	   (case chr
+	    ((#\") (display "\\\"" port))
+	    ((#\\) (display "\\\\" port))
 	    (else (display chr port))))
 	 (string->list arg))
 	(display "\"" port))
@@ -803,19 +795,18 @@
 	(loop (cdr lst) (cons (car lst) res))
 	res)))
 (define (list-ref lst n)
-  (let loop ((lst lst) (n n))
-    (if (zero? n)
-	(car lst)
-	(loop (cdr lst) (- n 1)))))
+  (do ((lst lst (cdr lst))
+         (n n (- n 1)))
+        ((zero? n) (car lst))))
 (define (list-tail lst k)
-  (let loop ((lst lst) (k k))
-    (if (> k 0)
-	(loop (cdr lst) (- k 1))
-	lst)))
+  (do ((lst lst (cdr lst))
+         (k k (- k 1)))
+        ((<= k 0) lst)))
 (define (list-set! list k obj)
-  (if (= k 0)
-      (set-car! list obj)
-      (list-set! (cdr list) (- k 1) obj)))
+  (do ((list list (cdr list))
+           (k k (- k 1))
+           (obj obj))
+          ((= k 0) (set-car! list obj))))
 (define (list-copy lst)
   (if (pair? lst)
       (cons (car lst) (list-copy (cdr lst)))
@@ -846,60 +837,50 @@
 			  (and (not (eq? fast slow))
 			       (loop fast slow))))))))))
 (define (memv obj list)
-  (let loop ((list list))
-    (if (null? list) #f
-	(if (eqv? obj (car list)) 
-	    list
-	    (loop (cdr list))))))
+  (and (not (null? list))
+       (if (eqv? obj (car list)) 
+	   list
+	   (memv obj (cdr list)))))
 (define (memq obj list)
-  (let loop ((list list))
-    (if (null? list) #f
-	(if (eq? obj (car list)) 
-	    list
-	    (loop (cdr list))))))
+  (and (not (null? list))
+       (if (eq? obj (car list)) 
+	   list
+	   (memq obj (cdr list)))))
 (define member
   (case-lambda
    ((obj list) (member obj list equal?))
    ((obj list cmp)
-    (let loop ((list list))
-      (if (null? list) #f
-	  (if (cmp obj (car list)) 
-	      list
-	      (loop (cdr list))))))))
+    (and (not (null? list))
+	 (if (cmp obj (car list)) 
+	     list
+	     (member obj (cdr list) cmp))))))
 
-(define (assq obj1 alist1)
-  (let loop ((obj obj1) (alist alist1))
-    (if (null? alist) #f
-	(begin
-	  (if (eq? (caar alist) obj) 
-	      (car alist)
-	      (loop obj (cdr alist)))))))
-(define (assv obj1 alist1)
-  (let loop ((obj obj1) (alist alist1))
-    (if (null? alist) #f
-	(begin
-	  (if (eqv? (caar alist) obj) 
-	      (car alist)
-	      (loop obj (cdr alist)))))))
+(define (assq obj alist)
+  (and (not (null? alist))
+      (if (eq? (caar alist) obj) 
+	  (car alist)
+	  (assq obj (cdr alist)))))
+(define (assv obj alist)
+  (and (not (null? alist))
+      (if (eqv? (caar alist) obj) 
+	  (car alist)
+	  (assv obj (cdr alist)))))
 (define assoc 
   (case-lambda
-   ((obj1 alist1 compare)
-    (let loop ((obj obj1) (alist alist1))
-      (if (null? alist) #f
-	  (begin
-	    (if (compare (caar alist) obj) 
-		(car alist)
-		(loop obj (cdr alist)))))))
+   ((obj alist compare)
+    (and (not (null? alist))
+	 (if (compare (caar alist) obj) 
+	     (car alist)
+	     (assoc obj (cdr alist) compare))))
    ((obj alist)
     (assoc obj alist equal?))))
 
 (define (any pred list)
-  (let lp ((list list))
-    (and (not (null? list))
-	 (let lp ((head (car list)) (tail (cdr list)))
-	   (if (null? tail)
-	       (pred head)
-	       (or (pred head) (lp (car tail) (cdr tail))))))))
+  (and (not (null? list))
+       (let lp ((head (car list)) (tail (cdr list)))
+	 (or (pred head)
+	     (and (not (null? tail))
+		  (lp (car tail) (cdr tail)))))))
 
 (define for-each
   (case-lambda
