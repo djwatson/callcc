@@ -1,7 +1,6 @@
 # CLEANUP
 
 * get a scm formatter
-* scm lint as much as possible
 * clean C some more
 * remove dead code?
 

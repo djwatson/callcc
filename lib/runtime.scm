@@ -214,7 +214,7 @@
   (let loop ((args args))
     (if (and (pair? args) (pair? (cdr args)))
 	(and (f (car args) (cadr args))
-	    (loop (cdr args)))
+	     (loop (cdr args)))
 	#t)))
 
 (define <
@@ -422,7 +422,7 @@
    ((n) (display n (current-output-port)))
    ((n port)
     (let ((shared (and (or (pair? n) (vector? n))
-			(cons 0 (extract-shared-objects n #t)))))
+		       (cons 0 (extract-shared-objects n #t)))))
       (let display ((n n) (port port))
 	(cond
 	 ((string? n) (do ((i 0 (+ i 1)))
@@ -566,19 +566,19 @@
 	  (write (vector->list arg) port)))
        ((char? arg)
 	(case arg
-	 ((#\newline) (display "#\\newline" port))
-	 ((#\tab) (display "#\\tab" port))
-	 ((#\space) (display "#\\space" port))
-	 ((#\return) (display "#\\return" port))
-	 (else (display "#\\" port) (display arg port))))
+	  ((#\newline) (display "#\\newline" port))
+	  ((#\tab) (display "#\\tab" port))
+	  ((#\space) (display "#\\space" port))
+	  ((#\return) (display "#\\return" port))
+	  (else (display "#\\" port) (display arg port))))
        ((string? arg)
 	(display "\"" port) 
 	(for-each 
 	 (lambda (chr) 
 	   (case chr
-	    ((#\") (display "\\\"" port))
-	    ((#\\) (display "\\\\" port))
-	    (else (display chr port))))
+	     ((#\") (display "\\\"" port))
+	     ((#\\) (display "\\\\" port))
+	     (else (display chr port))))
 	 (string->list arg))
 	(display "\"" port))
        (else 
@@ -686,13 +686,12 @@
    ((a b)
     (string-append2 a b))
    (strs
-    (let* ((totallen (apply + (map string-length strs)))
-	   (newstr (make-string totallen)))
+    (let ((newstr (make-string (apply + (map string-length strs)))))
       (let loop ((strs strs) (place 0))
 	(if (not (null? strs))
 	    (let* ((cur_str (car strs))
  		   (cur_len (string-length cur_str)))
-	      (sys:FOREIGN_CALL "SCM_STRING_CPY" newstr place (car strs) 0 cur_len)
+	      (sys:FOREIGN_CALL "SCM_STRING_CPY" newstr place cur_str 0 cur_len)
 	      (loop (cdr strs) (+ place cur_len)))))
       newstr))))
 
@@ -796,17 +795,17 @@
 	res)))
 (define (list-ref lst n)
   (do ((lst lst (cdr lst))
-         (n n (- n 1)))
-        ((zero? n) (car lst))))
+       (n n (- n 1)))
+      ((zero? n) (car lst))))
 (define (list-tail lst k)
   (do ((lst lst (cdr lst))
-         (k k (- k 1)))
-        ((<= k 0) lst)))
+       (k k (- k 1)))
+      ((<= k 0) lst)))
 (define (list-set! list k obj)
   (do ((list list (cdr list))
-           (k k (- k 1))
-           (obj obj))
-          ((= k 0) (set-car! list obj))))
+       (k k (- k 1))
+       (obj obj))
+      ((= k 0) (set-car! list obj))))
 (define (list-copy lst)
   (if (pair? lst)
       (cons (car lst) (list-copy (cdr lst)))
@@ -857,14 +856,14 @@
 
 (define (assq obj alist)
   (and (not (null? alist))
-      (if (eq? (caar alist) obj) 
-	  (car alist)
-	  (assq obj (cdr alist)))))
+       (if (eq? (caar alist) obj) 
+	   (car alist)
+	   (assq obj (cdr alist)))))
 (define (assv obj alist)
   (and (not (null? alist))
-      (if (eqv? (caar alist) obj) 
-	  (car alist)
-	  (assv obj (cdr alist)))))
+       (if (eqv? (caar alist) obj) 
+	   (car alist)
+	   (assv obj (cdr alist)))))
 (define assoc 
   (case-lambda
    ((obj alist compare)
@@ -882,57 +881,55 @@
 	     (and (not (null? tail))
 		  (lp (car tail) (cdr tail)))))))
 
+;; Returns the car of every list, or #f
+;; if any list is null.
+(define (get-heads lsts)
+  (if (null? lsts)
+      '()
+      (let ((x (car lsts)))
+	(and (not (null? x))
+	     (let ((r (get-heads (cdr lsts))))
+	       (and r (cons (car x) r)))))))
+
 (define for-each
   (case-lambda
    ((proc lst)
     (unless (list? lst) (error "circular for-each"))
-    (let loop ((proc proc) (lst lst))
-      (unless (null? lst)
-	(proc (car lst))
-	(loop proc (cdr lst)))))
+    (do ((lst lst (cdr lst)))
+	((null? lst))
+      (proc (car lst))))
    ((proc lst1 lst2)
     (unless (or (list? lst1) (list? lst2)) (error "circular for-each"))
-    (let loop ((proc proc) (lst1 lst1) (lst2 lst2))
-      (if (and  (not (null? lst1)) (not (null? lst2)))
-	  (begin
-	    (proc (car lst1) (car lst2))
-	    (loop proc (cdr lst1) (cdr lst2))))))
+    (do ((lst1 lst1 (cdr lst1))
+	 (lst2 lst2 (cdr lst2)))
+	((or (null? lst1) (null? lst2)))
+      (proc (car lst1) (car lst2))))
    ((proc . lsts)
     (unless (any list? lsts) (error "circular for-each"))
     (let loop ((lsts lsts))
-      (let ((hds (let loop2 ((lsts lsts))
-		   (if (null? lsts)
-		       '()
-		       (let ((x (car lsts)))
-			 (and (not (null? x))
-			      (let ((r (loop2 (cdr lsts))))
-				(and r (cons (car x) r)))))))))
-	(if hds (begin
-		  (apply proc hds)
-		  (loop
-		   (let loop3 ((lsts lsts))
-		     (if (null? lsts)
-			 '()
-			 (cons (cdr (car lsts)) (loop3 (cdr lsts)))))))))))))
+      (let ((hds (get-heads lsts)))
+	(when hds
+	  (apply proc hds)
+	  (loop (map cdr lsts))))))))
 
 (define string-for-each
   (case-lambda
    ((proc str)
-    (let ((len (string-length str)))
-      (do ((i 0 (+ i 1)) (pos 0 (+ pos 1)))
-	  ((= i len))
-	(proc (string-ref str pos)))))
+    (do ((len (string-length str))
+	 (i 0 (+ i 1)) (pos 0 (+ pos 1)))
+	((= i len))
+      (proc (string-ref str pos))))
    ((proc . strs)
-    (let ((len (apply min (map string-length strs))))
-      (do ((i 0 (+ i 1)))
-	  ((= i len))
-	(apply proc (map (lambda (x) (string-ref x i)) strs)))))))
+    (do ((len (apply min (map string-length strs)))
+	 (i 0 (+ i 1)))
+	((= i len))
+      (apply proc (map (lambda (x) (string-ref x i)) strs))))))
 
 (define (vector-for-each proc . vecs)
-  (let ((len (apply min (map vector-length vecs))))
-    (do ((i 0 (+ i 1)))
-	((= i len))
-      (apply proc (map (lambda (x) (vector-ref x i)) vecs)))))
+  (do ((len (apply min (map vector-length vecs)))
+       (i 0 (+ i 1)))
+      ((= i len))
+    (apply proc (map (lambda (x) (vector-ref x i)) vecs))))
 
 (define map
   (case-lambda
@@ -948,24 +945,12 @@
 	  (cons (f (car lst1) (car lst2)) (loop f (cdr lst1) (cdr lst2))))))
    (lst (let loop ((lsts (cons (cadr lst) (cddr lst))))
 	  (unless (any list? lst) (error "circular map lists"))
-	  (let ((hds (let loop2 ((lsts lsts))
-		       (if (null? lsts)
-			   '()
-			   (let ((x (car lsts)))
-			     (and (not (null? x))
-				  (let ((r (loop2 (cdr lsts))))
-				    (and r (cons (car x) r)))))))))
-	    (if hds
+	  (let ((hds (get-heads lsts)))
+	    (if (not hds)
+		'()
 		(cons
 		 (apply (car lst) hds)
-		 (loop
-		  (let loop3 ((lsts lsts))
-		    (if (null? lsts)
-			'()
-			(cons (cdr (car lsts)) (loop3 (cdr lsts)))))))
-		'()))))))
-
-
+		 (loop (map cdr lsts)))))))))
 
 (define (eqv? a b)
   (eqv? a b))
@@ -1055,7 +1040,6 @@
    ((vec) (vector->list vec 0 (vector-length vec)))
    ((vec start) (vector->list vec start (vector-length vec)))
    ((vec start end)
-    (unless (fixnum? start) (error "vector->list" start))
     (unless (or (< -1 start (vector-length vec))
 		(= start end)) (error "Bad start vector->list" start (vector-length vec)))
     (unless (<= 0 end (vector-length vec)) (error "Bad end vector->list" end) (vector-length vec))
@@ -1076,12 +1060,11 @@
 		(= start end)) (error "Bad start string->vector" start))
     (unless (<= 0 end (string-length string)) (error "Bad end string->vector" end))
     (when (> start end) (error "Bad end string->vector" end))
-    (let ((v (make-vector (- end start))))
-      (do ((i start (+ i 1))
-	   (vpos 0 (+ vpos 1)))
-	  ((= i end))
-	(vector-set! v vpos (string-ref string i)))
-      v))))
+    (do ((v (make-vector (- end start)))
+	 (i start (+ i 1))
+	 (vpos 0 (+ vpos 1)))
+	((= i end) v)
+      (vector-set! v vpos (string-ref string i))))))
 
 (define vector->string
   (case-lambda
@@ -1094,12 +1077,11 @@
 		(= start end)) (error "Bad start vector->string" start))
     (unless (<= 0 end (vector-length vec)) (error "Bad end vector->string" end))
     (when (> start end) (error "Bad end vector->string" end))
-    (let ((str (make-string (- end start))))
-      (do ((i start (+ i 1))
-	   (spos 0 (+ spos 1)))
-	  ((= i end))
-	(string-set! str spos (vector-ref vec i)))
-      str))))
+    (do ((str (make-string (- end start)))
+	 (i start (+ i 1))
+	 (spos 0 (+ spos 1)))
+	((= i end) str)
+      (string-set! str spos (vector-ref vec i))))))
 
 (define vector-copy
   (case-lambda
@@ -1112,16 +1094,14 @@
 		(= start end)) (error "Bad start vector-copy" start))
     (unless (<= 0 end (vector-length vec)) (error "Bad end vector-copy" end))
     (when (> start end) (error "Bad end vector-copy" end))
-    (let ((v (make-vector (- end start))))
-      (do ((from start (+ from 1))
-	   (to 0 (+ to 1)))
-	  ((= from end))
-	(vector-set! v to (vector-ref vec from)))
-      v))))
+    (do ((v (make-vector (- end start)))
+	 (from start (+ from 1))
+	 (to 0 (+ to 1)))
+	((= from end) v)
+      (vector-set! v to (vector-ref vec from))))))
 
 (define (vector-append . vecs)
-  (let* ((len (apply + (map vector-length vecs)))
-	 (v (make-vector len)))
+  (let ((v (make-vector (apply + (map vector-length vecs)))))
     (let loop ((pos 0) (vecs vecs))
       (when (pair? vecs)
 	(vector-copy! v pos (car vecs))
@@ -1166,9 +1146,9 @@
     vec)))
 
 (define (list->vector lst)
-  (let* ((len (length lst))
-	 (v (make-vector len)))
-    (do ((i 0 (+ i 1))
+  (let ((len (length lst)))
+    (do ((v (make-vector len))
+	 (i 0 (+ i 1))
 	 (p lst (cdr p)))
 	((= i len) v)
       (vector-set-fast! v i (car p)))))
@@ -1269,67 +1249,63 @@
   (unless (char? ch) (error "not a char: "ch))
   (let ((n (char->integer ch)))
     (let lp ((lo 0) (hi (- (vector-length zeros) 1)))
-      (if (> lo hi)
-          #f
-          (let* ((mid (+ lo (quotient (- hi lo) 2)))
-                 (mid-zero (char->integer (vector-ref zeros mid))))
-            (cond
-             ((<= mid-zero n (+ mid-zero 9))
-              (- n mid-zero))
-             ((< n mid-zero)
-              (lp lo (- mid 1)))
-             (else
-              (lp (+ mid 1) hi))))))))
+      (and (<= lo hi)
+           (let* ((mid (+ lo (quotient (- hi lo) 2)))
+                  (mid-zero (char->integer (vector-ref zeros mid))))
+             (cond
+              ((<= mid-zero n (+ mid-zero 9)) (- n mid-zero))
+              ((< n mid-zero) (lp lo (- mid 1)))
+              (else (lp (+ mid 1) hi))))))))
 ;; Zeros taken from chibi
 (define zeros
-  '#(#\x0030                ;DIGIT ZERO
-     #\x0660                ;ARABIC-INDIC DIGIT ZERO
-     #\x06F0                ;EXTENDED ARABIC-INDIC DIGIT ZERO
-     #\x07C0                ;NKO DIGIT ZERO
-     #\x0966                ;DEVANAGARI DIGIT ZERO
-     #\x09E6                ;BENGALI DIGIT ZERO
-     #\x0A66                ;GURMUKHI DIGIT ZERO
-     #\x0AE6                ;GUJARATI DIGIT ZERO
-     #\x0B66                ;ORIYA DIGIT ZERO
-     #\x0BE6                ;TAMIL DIGIT ZERO
-     #\x0C66                ;TELUGU DIGIT ZERO
-     #\x0CE6                ;KANNADA DIGIT ZERO
-     #\x0D66                ;MALAYALAM DIGIT ZERO
-     #\x0E50                ;THAI DIGIT ZERO
-     #\x0ED0                ;LAO DIGIT ZERO
-     #\x0F20                ;TIBETAN DIGIT ZERO
-     #\x1040                ;MYANMAR DIGIT ZERO
-     #\x1090                ;MYANMAR SHAN DIGIT ZERO
-     #\x17E0                ;KHMER DIGIT ZERO
-     #\x1810                ;MONGOLIAN DIGIT ZERO
-     #\x1946                ;LIMBU DIGIT ZERO
-     #\x19D0                ;NEW TAI LUE DIGIT ZERO
-     #\x1A80                ;TAI THAM HORA DIGIT ZERO
-     #\x1A90                ;TAI THAM THAM DIGIT ZERO
-     #\x1B50                ;BALINESE DIGIT ZERO
-     #\x1BB0                ;SUNDANESE DIGIT ZERO
-     #\x1C40                ;LEPCHA DIGIT ZERO
-     #\x1C50                ;OL CHIKI DIGIT ZERO
-     #\xA620                ;VAI DIGIT ZERO
-     #\xA8D0                ;SAURASHTRA DIGIT ZERO
-     #\xA900                ;KAYAH LI DIGIT ZERO
-     #\xA9D0                ;JAVANESE DIGIT ZERO
-     #\xAA50                ;CHAM DIGIT ZERO
-     #\xABF0                ;MEETEI MAYEK DIGIT ZERO
-     #\xFF10                ;FULLWIDTH DIGIT ZERO
-     #\x104A0               ;OSMANYA DIGIT ZERO
-     #\x11066               ;BRAHMI DIGIT ZERO
-     #\x1D7CE               ;MATHEMATICAL BOLD DIGIT ZERO
-     #\x1D7D8               ;MATHEMATICAL DOUBLE-STRUCK DIGIT ZERO
-     #\x1D7E2               ;MATHEMATICAL SANS-SERIF DIGIT ZERO
-     #\x1D7EC               ;MATHEMATICAL SANS-SERIF BOLD DIGIT ZERO
-     #\x1D7F6               ;MATHEMATICAL MONOSPACE DIGIT ZERO
-     ))
+  #(#\x0030                ;DIGIT ZERO
+    #\x0660                ;ARABIC-INDIC DIGIT ZERO
+    #\x06F0                ;EXTENDED ARABIC-INDIC DIGIT ZERO
+    #\x07C0                ;NKO DIGIT ZERO
+    #\x0966                ;DEVANAGARI DIGIT ZERO
+    #\x09E6                ;BENGALI DIGIT ZERO
+    #\x0A66                ;GURMUKHI DIGIT ZERO
+    #\x0AE6                ;GUJARATI DIGIT ZERO
+    #\x0B66                ;ORIYA DIGIT ZERO
+    #\x0BE6                ;TAMIL DIGIT ZERO
+    #\x0C66                ;TELUGU DIGIT ZERO
+    #\x0CE6                ;KANNADA DIGIT ZERO
+    #\x0D66                ;MALAYALAM DIGIT ZERO
+    #\x0E50                ;THAI DIGIT ZERO
+    #\x0ED0                ;LAO DIGIT ZERO
+    #\x0F20                ;TIBETAN DIGIT ZERO
+    #\x1040                ;MYANMAR DIGIT ZERO
+    #\x1090                ;MYANMAR SHAN DIGIT ZERO
+    #\x17E0                ;KHMER DIGIT ZERO
+    #\x1810                ;MONGOLIAN DIGIT ZERO
+    #\x1946                ;LIMBU DIGIT ZERO
+    #\x19D0                ;NEW TAI LUE DIGIT ZERO
+    #\x1A80                ;TAI THAM HORA DIGIT ZERO
+    #\x1A90                ;TAI THAM THAM DIGIT ZERO
+    #\x1B50                ;BALINESE DIGIT ZERO
+    #\x1BB0                ;SUNDANESE DIGIT ZERO
+    #\x1C40                ;LEPCHA DIGIT ZERO
+    #\x1C50                ;OL CHIKI DIGIT ZERO
+    #\xA620                ;VAI DIGIT ZERO
+    #\xA8D0                ;SAURASHTRA DIGIT ZERO
+    #\xA900                ;KAYAH LI DIGIT ZERO
+    #\xA9D0                ;JAVANESE DIGIT ZERO
+    #\xAA50                ;CHAM DIGIT ZERO
+    #\xABF0                ;MEETEI MAYEK DIGIT ZERO
+    #\xFF10                ;FULLWIDTH DIGIT ZERO
+    #\x104A0               ;OSMANYA DIGIT ZERO
+    #\x11066               ;BRAHMI DIGIT ZERO
+    #\x1D7CE               ;MATHEMATICAL BOLD DIGIT ZERO
+    #\x1D7D8               ;MATHEMATICAL DOUBLE-STRUCK DIGIT ZERO
+    #\x1D7E2               ;MATHEMATICAL SANS-SERIF DIGIT ZERO
+    #\x1D7EC               ;MATHEMATICAL SANS-SERIF BOLD DIGIT ZERO
+    #\x1D7F6               ;MATHEMATICAL MONOSPACE DIGIT ZERO
+    ))
 ;;;;;;;;; string
 (define (strcmp eq? f eq lt gt a b)
   (let loop ((pos 0) (rema (string-length a)) (remb (string-length b)))
     (cond
-     ((and (= rema 0 ) (= remb 0))  eq)
+     ((= rema remb 0 )  eq)
      ((= rema 0)  lt)
      ((= remb 0)  gt)
      ((eq? (string-ref a pos) (string-ref b pos))
@@ -1518,14 +1494,12 @@
       (string-set! string i fill)))))
 (define (string . chars) (list->string chars))
 (define (list->string chars)
-  (let* ((len (length chars))
-	 (c (make-string len)))
-    (let loop ((i 0) (chars chars))
-      (if (< i len)
-	  (begin
-	    (string-set! c i (car chars))
-	    (loop (+ i 1) (cdr chars)))))
-    c))
+  (let* ((len (length chars)))
+    (do ((c (make-string len))
+	 (i 0 (+ i 1))
+         (chars chars (cdr chars)))
+        ((>= i len) c)
+      (string-set! c i (car chars)))))
 (define string-copy
   (case-lambda
    ((string) (substring string 0 (string-length string)))
@@ -1671,7 +1645,8 @@
       (let ((half (/ (denominator x) 2)))
 	(cond
 	 ((> r half) (+ q 1))
-	 ((= r half) (if (odd? q) (+ q 1) q))
+	 ((not (= r half)) q)
+	 ((odd? q) (+ 1 q))
 	 (else q)))))
    (else x)))
 
@@ -1686,10 +1661,9 @@
       (cond ((flonum? num)
 	     (cond
 	      ((nan? num) "+nan.0")
-	      ((and (infinite? num) (positive? num)) "+inf.0")
-	      ((infinite? num) "-inf.0")
-	      (else
-	       (sys:FOREIGN_CALL "SCM_FLONUM_STR" num))))
+	      ((not (infinite? num)) (sys:FOREIGN_CALL "SCM_FLONUM_STR" num))
+	      ((positive? num) "+inf.0")
+	      (else "-inf.0")))
 	    ((bignum? num) (sys:FOREIGN_CALL "SCM_BIGNUM_STR" num))
 	    ((ratnum? num) (sys:FOREIGN_CALL "SCM_RATNUM_STR" num))
 	    ((compnum? num)
@@ -1706,10 +1680,9 @@
 	     (let ((neg (negative? num)))
 	       (let loop ((p buflen) (n (if neg (- 0 num) num)))
 		 (cond ((eq? n 0)
-			(if neg
- 			    (begin
-			      (set! p (- p 1))
-			      (string-set! buffer p #\-)))
+			(when neg
+ 			  (set! p (- p 1))
+			  (string-set! buffer p #\-))
 			(substring buffer p buflen))
 		       (else
 			(let ((q (quotient n base))
@@ -2070,15 +2043,14 @@
    (() (read-line (current-input-port)))
    ((port)
     (let ((p (open-output-string)))
-      (let loop ((c (read-char port)))
-	(if (or (eof-object? c) (eq? #\newline c))
-	    (let ((res (get-output-string p)))
-	      (if (and (eof-object? c) (eqv? (string-length res) 0))
-		  c
-		  res))
-	    (begin
-	      (write-char c p)
-	      (loop (read-char port)))))))))
+      (do ((c (read-char port) (read-char port)))
+          ((or (eof-object? c) (eq? #\newline c))
+           (let ((res (get-output-string p)))
+             (if (and (eof-object? c)
+                      (eqv? (string-length res) 0))
+		 c
+		 res)))
+	(write-char c p))))))
 
 (define write-string
   (case-lambda
@@ -2086,9 +2058,7 @@
    ((str port start) (write-string (substring str start (string-length str)) port))
    ((str port start end) (write-string (substring str start end) port))
    ((str port)
-    (do ((i 0 (+ i 1)))
-	((= i  (string-length str)))
-      (write-char (string-ref str i) port)))))
+    (string-for-each (lambda (ch) (write-char ch port)) str ))))
 
 (define (with-input-from-file file thunk)
   (let ((p (open-input-file file)))
@@ -2112,12 +2082,11 @@
     (set! scm-symbol-table (make-hash-table string=? string-hash))
     (let ((table (sys:FOREIGN_CALL "SCM_GET_SYM_TABLE")))
       (for-each (lambda (x) (hash-table-set! scm-symbol-table (symbol->string x) x)) (vector->list table))))
-  (cond
-   ((hash-table-ref/default scm-symbol-table str #f))
-   (else (let* ((strcopy (string-copy str))
-		(new-sym (sys:FOREIGN_CALL "SCM_MAKE_SYMBOL" strcopy)))
-	   (hash-table-set! scm-symbol-table strcopy new-sym)
-	   new-sym))))
+  (or (hash-table-ref/default scm-symbol-table str #f)
+      (let* ((strcopy (string-copy str))
+	     (new-sym (sys:FOREIGN_CALL "SCM_MAKE_SYMBOL" strcopy)))
+	(hash-table-set! scm-symbol-table strcopy new-sym)
+	new-sym)))
 
 ;; process context
 (define (command-line) (sys:FOREIGN_CALL "SCM_COMMAND_LINE"))
@@ -2176,12 +2145,12 @@
    ((len init)
     (sys:FOREIGN_CALL "SCM_MAKE_BYTEVECTOR" len init))))
 (define (bytevector . rest)
-  (let ((res (make-bytevector (length rest))))
-    (do ((i 0 (+ i 1)) (v rest (cdr v)))
-	((= i (length rest)) res)
-      (unless (fixnum? (car v)) (error "Bad bytevector set:"))
-      (bytevector-u8-set! res i (car v)))
-    res))
+  (do ((res (make-bytevector (length rest)))
+       (i 0 (+ i 1)) (v rest (cdr v)))
+      ((= i (length rest)) res)
+    (unless (fixnum? (car v)) (error "Bad bytevector set:"))
+    (bytevector-u8-set! res i (car v))))
+
 (define %bytevector-copy 
   (case-lambda
    ((bytevector) (%bytevector-copy bytevector 0 (bytevector-length bytevector)))
@@ -2238,8 +2207,7 @@
     (%bytevector-copy! to at from start end))))
 
 (define (bytevector-append . bvs)
-  (let* ((len (apply + (map bytevector-length bvs)))
-	 (bv (make-bytevector len)))
+  (let ((bv (make-bytevector (apply + (map bytevector-length bvs)))))
     (let loop ((pos 0) (bvs bvs))
       (when (pair? bvs)
 	(bytevector-copy! bv pos (car bvs))
