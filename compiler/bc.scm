@@ -28,9 +28,9 @@
   (when (symbol? c)
     (push! symbol-table c))
   (or (hash-table-ref/default const-hash c #f)
-   (let ((val (add-const c)))
-     (hash-table-set! const-hash c val)
-     val)))
+      (let ((val (add-const c)))
+	(hash-table-set! const-hash c val)
+	val)))
 
 (define-record-type loop-var (make-loop-var dest phis) loop-var?
 		    (dest loop-var-dest)
@@ -56,25 +56,22 @@
 	    label))))
 
 (define (emit-function fun nlambda var env)
-  (let* ((name (second nlambda))
-	 (cases (cddr nlambda))
-	 (last-case (last cases))
-	 (last-case-jmp #f))
+  (let ((cases (cddr nlambda)))
     (fun-name-set! fun (fun-to-label nlambda var))
 
     (when (hash-table-exists? escapes-table var)
       (fun-thunk-set! fun #t)
       (fun-args-set! fun default-param-list)
-      (push-instr! fun (format "%argcnt = load i64, ptr @argcnt"))
+      (push-instr! fun "%argcnt = load i64, ptr @argcnt")
       (for (case i) (cases (iota (length cases)))
 	   (let ((id (next-id))
 		 (call-res (next-id))
 		 (true-label (next-id))
 		 (false-label (next-id)))
-	     (if (list? (second case))
-		 (push-instr! fun (format "%v~a = icmp eq i64 %argcnt, ~a" id (length (second case))))
-		 (push-instr! fun (format "%v~a = icmp uge i64 %argcnt, ~a"
-					  id (- (length (to-proper (second case))) 1))))
+	     (push-instr! fun
+			  (if (list? (second case))
+			      (format "%v~a = icmp eq i64 %argcnt, ~a" id (length (second case)))
+			      (format "%v~a = icmp uge i64 %argcnt, ~a" id (- (length (to-proper (second case))) 1))))
 	     (push-instr! fun (format "br i1 %v~a, label %l~a, label %l~a" id true-label false-label))
 	     (push-instr! fun (format "l~a:" true-label))
 	     (let ((arglist
@@ -123,8 +120,7 @@
 	  ;; (display (format "Warning: Can't find case for call:~a cnt ~a\n"
 	  ;; 		   var argcnt) (current-error-port))
 	  var)
-	(let* ((case (car cases))
-	       (arglist (second case)))
+	(let ((arglist (second (car cases))))
 	  (if (list? arglist)
 	      (if (= argcnt (length arglist))
 		  (format "~a_case~a" var i)
@@ -162,15 +158,15 @@
 ;;;;;;;; Main emit
 
 (define (emit-call fun tail label args)
-  (let ((id (next-id)))
-    (let-values (((reg-args stack-args) (split-arglist args)))
-      (for (arg i) (stack-args (iota (length stack-args)))
-	   (push-instr! fun (format "call void @SCM_WRITE_SHADOW_STACK(i64 ~a, i64 ~a), !dbg !~a"
-				    (* 8 i) arg
-				    (fun-debug-loc-id fun))))
-      (push-instr! fun (format "%v~a = ~a call i64 ~a(~a) #0, !dbg !~a"
-			       id (if tail "musttail" "") label (reg-args-to-call-list reg-args)
-			       (fun-debug-loc-id fun))))
+  (let-values (((id) (next-id))
+	       ((reg-args stack-args) (split-arglist args)))
+    (for (arg i) (stack-args (iota (length stack-args)))
+	 (push-instr! fun (format "call void @SCM_WRITE_SHADOW_STACK(i64 ~a, i64 ~a), !dbg !~a"
+				  (* 8 i) arg
+				  (fun-debug-loc-id fun))))
+    (push-instr! fun (format "%v~a = ~a call i64 ~a(~a) #0, !dbg !~a"
+			     id (if tail "musttail" "") label (reg-args-to-call-list reg-args)
+			     (fun-debug-loc-id fun)))
     (format "%v~a" id)))
 
 (define (emit sexp env fun tail)
@@ -224,11 +220,10 @@
     ;; but, the calling conventions don't match.
     ((primcall FOREIGN_CALL ,name ,args ___)
      (let* ((id (next-id))
-	    (args (omap arg args (format "i64 ~a" (emit arg env fun #f))))
-	    (argstr (join ", " args)))
+	    (argstr (join ", " (omap arg args (format "i64 ~a" (emit arg env fun #f))))))
        (push-instr! fun (format "%v~a = call ~a i64 @\"~a\"(~a) #0, !dbg !~a"
 				id
-				(if (equal? "SCM_CALLCC" (substring name 0 (min (string-length name) 10)))
+				(if (string=? "SCM_CALLCC" (substring name 0 (min (string-length name) 10)))
 				    "preserve_nonecc" "")
 				name argstr (fun-debug-loc-id fun)))
        (finish (format "%v~a" id))))
@@ -236,9 +231,8 @@
      (let* ((vals (omap val vals (emit val env fun #f)))
 	    (arglist (join ", " (omap val vals (format "i64 ~a" val))))
 	    (id (next-id)))
-       (push-instr! fun (format "%v~a = call i64 @\"~a\"(~a), !dbg !~a"
-				id (string-append "SCM_" (symbol->string var)) arglist
-				(fun-debug-loc-id fun)))
+       (push-instr! fun (format "%v~a = call i64 @\"SCM_~a\"(~a), !dbg !~a"
+				id var arglist (fun-debug-loc-id fun)))
        (finish (format "%v~a" id))))
     ((if ,a ,b ,c)
      (let ((id (next-id))
@@ -253,27 +247,23 @@
        (fun-last-label-set! fun true)
        (let* ((t-res (emit b env fun tail))
 	      (t-last-label (fun-last-label fun)))
-	 (if (or tail (not t-res))
-	     #f
-	     (push-instr! fun (format "br label %~a" join)))
+	 (unless (or tail (not t-res))
+	   (push-instr! fun (format "br label %~a" join)))
 	 (push-instr! fun (format "~a:" false))
 	 (fun-last-label-set! fun false)
 	 (let* ((f-res (emit c env fun tail))
 		(f-last-label (fun-last-label fun)))
-	   (if (or tail (not f-res))
-	       #f
-	       (push-instr! fun (format "br label %~a" join)))
-	   (if (or tail (not (or f-res t-res)))
-	       #f
-	       (begin
-		 (push-instr! fun (format "~a:" join))
-		 (fun-last-label-set! fun join)
-		 (if (and f-res t-res)
-		     (begin
-		       (push-instr! fun (format "%v~a = phi i64 [~a, %~a], [~a, %~a]"
-						join-id t-res t-last-label f-res f-last-label))
-		       (format "%v~a" join-id))
-		     (or f-res t-res))))))))
+	   (unless (or tail (not f-res))
+	     (push-instr! fun (format "br label %~a" join)))
+	   (unless (or tail (not (or f-res t-res)))
+	     (push-instr! fun (format "~a:" join))
+	     (fun-last-label-set! fun join)
+	     (if (and f-res t-res)
+		 (begin
+		   (push-instr! fun (format "%v~a = phi i64 [~a, %~a], [~a, %~a]"
+					    join-id t-res t-last-label f-res f-last-label))
+		   (format "%v~a" join-id))
+		 (or f-res t-res)))))))
     ((call ,loop-var ,args ___)
      (guard (and (assq loop-var env) (loop-var? (cdr (assq loop-var env)))))
      (let ((args (omap arg args (emit arg env fun #f)))
@@ -292,7 +282,6 @@
        (finish (emit-call fun tail (format "%v~a" clo-id) args))))
     ((label-call ,label ,args ___)
      (let* ((args (omap arg args (emit arg env fun #f)))
-	    (id (next-id))
 	    (lfun (cond
 		   ((assq label env) => cdr)
 		   (else (hash-table-ref global-labels label))))
@@ -321,12 +310,13 @@
      (let ((label (fun-to-label (emit label env fun #f) label)))
        (finish (emit-const `($const-closure ,label)))))
     ((labels ((,vars ,lambdas) ___) ,body)
-     (let* ((funs (map-in-order
-		   (lambda (id) (define fun (make-fun 1))
-			   (push! functions fun)
-			   fun)
-		   vars))
-	    (env (append (map cons vars lambdas) env)))
+     (let ((funs (map-in-order
+		  (lambda (id)
+		    (let ((fun (make-fun 1)))
+		      (push! functions fun)
+		      fun))
+		  vars))
+	   (env (append (map cons vars lambdas) env)))
        (for (func-p lambda var) (funs lambdas vars)
 	    (emit-function func-p lambda var env))
        (emit body env fun tail)))
@@ -348,12 +338,10 @@
        (push-instr! fun (format "~a:" label))
        (push-instr! fun loop)
        (fun-last-label-set! fun label)
-       (emit body (append (list (cons name loop)) (map cons vars phi-ids) env) fun tail)))
+       (emit body (cons (cons name loop) (append (map cons vars phi-ids) env)) fun tail)))
     ((lookup ,var)
      (let ((sym (emit-const var))
-	   (id (next-id))
-	   (pid (next-id))
-	   (resid (next-id)))
+	   (id (next-id)))
        (push-instr! fun (format "%v~a = call i64 @SCM_LOAD_GLOBAL(i64 ~a), !dbg !~a" id sym (fun-debug-loc-id fun)))
        (finish (format "%v~a" id))))
     (,const
@@ -376,7 +364,7 @@
   (and (number? c) (inexact? c)))
 
 (define (fixnum? c)
-  (and (number? c) (exact? c) (integer? c)  (real? c)
+  (and (number? c)  (integer? c) 
        (< (abs c) #x1fffffffffffffff)))
 
 (define (escape-quotes str)
@@ -398,12 +386,11 @@
       (format "add (i64 ~a, i64 ptrtoint ({i64, i64, i64}* @\"~a\" to i64))"
 	      ptr-tag sym-name)))
    ((flonum? c)
-    (let* ((id (next-id))
-	   (u (get-double-as-u64 c))
+    (let* ((u (get-double-as-u64 c))
 	   (urot (bit-field-rotate u 4 0 64))
 	   (plus (+ urot 1))
 	   (low (bitwise-and urot 7)))
-      (if (memq low '(0 3 4))
+      (if (memv low '(0 3 4))
 	  plus
 	  (let ((id (next-id)))
 	    (push! consts (format "@flonum~a = private unnamed_addr global [2 x i64] [i64 ~a, i64 ~a], align 8\n"
@@ -428,10 +415,6 @@
 			    id  string-tag (* 8 len) (* 8 bytes)  id ))
       (format "add (i64 ~a, i64 ptrtoint ({i64, i64, ptr}* @str~a to i64))"
 	      ptr-tag  id)))
-   ((and (pair? c) (eq? '$label (car c)))
-    (abort 'const-label)
-    (let ((fun (list-ref functions (cdr c))))
-      (fun-bc-start fun)))
    ;; TODO use a record
    ((and (pair? c) (eq? '$const-closure (car c)))
     (let ((id (next-id)))
@@ -612,84 +595,83 @@ attributes #0 = { returns_twice}
 (define (compile file verbose include-eval)
   (set! functions '())
   (let* ((path (get-compile-path))
-	 (libman (make-libman path))
-	 (unused (set! library-search-paths (cons (string-append path "lib/srfi2") library-search-paths)))
-	 (unused (set! library-search-paths (cons (string-append path "compiler/headers") library-search-paths)))
-	 (unused (set! library-search-paths (cons (string-append path "lib") library-search-paths)))
-	 (unused (set! library-search-paths (cons (string-append path "compiler") library-search-paths)))
-	 (runtime-input (with-input-from-file (string-append path "lib/runtime.scm") read-file))
-	 (eval-input (with-input-from-file (string-append path "lib/eval.scm") read-file))
+	 (libman (make-libman path)))
+    (set! library-search-paths (cons (string-append path "lib/srfi2") library-search-paths))
+    (set! library-search-paths (cons (string-append path "compiler/headers") library-search-paths))
+    (set! library-search-paths (cons (string-append path "lib") library-search-paths))
+    (set! library-search-paths (cons (string-append path "compiler") library-search-paths))
+    (expander-init libman)
+    
+    (let* ((runtime-input (with-input-from-file (string-append path "lib/runtime.scm") read-file))
+	   (eval-input (with-input-from-file (string-append path "lib/eval.scm") read-file))
+	   (pre-input (with-input-from-file file read-file))
 
-	 (pre-input (with-input-from-file file read-file))
-
-	 ;; Auto-add 'import' to scripts.
-	 (input
-	  (match pre-input
-	    (((import ,anything ___) ,body ___) pre-input)
-	    (,else `((import  (scheme base) (scheme r5rs) (scheme time) (scheme file) (scheme inexact) (scheme complex)) ,@pre-input))))
-	 (unused (expander-init libman))
-	 (runtime (expand-program runtime-input "" libman))
-	 (evals (if include-eval (expand-program eval-input "" libman) '()))
-	 (prog (expand-program input "PROG-" libman))
-	 (eval-and-macros (if include-eval (append evals (serialize-libraries libman)) '()))
-	 (lowered (r7-pass `(begin  	,@runtime
+	   ;; Auto-add 'import' to scripts.
+	   (input
+	    (match pre-input
+	      (((import ,anything ___) ,body ___) pre-input)
+	      (,else `((import  (scheme base) (scheme r5rs) (scheme time) (scheme file) (scheme inexact) (scheme complex)) ,@pre-input))))
+	   (runtime (expand-program runtime-input "" libman))
+	   (evals (if include-eval (expand-program eval-input "" libman) '()))
+	   (prog (expand-program input "PROG-" libman))
+	   (eval-and-macros (if include-eval (append evals (serialize-libraries libman)) '()))
+	   (lowered (r7-pass `(begin  	,@runtime
 					,@eval-and-macros
 					,@prog
 					0 ;; default return value.
 					)))
-	 (main-fun (make-fun "SCM_MAIN")))
-    (when verbose
-      (display (format "Compiling ~a\n" file) (current-error-port)))
-    (emit lowered '() main-fun #t)
-    (emit-header)
+	   (main-fun (make-fun "SCM_MAIN")))
+      (when verbose
+	(display (format "Compiling ~a\n" file) (current-error-port)))
+      (emit lowered '() main-fun #t)
+      (emit-header)
 
-    (let ((sym-vec (emit-const (list->vector symbol-table))))
-      (for const (reverse! consts)
-	   (display const)
-	   (newline))
+      (let ((sym-vec (emit-const (list->vector symbol-table))))
+	(for const (reverse! consts)
+	     (display const)
+	     (newline))
 
-      (display (format "@symbol_table = constant i64 ~a\n"
-		       sym-vec)))
+	(display (format "@symbol_table = constant i64 ~a\n"
+			 sym-vec)))
 
-    (display (format "@complex_constants = constant [~a x ptr] [~a]\n"
-		     (length complex-consts) (join ", " (omap const complex-consts (format "ptr ~a" const)))))
-    (display (format "@complex_constants_len = constant i64 ~a\n"
-		     (length complex-consts)))
+      (display (format "@complex_constants = constant [~a x ptr] [~a]\n"
+		       (length complex-consts) (join ", " (omap const complex-consts (format "ptr ~a" const)))))
+      (display (format "@complex_constants_len = constant i64 ~a\n"
+		       (length complex-consts)))
 
-    (set! functions (reverse! (cons main-fun functions)))
-    (for func functions
-	 (fun-code-set! func (reverse! (fun-code func)))
-	 (newline)
+      (set! functions (reverse! (cons main-fun functions)))
+      (for func functions
+	   (fun-code-set! func (reverse! (fun-code func)))
+	   (newline)
 
-	 (let-values (((reg-args stack-args) (split-arglist (fun-args func)))
-		      ((debug-id) (fun-debug-id func))
-		      ((debug-loc-id) (fun-debug-loc-id func)))
-	   ;; Set debug info
-	   (push! debug-strings
-		  (format "!~a = distinct !DISubprogram(name: \"~a\", scope: !1, file: !1, type: !4, unit: !0)"
-			  debug-id (fun-name func)))
-	   (push! debug-strings
-		  (format "!~a = !DILocation(line:1, scope: !~a)" debug-loc-id debug-id))
-	   
-	   (display (format "define ~a i64 @\"~a\"(~a) ~a #0 !dbg !~a {\n" 
-			    (if (or (equal? (fun-name func) "SCM_MAIN")
-				    (equal? (fun-name func) "S_error"))
-				"" "internal")
-			    (fun-name func)
-			    (reg-args-to-param-list reg-args)
-			    (if (equal? (fun-name func) "S_error")
-				"noreturn" "")
-			    (fun-debug-id func)))
-	   (display (format " entry:\n"))
-	   (for (arg i) (stack-args (iota (length stack-args)))
-		(display (format "  ~a = call i64 @SCM_READ_SHADOW_STACK(i64 ~a), !dbg !~a\n"
-				 arg i (fun-debug-loc-id func))))
-	   (for line (fun-code func)
-		(if (loop-var? line)
-		    (for phi (loop-var-phis line)
-			 (display (format "  ~a\n" phi)))
-		    (display (format "  ~a\n" line))))
-	   (display "}\n"))))
+	   (let-values (((reg-args stack-args) (split-arglist (fun-args func)))
+			((debug-id) (fun-debug-id func))
+			((debug-loc-id) (fun-debug-loc-id func)))
+	     ;; Set debug info
+	     (push! debug-strings
+		    (format "!~a = distinct !DISubprogram(name: \"~a\", scope: !1, file: !1, type: !4, unit: !0)"
+			    debug-id (fun-name func)))
+	     (push! debug-strings
+		    (format "!~a = !DILocation(line:1, scope: !~a)" debug-loc-id debug-id))
+	     
+	     (display (format "define ~a i64 @\"~a\"(~a) ~a #0 !dbg !~a {\n" 
+			      (if (member (fun-name func) '("SCM_MAIN" "S_error"))
+				  "" "internal")
+			      (fun-name func)
+			      (reg-args-to-param-list reg-args)
+			      (if (equal? (fun-name func) "S_error")
+				  "noreturn" "")
+			      (fun-debug-id func)))
+	     (display (format " entry:\n"))
+	     (for (arg i) (stack-args (iota (length stack-args)))
+		  (display (format "  ~a = call i64 @SCM_READ_SHADOW_STACK(i64 ~a), !dbg !~a\n"
+				   arg i (fun-debug-loc-id func))))
+	     (for line (fun-code func)
+		  (if (loop-var? line)
+		      (for phi (loop-var-phis line)
+			   (display (format "  ~a\n" phi)))
+		      (display (format "  ~a\n" line))))
+	     (display "}\n")))))
   (for line (reverse! debug-strings)
        (display line) (newline)))
 
