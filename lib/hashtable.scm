@@ -48,7 +48,7 @@
     (do ((index 0 (+ index 1)))
 	((>= index len) (modulo hashvalue bound))
       (set! hashvalue (modulo (+ (* 257 hashvalue) (hash (bytevector-u8-ref v index)))
-					   *default-bound*)))))
+			      *default-bound*)))))
 
 (define hash-by-identity
   (case-lambda
@@ -88,22 +88,22 @@
 
 (define make-hash-table
   (case-lambda
-    (() (make-hash-table equal? hash *default-table-size*))
-    ((cmp) (make-hash-table cmp (appropriate-hash-function-for cmp ) *default-table-size*))
-    ((cmp hf) (make-hash-table cmp hf *default-table-size*))
-    ((comparison hash size)
-     (let* ((association
-	     (or (and (eq? comparison eq?) assq)
-		 (and (eq? comparison eqv?) assv)
-		 (and (eq? comparison equal?) assoc)
-		 (letrec
-		     ((associate
-		       (lambda (val alist)
-			 (cond ((null? alist) #f)
-			       ((comparison val (caar alist)) (car alist))
-			       (else (associate val (cdr alist)))))))
-		   associate))))
-       (%make-hash-table 0 hash comparison association (make-vector size '()))))))
+   (() (make-hash-table equal? hash *default-table-size*))
+   ((cmp) (make-hash-table cmp (appropriate-hash-function-for cmp ) *default-table-size*))
+   ((cmp hf) (make-hash-table cmp hf *default-table-size*))
+   ((comparison hash size)
+    (let ((association
+	   (or (and (eq? comparison eq?) assq)
+	       (and (eq? comparison eqv?) assv)
+	       (and (eq? comparison equal?) assoc)
+	       (letrec
+		   ((associate
+		     (lambda (val alist)
+		       (cond ((null? alist) #f)
+			     ((comparison val (caar alist)) (car alist))
+			     (else (associate val (cdr alist)))))))
+		 associate))))
+      (%make-hash-table 0 hash comparison association (make-vector size '()))))))
 
 (define (make-hash-table-maker comp hash)
   (lambda args (apply make-hash-table (cons comp (cons hash args)))))
