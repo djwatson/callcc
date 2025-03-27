@@ -15,10 +15,10 @@
    (bytevector? x)
    (const-label? x)
    (char? x)
-    (boolean? x)
-    (number? x)
-    (string? x)
-    (vector? x)))
+   (boolean? x)
+   (number? x)
+   (string? x)
+   (vector? x)))
 (define (datum x) (or (null? x) (pair? x) (symbol? x) (unquoted? x)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -39,18 +39,19 @@ Hints:
 * Always guard matching uvars with symbol?, otherwise ,uvar matches anything
 * We use destructive map! and set-car! calls for improved performance.
 * Therefore you can't use catamorphism with guard! You have to guard
-  *first*, then explicitly call the recursive path.
+*first*, then explicitly call the recursive path.
 
 TODO: we could uniq-ify uvars if we wanted: make a record for them?
-        then it could hold assigned?
+then it could hold assigned?
 TODO: boxes could be passed down through funcs
- |#
+|#
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (define (map! proc lst)
-  (when (pair? lst)
-    (set-car! lst (proc (car lst)))
-    (map! proc (cdr lst))))
+  (do ((proc proc)
+       (lst lst (cdr lst)))
+      ((not (pair? lst)))
+    (set-car! lst (proc (car lst)))))
 
 ;; AST node-walker.
 ;; Pull out the matcher so we're not re-generating it
@@ -99,7 +100,7 @@ TODO: boxes could be passed down through funcs
 
 (define-pass parse-expanded x
   ;; TODO can remove?  primcalls should only ever be calls.
-   ;; TODO error
+  ;; TODO error
   ((primcall ,op)
    `(primref ,op))
   (((primcall ,op) ,(parse-expanded args) ___)
@@ -123,7 +124,7 @@ TODO: boxes could be passed down through funcs
   (and (number? x) (exact? x) (rational? x) (not (integer? x))))
 
 (define (is-compnum? x)
-   (and (number? x) (not (real? x)) (not (rational? x))))
+  (and (number? x) (not (real? x)) (not (rational? x))))
 
 (define gen-label
   (let ((num 0))
@@ -237,23 +238,23 @@ TODO: boxes could be passed down through funcs
     ((_ arg) arg)))
 
 (define (make-a-program prog)
-  (define sexp (cdr prog))
-  (define (doit sexp defs)
-    (if (null? (cdr sexp))
-	`(letrec* ,(reverse defs)
-	   ,(car sexp))
-	(match (car sexp)
-	  ((define ,var ,val)
-	   (if (assq var defs)
-	       (begin
-		 (display (format "WARNING: multiple definition of ~a\n" var) (current-error-port))
-		 (doit (cdr sexp) (cons (list (gen-sym 'unused) `(set! ,var ,val)) defs)))
-	       (doit (cdr sexp) (cons
-				 (list (gen-sym 'unused) `(global-set! ,var ,var))
-				 (cons (list var val) defs)))))
-	  (,else
-	   (doit (cdr sexp) (cons (list (gen-sym 'unused) else) defs))))))
-  `(begin ,(doit sexp '())))
+  (let ((sexp (cdr prog)))
+    (define (doit sexp defs)
+      (if (null? (cdr sexp))
+	  `(letrec* ,(reverse defs)
+	     ,(car sexp))
+	  (match (car sexp)
+	    ((define ,var ,val)
+	     (if (assq var defs)
+		 (begin
+		   (display (format "WARNING: multiple definition of ~a\n" var) (current-error-port))
+		   (doit (cdr sexp) (cons (list (gen-sym 'unused) `(set! ,var ,val)) defs)))
+		 (doit (cdr sexp) (cons
+				   (list (gen-sym 'unused) `(global-set! ,var ,var))
+				   (cons (list var val) defs)))))
+	    (,else
+	     (doit (cdr sexp) (cons (list (gen-sym 'unused) else) defs))))))
+    `(begin ,(doit sexp '()))))
 
 
 ;; Requires alpha-renamed
@@ -277,37 +278,37 @@ TODO: boxes could be passed down through funcs
 ;; We don't actually have let yet, use a lambda call.
 (define (build-let vars inits body)
   (if (null? vars)
-    body
-    `(call (lambda (case ,vars ,body)) ,@inits)))
+      body
+      `(call (lambda (case ,vars ,body)) ,@inits)))
 
 (define (build-fix vars inits body)
   (if (null? vars)
-    body
-    `(fix ,vars ,@inits
-	,body)))
+      body
+      `(fix ,vars ,@inits
+	    ,body)))
 
 (define (find-fixed vars inits)
   (filter-map
-    (lambda (uvar init)
-      (and
-        (lambda-expr? init)
-        (not (hash-table-exists? assigned uvar))
-        (list uvar init)))
-    vars
-    inits))
+   (lambda (uvar init)
+     (and
+      (lambda-expr? init)
+      (not (hash-table-exists? assigned uvar))
+      (list uvar init)))
+   vars
+   inits))
 
 (define (find-not-fixed vars inits fixed)
   (filter-map
-    (lambda (uvar init)
-      (and
-        (not (assq uvar fixed))
-        (list uvar init)))
-    vars
-    inits))
+   (lambda (uvar init)
+     (and
+      (not (assq uvar fixed))
+      (list uvar init)))
+   vars
+   inits))
 
 ;; Add 'lookup' to global variables.
 (define (find-globals x)
-  (define (find x locals)
+  (let find ((x x) (locals '()))
     (define-pass pass
       ((case ,args ,body)
        `(case ,args ,(find body (append (to-proper args) locals))))
@@ -321,37 +322,34 @@ TODO: boxes could be passed down through funcs
        (if (memq var locals)
 	   var
 	   `(lookup ,var))))
-    (pass x))
-  (find x '()))
+    (pass x)))
 
 (define (assignment-conversion x)
   ;; TODO cleanup boxes: make it a hash table?
   ;; cleanup uvar to be unique?
-  (define boxes '())
-  
-  (define-pass conv arg
-    (,var
-     (guard (symbol? var))
-     (cond
-      ((assq var boxes) => (lambda (x) `(primcall FOREIGN_CALL "SCM_CAR" ,(cdr x))))
-      (else arg)))
-    ((set! ,var ,(conv body))
-     (cond
-      ((assq var boxes) => (lambda (x) `(primcall FOREIGN_CALL "SCM_SETCAR" ,(cdr x) ,body)))
-      (else `(set! ,var ,body))))
-    ((case ,args ,body)
-     (let* ((new-boxes (filter-map
-		       (lambda (x)
-			 (if (hash-table-exists? assigned x)
-			     (cons x (gen-sym x))
-			     #f))
-		       (to-proper args))))
-      (set! boxes (append new-boxes boxes))
-      `(case ,args
-	 ,(build-let (map cdr new-boxes)
-		     (map (lambda (x) `(primcall FOREIGN_CALL "SCM_CONS" ,(car x) #f)) new-boxes)
-		     (conv body))))))
-  (conv x))
+  (let ((boxes '()))
+    (define-pass conv arg
+      (,var
+       (guard (symbol? var))
+       (cond
+	((assq var boxes) => (lambda (x) `(primcall FOREIGN_CALL "SCM_CAR" ,(cdr x))))
+	(else arg)))
+      ((set! ,var ,(conv body))
+       (cond
+	((assq var boxes) => (lambda (x) `(primcall FOREIGN_CALL "SCM_SETCAR" ,(cdr x) ,body)))
+	(else `(set! ,var ,body))))
+      ((case ,args ,body)
+       (let ((new-boxes (filter-map
+			 (lambda (x)
+			   (and (hash-table-exists? assigned x)
+				(cons x (gen-sym x))))
+			 (to-proper args))))
+	 (set! boxes (append new-boxes boxes))
+	 `(case ,args
+	    ,(build-let (map cdr new-boxes)
+			(map (lambda (x) `(primcall FOREIGN_CALL "SCM_CONS" ,(car x) #f)) new-boxes)
+			(conv body))))))
+    (conv x)))
 
 ;; TODO: we need (list ... ) here, but it's in the scheme-base, which may not be imported???
 (define-pass recover-let
@@ -360,10 +358,10 @@ TODO: boxes could be passed down through funcs
    `(let ,(map list args (map recover-let params)) ,(recover-let body)))
   ((call (lambda (case (,first ___ . ,rest) ,body)) ,params ___)
    (guard (not (null? rest))
-     (<= (length first) (length params)))
+	  (<= (length first) (length params)))
    (let ((params (recover-let params))
 	 (first-params (take params (length first)))
-	  (rest-params (drop params (length first))))
+	 (rest-params (drop params (length first))))
      `(let (,@(map list first first-params) (,rest (call (lookup list) ,@rest-params ))) ,(recover-let body))))
   ((call (lambda (case ,arg ,body)) ,params ___)
    (guard (symbol? arg))
@@ -375,8 +373,7 @@ TODO: boxes could be passed down through funcs
   (define (no-refs? var f)
     (if (atom? f)
 	(not (eq? f var))
-	(if (eq? 'quote (car f))
-	    #t
+	(or (eq? 'quote (car f))
 	    (fold (lambda (a b) (and (no-refs? var a) b)) #t f))))
   (define (only-tailcalls? var f)
     (if (atom? f)
@@ -389,7 +386,6 @@ TODO: boxes could be passed down through funcs
 		     ((1) #t)
 		     ((2) (only-tailcalls? var (second f)))
 		     (else (and (no-refs? var (second f)) (only-tailcalls? var `(begin ,@(cddr f)))))))
-	  ((lambda) (no-refs? var f))
 	  ((call)
 	   (if (eq? var (cadr f))
 	       (no-refs? var (cddr f))
@@ -409,7 +405,7 @@ TODO: boxes could be passed down through funcs
 ;; TODO: we should track the current name, and give anonymous lambdas
 ;; named after the function they are defined in.
 (define (name-lambdas sexp)
-  (define (do-name sexp ns)
+  (let do-name ((sexp sexp) (ns "main"))
     (define-pass namer
       ((define ,var (lambda ,cases ___))
        `(define ,var (nlambda ,(symbol->string var) ,@(omap case cases (do-name case (symbol->string var))))))
@@ -419,13 +415,12 @@ TODO: boxes could be passed down through funcs
        (let ((names (map symbol->string vars)))
 	 `(fix ,vars ,@(omap (var cases name) (vars cases names)
 			     `(nlambda ,name
-				      ,@(omap case cases
-					      (do-name case (symbol->string var)))))
+				       ,@(omap case cases
+					       (do-name case (symbol->string var)))))
 	       ,fix-body)))
       ((lambda ,(namer cases) ___)
        `(nlambda ,(symbol->string (string->symbol (string-append ns "-anon"))) ,cases ___)))
-    (namer sexp))
-  (do-name sexp "main"))
+    (namer sexp)))
 
 ;; Add a fix-form to single lambdas.
 (define-pass fix-all x
@@ -462,7 +457,7 @@ TODO: boxes could be passed down through funcs
 	      (new-lbodies
 	       (omap (args lbody info) (args lbody infos) ;; For each lambda
 		     (omap (args x) (args lbody) ;; For each case
-		      (uncover-free x (append (to-proper args) new-env) info))))
+			   (uncover-free x (append (to-proper args) new-env) info))))
 	      (new-body (uncover-free body new-env fv-info))
 	      (free-vars (omap (args table) (args infos) ;; for each lambda
 			       (omap args args ;; for each case
@@ -496,48 +491,44 @@ TODO: boxes could be passed down through funcs
     (check sexp)))
 
 (define (tarjan-scc graph)
-  (define stack '())
-  (define index 0)
-  (define indices '())
-  (define lowlinks '())
-  (define on-stack '())
-  (define result '())
+  (let ((index 0)
+	(indices '())
+	(lowlinks '())
+	(on-stack '())
+	(result '()))
+    (define (update-lowlink v link)
+      (let ((cur (assq v lowlinks)))
+	(if cur (set-cdr! cur link)
+	    (set! lowlinks (cons (cons v link) lowlinks)))))
 
-  (define (update-lowlink v link)
-    (let ((cur (assq v lowlinks)))
-      (if cur (set-cdr! cur link)
-	  (set! lowlinks (cons (cons v link) lowlinks)))))
+    (define (strongconnect v)
+      (set! indices (cons (cons v index) indices))
+      (set! lowlinks (cons (cons v index) lowlinks))
+      (set! index (+ index 1))
+      (set! on-stack (cons v on-stack))
+      
+      (for w (assq v graph)
+	   (let ((w-index (assq w indices)))
+             (if (not w-index)
+		 (begin
+		   (strongconnect w)
+		   (update-lowlink v (min (cdr (assq v lowlinks)) (cdr (assq w lowlinks)))))
+		 (when (memq w on-stack)
+		   (update-lowlink v (min (cdr (assq v lowlinks)) (cdr (assq w indices))))))))
 
-  (define (strongconnect v)
-    (set! indices (cons (cons v index) indices))
-    (set! lowlinks (cons (cons v index) lowlinks))
-    (set! index (+ index 1))
-    (set! on-stack (cons v on-stack))
-  
-    (for-each (lambda (w)
-                (let ((w-index (assq w indices)))
-                  (if (not w-index)
-		      (begin
-			(strongconnect w)
-			(update-lowlink v (min (cdr (assq v lowlinks)) (cdr (assq w lowlinks)))))
-		      (when (memq w on-stack)
-			(update-lowlink v (min (cdr (assq v lowlinks)) (cdr (assq w indices))))))))
-	      (assq v graph))
+      (when (= (cdr (assq v lowlinks)) (cdr (assq v indices)))
+	(let loop ((scc '()))
+	  (let ((w (car on-stack)))
+            (set! on-stack (cdr on-stack))
+            (if (eq? v w)
+		(set! result (cons (cons v scc) result))
+		(loop (cons w scc)))))))
 
-    (when (= (cdr (assq v lowlinks)) (cdr (assq v indices)))
-      (let loop ((scc '()))
-	(let ((w (car on-stack)))
-          (set! on-stack (cdr on-stack))
-          (if (eq? v w)
-              (set! result (cons (cons v scc) result))
-              (loop (cons w scc)))))))
-
-  (for-each (lambda (v)
-              (unless (assq v indices)
-                (strongconnect v)))
-            (map car graph))
-  
-  result)
+    (for v (map car graph)
+	 (unless (assq v indices)
+           (strongconnect v)))
+    
+    result))
 
 (define scc-table (make-hash-table eq?))
 (define free-table (make-hash-table eq?))
@@ -571,8 +562,8 @@ TODO: boxes could be passed down through funcs
 	     (if (null? not-well-known)
 		 `(scletrec (,new-bindings) ,@new-body)
 		 `(scletrec (,(append (binding-set (list (car not-well-known)))
-				       (binding-set well-known))
-			      ,@(map binding-set (map list (cdr not-well-known)))) ,@new-body))))
+				      (binding-set well-known))
+			     ,@(map binding-set (map list (cdr not-well-known)))) ,@new-body))))
 	  (else (imap update f)))))
   (imap update sexp))
 
@@ -609,11 +600,11 @@ TODO: boxes could be passed down through funcs
 		 (when (not (null? free))
 		   (for-each (lambda (f)
 			       (let* ((cur-free (hash-table-ref final-free-table f))
-				     (needs-update (not (memq link cur-free))))
-				(when needs-update
-				  (hash-table-set! final-free-table f (union (list link) cur-free))
-				  (set! again #t)
-				  )))
+				      (needs-update (not (memq link cur-free))))
+				 (when needs-update
+				   (hash-table-set! final-free-table f (union (list link) cur-free))
+				   (set! again #t)
+				   )))
 			     g)))
 	       (define (add-links f g)
 		 (define links (hash-table-ref scc-table f))
@@ -665,7 +656,7 @@ TODO: boxes could be passed down through funcs
 		    (groups (second f))
 		    (free-cnt (map get-free-cnt (second f)))
 		    (closures (map (lambda (wk free) (if (and wk (= free 0)) #f
-							   (gen-sym 'closure)))
+							 (gen-sym 'closure)))
 				   group-well-known free-cnt))
 		    (clo-bind (apply append (map (lambda (g clo free-cnt)
 						   (map (lambda (f)
@@ -677,21 +668,21 @@ TODO: boxes could be passed down through funcs
 						 (second f) closures free-cnt))))
 	       (define (update-group g clo)
 		 (let* ((representative (caar g))
-		       (free (hash-table-ref final-free-table (caar g)))
-		       (free-bind (map (lambda (f n) (cons f `(primcall CLOSURE_GET ,clo ,n))) free (iota (length free))))
-		       ;; Clo-bind must be done for all groups
-		       (new-replace (append free-bind clo-bind replace))
-		       ;;(foo (dformat "update grou ~a bindings: ~a\n" (map car g) free-bind))
-		       )
+			(free (hash-table-ref final-free-table (caar g)))
+			(free-bind (map (lambda (f n) (cons f `(primcall CLOSURE_GET ,clo ,n))) free (iota (length free))))
+			;; Clo-bind must be done for all groups
+			(new-replace (append free-bind clo-bind replace))
+			;;(foo (dformat "update grou ~a bindings: ~a\n" (map car g) free-bind))
+			)
 		   (define (update-lambda f)
 		     (define var (car f))
 		     (define lam (second f))
 		     (define new-cases
 		       (omap case (cddr lam)
-			    (define args (second case))
-			    (define body (third case))
-			    `(case ,(if clo (cons clo args) args)
-			       ,(update body new-replace))))
+			     (define args (second case))
+			     (define body (third case))
+			     `(case ,(if clo (cons clo args) args)
+				,(update body new-replace))))
 		     `(,var (nlambda ,(second lam) ,@new-cases)))
 		   (map update-lambda g)))
 	       ;;(dformat "Gen closure \n")
@@ -733,13 +724,13 @@ TODO: boxes could be passed down through funcs
 	       ;; The function labels
 	       ;; TODO $labels
 	       `(labels ,(apply append (map update-group (second f) closures))
-			 ;; The closures
-		  (let ,(filter-map (lambda (f) (if (car f) f #f)) (map generate-closure (second f) closures))
-		    ;; Any letrec groups that need closure-set!
-		    (begin
-		      ,@(filter-map id (apply append (map generate-closure-set (second f) closures)))
-		      ;; The body
-		      ,@(imap (lambda (f) (update f (append body-clo-bind replace))) (cddr f))))))))
+			;; The closures
+			(let ,(filter-map (lambda (f) (if (car f) f #f)) (map generate-closure (second f) closures))
+			  ;; Any letrec groups that need closure-set!
+			  (begin
+			    ,@(filter-map id (apply append (map generate-closure-set (second f) closures)))
+			    ;; The body
+			    ,@(imap (lambda (f) (update f (append body-clo-bind replace))) (cddr f))))))))
 	  (else (imap (lambda (f) (update f replace)) f)))))
   (imap (lambda (f) (update f '())) sexp))
 
@@ -763,7 +754,7 @@ TODO: boxes could be passed down through funcs
    (if (hash-table-exists? global-defs global)
        `(label-call ,(hash-table-ref global-defs global) #f ,args ___)
        (begin
-	 ;(display (format "Global not found:~a\n" global) (current-error-port))
+					;(display (format "Global not found:~a\n" global) (current-error-port))
 	 `(call (lookup ,global) ,args ___)))))
 
 (define (debug-print x)
@@ -785,7 +776,7 @@ TODO: boxes could be passed down through funcs
       parse-expanded
       lift-bignums
       integrate-r5rs
-      ;make-a-program
+      ;;make-a-program
       fix-letrec
       find-assigned
       find-globals
@@ -805,7 +796,7 @@ TODO: boxes could be passed down through funcs
       find-global-labels
       programify
       
-;      storage-use-analysis
+      ;; storage-use-analysis
       ))
 
 
