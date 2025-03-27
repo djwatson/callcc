@@ -1,13 +1,14 @@
 # CLEANUP
 
-* get a scm formatter
 * clean C some more
-* remove dead code?
+* clean bc.scm intrinics
 
 * website? package? manpage?
 
 ----------------------------------------
 # POST-first-release
+
+* get a scm formatter - s7? chez?
 
 # known bugs
 

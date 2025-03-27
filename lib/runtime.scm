@@ -496,8 +496,9 @@
 	 ((eof-object? n) (display "#<eof>" port))
 	 ((undefined? n) (display "#<undef>" port))
 	 (else
-	  (display "UNKNOWN DISPLAY:\n" port)
-	  (sys:FOREIGN_CALL "SCM_DISPLAY" n (port-fd port)) (0))))))))
+	  (error "UNKNOWN DISPLAY")
+	  ;(sys:FOREIGN_CALL "SCM_DISPLAY" n (port-fd port)) (0)
+	  )))))))
 
 (define (check-shared? shared x port)
   (let ((seen (hash-table-ref/default (cdr shared) x #f)))

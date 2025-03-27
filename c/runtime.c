@@ -341,6 +341,7 @@ static double to_double_fast(gc_obj obj) {
   return res;
 }
 
+/*
 static void display_double(gc_obj obj, int fd) {
   char buffer[40];
   double d = to_double(obj);
@@ -354,6 +355,7 @@ static void display_double(gc_obj obj, int fd) {
   dprintf(fd, "%s", buffer);
 }
 
+// This is only for testing, display is implemented in scheme.
 gc_obj SCM_DISPLAY(gc_obj obj, gc_obj scmfd) {
   int fd = (int)to_fixnum(scmfd);
   auto tag = get_tag(obj);
@@ -495,6 +497,7 @@ gc_obj SCM_DISPLAY(gc_obj obj, gc_obj scmfd) {
   }
   return UNDEFINED;
 }
+*/
 
 ////////////// MATH
 
