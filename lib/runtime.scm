@@ -33,7 +33,7 @@
    ((compnum? f)
     (let* ((z (inexact f)))
       (* -i (log (+ (* +i z)
-			 (sqrt (- 1 (expt z 2))))))))
+		    (sqrt (- 1 (expt z 2))))))))
    (else (sys:FOREIGN_CALL "SCM_ASIN" (inexact f)))))
 
 (define pi/2 1.5707963267948966192313216916397514)
@@ -46,14 +46,14 @@
   (sys:FOREIGN_CALL "SCM_TAN" (inexact f)))
 (define atan
   (case-lambda
-    ((num) (sys:FOREIGN_CALL "SCM_ATAN" (inexact num)))
-    ((num1 num2)
-     (let ((res (sys:FOREIGN_CALL "SCM_ATAN" (/ (inexact num1) (inexact num2)))))
-       (if (< num2 0)
-	   (if (or (negative? num1) (eqv? -inf.0 (/ 1.0 num1))) ;; hack to check for -0.0
-	       (- res 3.14159265358979)
-	       (+ res 3.14159265358979))
-	   res)))))
+   ((num) (sys:FOREIGN_CALL "SCM_ATAN" (inexact num)))
+   ((num1 num2)
+    (let ((res (sys:FOREIGN_CALL "SCM_ATAN" (/ (inexact num1) (inexact num2)))))
+      (if (< num2 0)
+	  (if (or (negative? num1) (eqv? -inf.0 (/ 1.0 num1))) ;; hack to check for -0.0
+	      (- res 3.14159265358979)
+	      (+ res 3.14159265358979))
+	  res)))))
 (define (sqrt x)
   (cond
    ((compnum? x)
@@ -163,13 +163,13 @@
 
 (define log
   (case-lambda
-    ((num)
-     (cond
-      ((compnum? num)
-       (+ (log (magnitude num))
-	  (* +i (angle num))))
-      (else (sys:FOREIGN_CALL "SCM_LOG" (inexact num)))))
-    ((num base) (/ (log num) (log base)))))
+   ((num)
+    (cond
+     ((compnum? num)
+      (+ (log (magnitude num))
+	 (* +i (angle num))))
+     (else (sys:FOREIGN_CALL "SCM_LOG" (inexact num)))))
+   ((num base) (/ (log num) (log base)))))
 
 (define (reducer f init args)
   (let loop ((init init) (args args))
@@ -365,10 +365,10 @@
    ((a) a)
    ((a b)
     (if (= b 0)
-      (abs a)
-      (gcd b (remainder a b))))
+	(abs a)
+	(gcd b (remainder a b))))
    (args (let lp ((x (car args)) (ls (cdr args)))
-        (if (null? ls) x (lp (gcd x (car ls)) (cdr ls)))))))
+           (if (null? ls) x (lp (gcd x (car ls)) (cdr ls)))))))
 
 (define lcm
   (case-lambda
@@ -376,7 +376,7 @@
    ((a) a)
    ((a b) (abs (quotient (* a b) (gcd a b))))
    (args (let lp ((x (car args)) (ls (cdr args)))
-        (if (null? ls) x (lp (lcm x (car ls)) (cdr ls)))))))
+           (if (null? ls) x (lp (lcm x (car ls)) (cdr ls)))))))
 
 (define (odd? x)
   (= 1 (modulo x 2)))
@@ -594,18 +594,18 @@
 
 (define write
   (case-lambda
-    ((arg) (write arg (current-output-port)))
-    ((arg port) (write-all arg port 'write))))
+   ((arg) (write arg (current-output-port)))
+   ((arg port) (write-all arg port 'write))))
 
 (define write-simple
   (case-lambda
-    ((arg) (write-simple arg (current-output-port)))
-    ((arg port) (write-all arg port 'simple))))
+   ((arg) (write-simple arg (current-output-port)))
+   ((arg port) (write-all arg port 'simple))))
 
 (define write-shared
   (case-lambda
-    ((arg) (write-shared arg (current-output-port)))
-    ((arg port) (write-all arg port 'shared))))
+   ((arg) (write-shared arg (current-output-port)))
+   ((arg port) (write-all arg port 'shared))))
 
 (define (zero? x)
   (= x 0))
@@ -731,7 +731,7 @@
 (define (inexact? x) (or (flonum? x)
 			 (and (compnum? x) (or (inexact? (real-part x)) (inexact? (imag-part x))))))
 (define (nan? x) (or (and (flonum? x) (sys:FOREIGN_CALL "SCM_ISNAN" x))
-			   (and (compnum? x) (or (nan? (real-part x)) (nan? (imag-part x))))))
+		     (and (compnum? x) (or (nan? (real-part x)) (nan? (imag-part x))))))
 (define (infinite? x) (or (and (flonum? x) (sys:FOREIGN_CALL "SCM_ISINF" x))
 			  (and (compnum? x) (or (infinite? (real-part x)) (infinite? (imag-part x))))))
 (define (finite? num)
@@ -740,14 +740,14 @@
 
 (define boolean=?
   (case-lambda
-    ((a b) (eq? a b))
-    (rest
-     (comparer eq? rest))))
+   ((a b) (eq? a b))
+   (rest
+    (comparer eq? rest))))
 (define symbol=?
   (case-lambda
-    ((a b) (eq? a b))
-    (rest
-     (comparer eq? rest))))
+   ((a b) (eq? a b))
+   (rest
+    (comparer eq? rest))))
 (define (exact-integer-sqrt s)
   (unless (and (exact? s)
 	       (positive? s))
@@ -883,15 +883,15 @@
 	      (loop obj (cdr alist)))))))
 (define assoc 
   (case-lambda
-    ((obj1 alist1 compare)
-     (let loop ((obj obj1) (alist alist1))
-       (if (null? alist) #f
-	   (begin
-	     (if (compare (caar alist) obj) 
-		 (car alist)
-		 (loop obj (cdr alist)))))))
-    ((obj alist)
-     (assoc obj alist equal?))))
+   ((obj1 alist1 compare)
+    (let loop ((obj obj1) (alist alist1))
+      (if (null? alist) #f
+	  (begin
+	    (if (compare (caar alist) obj) 
+		(car alist)
+		(loop obj (cdr alist)))))))
+   ((obj alist)
+    (assoc obj alist equal?))))
 
 (define (any pred list)
   (let lp ((list list))
@@ -936,16 +936,16 @@
 
 (define string-for-each
   (case-lambda
-    ((proc str)
-     (let ((len (string-length str)))
-       (do ((i 0 (+ i 1)) (pos 0 (+ pos 1)))
-	   ((= i len))
-	 (proc (string-ref str pos)))))
-    ((proc . strs)
-     (let ((len (apply min (map string-length strs))))
-       (do ((i 0 (+ i 1)))
-	   ((= i len))
-	 (apply proc (map (lambda (x) (string-ref x i)) strs)))))))
+   ((proc str)
+    (let ((len (string-length str)))
+      (do ((i 0 (+ i 1)) (pos 0 (+ pos 1)))
+	  ((= i len))
+	(proc (string-ref str pos)))))
+   ((proc . strs)
+    (let ((len (apply min (map string-length strs))))
+      (do ((i 0 (+ i 1)))
+	  ((= i len))
+	(apply proc (map (lambda (x) (string-ref x i)) strs)))))))
 
 (define (vector-for-each proc . vecs)
   (let ((len (apply min (map vector-length vecs))))
@@ -1071,72 +1071,72 @@
 
 (define vector->list
   (case-lambda
-    ((vec) (vector->list vec 0 (vector-length vec)))
-    ((vec start) (vector->list vec start (vector-length vec)))
-    ((vec start end)
-     (unless (fixnum? start) (error "vector->list" start))
-     (unless (or (< -1 start (vector-length vec))
-		 (= start end)) (error "Bad start vector->list" start (vector-length vec)))
-     (unless (<= 0 end (vector-length vec)) (error "Bad end vector->list" end) (vector-length vec))
-     (when (> start end) (error "Bad end vector->list" end))
-     (let loop ((l (- end 1)) 
-		(lst '()))
-       (if (not (< l start))
-	   (loop (- l 1) (cons (vector-ref vec l) lst))
-	   lst)))))
+   ((vec) (vector->list vec 0 (vector-length vec)))
+   ((vec start) (vector->list vec start (vector-length vec)))
+   ((vec start end)
+    (unless (fixnum? start) (error "vector->list" start))
+    (unless (or (< -1 start (vector-length vec))
+		(= start end)) (error "Bad start vector->list" start (vector-length vec)))
+    (unless (<= 0 end (vector-length vec)) (error "Bad end vector->list" end) (vector-length vec))
+    (when (> start end) (error "Bad end vector->list" end))
+    (let loop ((l (- end 1)) 
+	       (lst '()))
+      (if (not (< l start))
+	  (loop (- l 1) (cons (vector-ref vec l) lst))
+	  lst)))))
 
 (define string->vector
   (case-lambda
-    ((string) (string->vector string 0 (string-length string)))
-    ((string start) (string->vector string start (string-length string)))
-    ((string start end)
-     (unless (fixnum? start) (error "string->vector" start))
-     (unless (or (< -1 start (string-length string))
-		 (= start end)) (error "Bad start string->vector" start))
-     (unless (<= 0 end (string-length string)) (error "Bad end string->vector" end))
-     (when (> start end) (error "Bad end string->vector" end))
-     (let ((v (make-vector (- end start))))
-       (do ((i start (+ i 1))
-	    (vpos 0 (+ vpos 1)))
-	   ((= i end))
-	 (vector-set! v vpos (string-ref string i)))
-       v))))
+   ((string) (string->vector string 0 (string-length string)))
+   ((string start) (string->vector string start (string-length string)))
+   ((string start end)
+    (unless (fixnum? start) (error "string->vector" start))
+    (unless (or (< -1 start (string-length string))
+		(= start end)) (error "Bad start string->vector" start))
+    (unless (<= 0 end (string-length string)) (error "Bad end string->vector" end))
+    (when (> start end) (error "Bad end string->vector" end))
+    (let ((v (make-vector (- end start))))
+      (do ((i start (+ i 1))
+	   (vpos 0 (+ vpos 1)))
+	  ((= i end))
+	(vector-set! v vpos (string-ref string i)))
+      v))))
 
 (define vector->string
   (case-lambda
-    ((vec) (vector->string vec 0 (vector-length vec)))
-    ((vec start) (vector->string vec start (vector-length vec)))
-    ((vec start end)
-     (unless (and (fixnum? start)
-		  (fixnum? end)) (error "vector->string" start))
-     (unless (or (< -1 start (vector-length vec))
-		 (= start end)) (error "Bad start vector->string" start))
-     (unless (<= 0 end (vector-length vec)) (error "Bad end vector->string" end))
-     (when (> start end) (error "Bad end vector->string" end))
-     (let ((str (make-string (- end start))))
-       (do ((i start (+ i 1))
-	    (spos 0 (+ spos 1)))
-	   ((= i end))
-	 (string-set! str spos (vector-ref vec i)))
-       str))))
+   ((vec) (vector->string vec 0 (vector-length vec)))
+   ((vec start) (vector->string vec start (vector-length vec)))
+   ((vec start end)
+    (unless (and (fixnum? start)
+		 (fixnum? end)) (error "vector->string" start))
+    (unless (or (< -1 start (vector-length vec))
+		(= start end)) (error "Bad start vector->string" start))
+    (unless (<= 0 end (vector-length vec)) (error "Bad end vector->string" end))
+    (when (> start end) (error "Bad end vector->string" end))
+    (let ((str (make-string (- end start))))
+      (do ((i start (+ i 1))
+	   (spos 0 (+ spos 1)))
+	  ((= i end))
+	(string-set! str spos (vector-ref vec i)))
+      str))))
 
 (define vector-copy
   (case-lambda
-    ((vec) (vector-copy vec 0 (vector-length vec)))
-    ((vec start) (vector-copy vec start (vector-length vec)))
-    ((vec start end)
-     (unless (and (fixnum? start)
-		  (fixnum? end)) (error "vector-copy" start))
-     (unless (or (< -1 start (vector-length vec))
-		 (= start end)) (error "Bad start vector-copy" start))
-     (unless (<= 0 end (vector-length vec)) (error "Bad end vector-copy" end))
-     (when (> start end) (error "Bad end vector-copy" end))
-     (let ((v (make-vector (- end start))))
-       (do ((from start (+ from 1))
-	    (to 0 (+ to 1)))
-	   ((= from end))
-	 (vector-set! v to (vector-ref vec from)))
-       v))))
+   ((vec) (vector-copy vec 0 (vector-length vec)))
+   ((vec start) (vector-copy vec start (vector-length vec)))
+   ((vec start end)
+    (unless (and (fixnum? start)
+		 (fixnum? end)) (error "vector-copy" start))
+    (unless (or (< -1 start (vector-length vec))
+		(= start end)) (error "Bad start vector-copy" start))
+    (unless (<= 0 end (vector-length vec)) (error "Bad end vector-copy" end))
+    (when (> start end) (error "Bad end vector-copy" end))
+    (let ((v (make-vector (- end start))))
+      (do ((from start (+ from 1))
+	   (to 0 (+ to 1)))
+	  ((= from end))
+	(vector-set! v to (vector-ref vec from)))
+      v))))
 
 (define (vector-append . vecs)
   (let* ((len (apply + (map vector-length vecs)))
@@ -1149,40 +1149,40 @@
 
 (define vector-copy!
   (case-lambda
-    ((to at from) (vector-copy! to at from 0 (vector-length from)))
-    ((to at from start) (vector-copy! to at from start (vector-length from)))
-    ((to at from start end)
-     (unless (and (fixnum? start)
-		  (fixnum? end)
-		  (fixnum? at)) (error "vector-copy!" start))
-     (unless (or (< -1 start (vector-length from))
-		 (= start end)) (error "Bad start vector-copy!" start))
-     (unless (<= 0 end (vector-length from)) (error "Bad end vector-copy!" end))
-     (when (> start end) (error "Bad end vector-copy!" end))
-     (if (>= start at)
-	 (do ((i start (+ i 1))
-	      (out at (+ out 1)))
-	     ((= i end) to)
-	   (vector-set! to out (vector-ref from i)))
-	 (do ((in end (- in 1))
-	      (out (+ at (- end start)) (- out 1)))
-	     ((= in start) to)
-	   (vector-set! to (- out 1) (vector-ref from (- in 1))))))))
+   ((to at from) (vector-copy! to at from 0 (vector-length from)))
+   ((to at from start) (vector-copy! to at from start (vector-length from)))
+   ((to at from start end)
+    (unless (and (fixnum? start)
+		 (fixnum? end)
+		 (fixnum? at)) (error "vector-copy!" start))
+    (unless (or (< -1 start (vector-length from))
+		(= start end)) (error "Bad start vector-copy!" start))
+    (unless (<= 0 end (vector-length from)) (error "Bad end vector-copy!" end))
+    (when (> start end) (error "Bad end vector-copy!" end))
+    (if (>= start at)
+	(do ((i start (+ i 1))
+	     (out at (+ out 1)))
+	    ((= i end) to)
+	  (vector-set! to out (vector-ref from i)))
+	(do ((in end (- in 1))
+	     (out (+ at (- end start)) (- out 1)))
+	    ((= in start) to)
+	  (vector-set! to (- out 1) (vector-ref from (- in 1))))))))
 
 (define vector-fill!
   (case-lambda
-    ((vec fill ) (vector-fill! vec fill 0 (vector-length vec)))
-    ((vec fill start) (vector-fill! vec fill start (vector-length vec)))
-    ((vec fill start end)
-     (unless (fixnum? start) (error "vector-fill!" start))
-     (unless (or (< -1 start (vector-length vec))
-		 (= start end)) (error "Bad start vector-fill!" start))
-     (unless (<= 0 end (vector-length vec)) (error "Bad end vector-fill!" end))
-     (when (> start end) (error "Bad end vector-fill!" end))
-     (do ((i start (+ i 1)))
-	 ((= i end))
-       (vector-set! vec i fill))
-     vec)))
+   ((vec fill ) (vector-fill! vec fill 0 (vector-length vec)))
+   ((vec fill start) (vector-fill! vec fill start (vector-length vec)))
+   ((vec fill start end)
+    (unless (fixnum? start) (error "vector-fill!" start))
+    (unless (or (< -1 start (vector-length vec))
+		(= start end)) (error "Bad start vector-fill!" start))
+    (unless (<= 0 end (vector-length vec)) (error "Bad end vector-fill!" end))
+    (when (> start end) (error "Bad end vector-fill!" end))
+    (do ((i start (+ i 1)))
+	((= i end))
+      (vector-set! vec i fill))
+    vec)))
 
 (define (list->vector lst)
   (let* ((len (length lst))
@@ -1205,59 +1205,59 @@
     (comparer eq? rest))))
 (define char>?
   (case-lambda
-    ((a b) (> (char->integer a) (char->integer b)))
-    (rest
-     (comparer char>? rest))))
+   ((a b) (> (char->integer a) (char->integer b)))
+   (rest
+    (comparer char>? rest))))
 (define char<?
   (case-lambda
-    ((a b) (< (char->integer a) (char->integer b)))
-    (rest
-     (comparer (lambda (a b) (char<? a b)) rest))))
+   ((a b) (< (char->integer a) (char->integer b)))
+   (rest
+    (comparer (lambda (a b) (char<? a b)) rest))))
 (define char>=?
   (case-lambda
-    ((a b) (>= (char->integer a) (char->integer b)))
-    (rest
-     (comparer (lambda (a b) (char>=? a b)) rest))))
+   ((a b) (>= (char->integer a) (char->integer b)))
+   (rest
+    (comparer (lambda (a b) (char>=? a b)) rest))))
 (define char<=?
   (case-lambda
-    ((a b) (<= (char->integer a) (char->integer b)))
-    (rest
-     (comparer (lambda (a b) (char<=? a b)) rest))))
+   ((a b) (<= (char->integer a) (char->integer b)))
+   (rest
+    (comparer (lambda (a b) (char<=? a b)) rest))))
 (define char-ci=?
   (case-lambda
-    ((a b)
-     (unless (and (char? a) (char? b)) (error "not chars:" a b))
-     (eq? (char-downcase a) (char-downcase b)))
-    (rest
-     (comparer (lambda (a b) (char-ci=? a b)) rest))))
+   ((a b)
+    (unless (and (char? a) (char? b)) (error "not chars:" a b))
+    (eq? (char-downcase a) (char-downcase b)))
+   (rest
+    (comparer (lambda (a b) (char-ci=? a b)) rest))))
 (define char-ci>?
   (case-lambda
-    ((a b)
-     (unless (and (char? a) (char? b)) (error "not chars:" a b))
-     (char>? (char-downcase a) (char-downcase b)))
-    (rest
-     (comparer (lambda (a b) (char-ci>? a b)) rest))))
+   ((a b)
+    (unless (and (char? a) (char? b)) (error "not chars:" a b))
+    (char>? (char-downcase a) (char-downcase b)))
+   (rest
+    (comparer (lambda (a b) (char-ci>? a b)) rest))))
 (define char-ci<?
   (case-lambda
-    ((a b)
-     (unless (and (char? a) (char? b)) (error "not chars:" a b))
-     (char<? (char-downcase a) (char-downcase b)))
-    (rest
-     (comparer (lambda (a b) (char-ci<? a b)) rest))))
+   ((a b)
+    (unless (and (char? a) (char? b)) (error "not chars:" a b))
+    (char<? (char-downcase a) (char-downcase b)))
+   (rest
+    (comparer (lambda (a b) (char-ci<? a b)) rest))))
 (define char-ci>=?
   (case-lambda
-    ((a b)
-     (unless (and (char? a) (char? b)) (error "not chars:" a b))
-     (char>=? (char-downcase a) (char-downcase b)))
-    (rest
-     (comparer (lambda (a b) (char-ci>=? a b)) rest))))
+   ((a b)
+    (unless (and (char? a) (char? b)) (error "not chars:" a b))
+    (char>=? (char-downcase a) (char-downcase b)))
+   (rest
+    (comparer (lambda (a b) (char-ci>=? a b)) rest))))
 (define char-ci<=?
   (case-lambda
-    ((a b)
-     (unless (and (char? a) (char? b)) (error "not chars:" a b))
-     (char<=? (char-downcase a) (char-downcase b)))
-    (rest
-     (comparer (lambda (a b) (char-ci<=? a b)) rest))))
+   ((a b)
+    (unless (and (char? a) (char? b)) (error "not chars:" a b))
+    (char<=? (char-downcase a) (char-downcase b)))
+   (rest
+    (comparer (lambda (a b) (char-ci<=? a b)) rest))))
 (define (char-alphabetic? c)
   (sys:FOREIGN_CALL "SCM_CHAR_ALPHABETIC" c))
 (define (char-numeric? c)
@@ -1301,49 +1301,49 @@
               (lp (+ mid 1) hi))))))))
 ;; Zeros taken from chibi
 (define zeros
-    '#(#\x0030                ;DIGIT ZERO
-       #\x0660                ;ARABIC-INDIC DIGIT ZERO
-       #\x06F0                ;EXTENDED ARABIC-INDIC DIGIT ZERO
-       #\x07C0                ;NKO DIGIT ZERO
-       #\x0966                ;DEVANAGARI DIGIT ZERO
-       #\x09E6                ;BENGALI DIGIT ZERO
-       #\x0A66                ;GURMUKHI DIGIT ZERO
-       #\x0AE6                ;GUJARATI DIGIT ZERO
-       #\x0B66                ;ORIYA DIGIT ZERO
-       #\x0BE6                ;TAMIL DIGIT ZERO
-       #\x0C66                ;TELUGU DIGIT ZERO
-       #\x0CE6                ;KANNADA DIGIT ZERO
-       #\x0D66                ;MALAYALAM DIGIT ZERO
-       #\x0E50                ;THAI DIGIT ZERO
-       #\x0ED0                ;LAO DIGIT ZERO
-       #\x0F20                ;TIBETAN DIGIT ZERO
-       #\x1040                ;MYANMAR DIGIT ZERO
-       #\x1090                ;MYANMAR SHAN DIGIT ZERO
-       #\x17E0                ;KHMER DIGIT ZERO
-       #\x1810                ;MONGOLIAN DIGIT ZERO
-       #\x1946                ;LIMBU DIGIT ZERO
-       #\x19D0                ;NEW TAI LUE DIGIT ZERO
-       #\x1A80                ;TAI THAM HORA DIGIT ZERO
-       #\x1A90                ;TAI THAM THAM DIGIT ZERO
-       #\x1B50                ;BALINESE DIGIT ZERO
-       #\x1BB0                ;SUNDANESE DIGIT ZERO
-       #\x1C40                ;LEPCHA DIGIT ZERO
-       #\x1C50                ;OL CHIKI DIGIT ZERO
-       #\xA620                ;VAI DIGIT ZERO
-       #\xA8D0                ;SAURASHTRA DIGIT ZERO
-       #\xA900                ;KAYAH LI DIGIT ZERO
-       #\xA9D0                ;JAVANESE DIGIT ZERO
-       #\xAA50                ;CHAM DIGIT ZERO
-       #\xABF0                ;MEETEI MAYEK DIGIT ZERO
-       #\xFF10                ;FULLWIDTH DIGIT ZERO
-       #\x104A0               ;OSMANYA DIGIT ZERO
-       #\x11066               ;BRAHMI DIGIT ZERO
-       #\x1D7CE               ;MATHEMATICAL BOLD DIGIT ZERO
-       #\x1D7D8               ;MATHEMATICAL DOUBLE-STRUCK DIGIT ZERO
-       #\x1D7E2               ;MATHEMATICAL SANS-SERIF DIGIT ZERO
-       #\x1D7EC               ;MATHEMATICAL SANS-SERIF BOLD DIGIT ZERO
-       #\x1D7F6               ;MATHEMATICAL MONOSPACE DIGIT ZERO
-       ))
+  '#(#\x0030                ;DIGIT ZERO
+     #\x0660                ;ARABIC-INDIC DIGIT ZERO
+     #\x06F0                ;EXTENDED ARABIC-INDIC DIGIT ZERO
+     #\x07C0                ;NKO DIGIT ZERO
+     #\x0966                ;DEVANAGARI DIGIT ZERO
+     #\x09E6                ;BENGALI DIGIT ZERO
+     #\x0A66                ;GURMUKHI DIGIT ZERO
+     #\x0AE6                ;GUJARATI DIGIT ZERO
+     #\x0B66                ;ORIYA DIGIT ZERO
+     #\x0BE6                ;TAMIL DIGIT ZERO
+     #\x0C66                ;TELUGU DIGIT ZERO
+     #\x0CE6                ;KANNADA DIGIT ZERO
+     #\x0D66                ;MALAYALAM DIGIT ZERO
+     #\x0E50                ;THAI DIGIT ZERO
+     #\x0ED0                ;LAO DIGIT ZERO
+     #\x0F20                ;TIBETAN DIGIT ZERO
+     #\x1040                ;MYANMAR DIGIT ZERO
+     #\x1090                ;MYANMAR SHAN DIGIT ZERO
+     #\x17E0                ;KHMER DIGIT ZERO
+     #\x1810                ;MONGOLIAN DIGIT ZERO
+     #\x1946                ;LIMBU DIGIT ZERO
+     #\x19D0                ;NEW TAI LUE DIGIT ZERO
+     #\x1A80                ;TAI THAM HORA DIGIT ZERO
+     #\x1A90                ;TAI THAM THAM DIGIT ZERO
+     #\x1B50                ;BALINESE DIGIT ZERO
+     #\x1BB0                ;SUNDANESE DIGIT ZERO
+     #\x1C40                ;LEPCHA DIGIT ZERO
+     #\x1C50                ;OL CHIKI DIGIT ZERO
+     #\xA620                ;VAI DIGIT ZERO
+     #\xA8D0                ;SAURASHTRA DIGIT ZERO
+     #\xA900                ;KAYAH LI DIGIT ZERO
+     #\xA9D0                ;JAVANESE DIGIT ZERO
+     #\xAA50                ;CHAM DIGIT ZERO
+     #\xABF0                ;MEETEI MAYEK DIGIT ZERO
+     #\xFF10                ;FULLWIDTH DIGIT ZERO
+     #\x104A0               ;OSMANYA DIGIT ZERO
+     #\x11066               ;BRAHMI DIGIT ZERO
+     #\x1D7CE               ;MATHEMATICAL BOLD DIGIT ZERO
+     #\x1D7D8               ;MATHEMATICAL DOUBLE-STRUCK DIGIT ZERO
+     #\x1D7E2               ;MATHEMATICAL SANS-SERIF DIGIT ZERO
+     #\x1D7EC               ;MATHEMATICAL SANS-SERIF BOLD DIGIT ZERO
+     #\x1D7F6               ;MATHEMATICAL MONOSPACE DIGIT ZERO
+     ))
 ;;;;;;;;; string
 (define (strcmp eq? f eq lt gt a b)
   (let loop ((pos 0) (rema (string-length a)) (remb (string-length b)))
@@ -1401,140 +1401,140 @@
 (define (string-foldcase s)
   (string-downcase (string-upcase s)))
 (define uppercase-special
-'(
-(#x00DF (#x0053 #x0053 ))
-(#xFB00 (#x0046 #x0046 ))
-(#xFB01 (#x0046 #x0049 ))
-(#xFB02 (#x0046 #x004C ))
-(#xFB03 (#x0046 #x0046 #x0049 ))
-(#xFB04 (#x0046 #x0046 #x004C ))
-(#xFB05 (#x0053 #x0054 ))
-(#xFB06 (#x0053 #x0054 ))
-(#x0587 (#x0535 #x0552 ))
-(#xFB13 (#x0544 #x0546 ))
-(#xFB14 (#x0544 #x0535 ))
-(#xFB15 (#x0544 #x053B ))
-(#xFB16 (#x054E #x0546 ))
-(#xFB17 (#x0544 #x053D ))
-(#x0149 (#x02BC #x004E ))
-(#x0390 (#x0399 #x0308 #x0301 ))
-(#x03B0 (#x03A5 #x0308 #x0301 ))
-(#x01F0 (#x004A #x030C ))
-(#x1E96 (#x0048 #x0331 ))
-(#x1E97 (#x0054 #x0308 ))
-(#x1E98 (#x0057 #x030A ))
-(#x1E99 (#x0059 #x030A ))
-(#x1E9A (#x0041 #x02BE ))
-(#x1F50 (#x03A5 #x0313 ))
-(#x1F52 (#x03A5 #x0313 #x0300 ))
-(#x1F54 (#x03A5 #x0313 #x0301 ))
-(#x1F56 (#x03A5 #x0313 #x0342 ))
-(#x1FB6 (#x0391 #x0342 ))
-(#x1FC6 (#x0397 #x0342 ))
-(#x1FD2 (#x0399 #x0308 #x0300 ))
-(#x1FD3 (#x0399 #x0308 #x0301 ))
-(#x1FD6 (#x0399 #x0342 ))
-(#x1FD7 (#x0399 #x0308 #x0342 ))
-(#x1FE2 (#x03A5 #x0308 #x0300 ))
-(#x1FE3 (#x03A5 #x0308 #x0301 ))
-(#x1FE4 (#x03A1 #x0313 ))
-(#x1FE6 (#x03A5 #x0342 ))
-(#x1FE7 (#x03A5 #x0308 #x0342 ))
-(#x1FF6 (#x03A9 #x0342 ))
-(#x1F80 (#x1F08 #x0399 ))
-(#x1F81 (#x1F09 #x0399 ))
-(#x1F82 (#x1F0A #x0399 ))
-(#x1F83 (#x1F0B #x0399 ))
-(#x1F84 (#x1F0C #x0399 ))
-(#x1F85 (#x1F0D #x0399 ))
-(#x1F86 (#x1F0E #x0399 ))
-(#x1F87 (#x1F0F #x0399 ))
-(#x1F88 (#x1F08 #x0399 ))
-(#x1F89 (#x1F09 #x0399 ))
-(#x1F8A (#x1F0A #x0399 ))
-(#x1F8B (#x1F0B #x0399 ))
-(#x1F8C (#x1F0C #x0399 ))
-(#x1F8D (#x1F0D #x0399 ))
-(#x1F8E (#x1F0E #x0399 ))
-(#x1F8F (#x1F0F #x0399 ))
-(#x1F90 (#x1F28 #x0399 ))
-(#x1F91 (#x1F29 #x0399 ))
-(#x1F92 (#x1F2A #x0399 ))
-(#x1F93 (#x1F2B #x0399 ))
-(#x1F94 (#x1F2C #x0399 ))
-(#x1F95 (#x1F2D #x0399 ))
-(#x1F96 (#x1F2E #x0399 ))
-(#x1F97 (#x1F2F #x0399 ))
-(#x1F98 (#x1F28 #x0399 ))
-(#x1F99 (#x1F29 #x0399 ))
-(#x1F9A (#x1F2A #x0399 ))
-(#x1F9B (#x1F2B #x0399 ))
-(#x1F9C (#x1F2C #x0399 ))
-(#x1F9D (#x1F2D #x0399 ))
-(#x1F9E (#x1F2E #x0399 ))
-(#x1F9F (#x1F2F #x0399 ))
-(#x1FA0 (#x1F68 #x0399 ))
-(#x1FA1 (#x1F69 #x0399 ))
-(#x1FA2 (#x1F6A #x0399 ))
-(#x1FA3 (#x1F6B #x0399 ))
-(#x1FA4 (#x1F6C #x0399 ))
-(#x1FA5 (#x1F6D #x0399 ))
-(#x1FA6 (#x1F6E #x0399 ))
-(#x1FA7 (#x1F6F #x0399 ))
-(#x1FA8 (#x1F68 #x0399 ))
-(#x1FA9 (#x1F69 #x0399 ))
-(#x1FAA (#x1F6A #x0399 ))
-(#x1FAB (#x1F6B #x0399 ))
-(#x1FAC (#x1F6C #x0399 ))
-(#x1FAD (#x1F6D #x0399 ))
-(#x1FAE (#x1F6E #x0399 ))
-(#x1FAF (#x1F6F #x0399 ))
-(#x1FB3 (#x0391 #x0399 ))
-(#x1FBC (#x0391 #x0399 ))
-(#x1FC3 (#x0397 #x0399 ))
-(#x1FCC (#x0397 #x0399 ))
-(#x1FF3 (#x03A9 #x0399 ))
-(#x1FFC (#x03A9 #x0399 ))
-(#x1FB2 (#x1FBA #x0399 ))
-(#x1FB4 (#x0386 #x0399 ))
-(#x1FC2 (#x1FCA #x0399 ))
-(#x1FC4 (#x0389 #x0399 ))
-(#x1FF2 (#x1FFA #x0399 ))
-(#x1FF4 (#x038F #x0399 ))
-(#x1FB7 (#x0391 #x0342 #x0399 ))
-(#x1FC7 (#x0397 #x0342 #x0399 ))
-(#x1FF7 (#x03A9 #x0342 #x0399 ))
-))
+  '(
+    (#x00DF (#x0053 #x0053 ))
+    (#xFB00 (#x0046 #x0046 ))
+    (#xFB01 (#x0046 #x0049 ))
+    (#xFB02 (#x0046 #x004C ))
+    (#xFB03 (#x0046 #x0046 #x0049 ))
+    (#xFB04 (#x0046 #x0046 #x004C ))
+    (#xFB05 (#x0053 #x0054 ))
+    (#xFB06 (#x0053 #x0054 ))
+    (#x0587 (#x0535 #x0552 ))
+    (#xFB13 (#x0544 #x0546 ))
+    (#xFB14 (#x0544 #x0535 ))
+    (#xFB15 (#x0544 #x053B ))
+    (#xFB16 (#x054E #x0546 ))
+    (#xFB17 (#x0544 #x053D ))
+    (#x0149 (#x02BC #x004E ))
+    (#x0390 (#x0399 #x0308 #x0301 ))
+    (#x03B0 (#x03A5 #x0308 #x0301 ))
+    (#x01F0 (#x004A #x030C ))
+    (#x1E96 (#x0048 #x0331 ))
+    (#x1E97 (#x0054 #x0308 ))
+    (#x1E98 (#x0057 #x030A ))
+    (#x1E99 (#x0059 #x030A ))
+    (#x1E9A (#x0041 #x02BE ))
+    (#x1F50 (#x03A5 #x0313 ))
+    (#x1F52 (#x03A5 #x0313 #x0300 ))
+    (#x1F54 (#x03A5 #x0313 #x0301 ))
+    (#x1F56 (#x03A5 #x0313 #x0342 ))
+    (#x1FB6 (#x0391 #x0342 ))
+    (#x1FC6 (#x0397 #x0342 ))
+    (#x1FD2 (#x0399 #x0308 #x0300 ))
+    (#x1FD3 (#x0399 #x0308 #x0301 ))
+    (#x1FD6 (#x0399 #x0342 ))
+    (#x1FD7 (#x0399 #x0308 #x0342 ))
+    (#x1FE2 (#x03A5 #x0308 #x0300 ))
+    (#x1FE3 (#x03A5 #x0308 #x0301 ))
+    (#x1FE4 (#x03A1 #x0313 ))
+    (#x1FE6 (#x03A5 #x0342 ))
+    (#x1FE7 (#x03A5 #x0308 #x0342 ))
+    (#x1FF6 (#x03A9 #x0342 ))
+    (#x1F80 (#x1F08 #x0399 ))
+    (#x1F81 (#x1F09 #x0399 ))
+    (#x1F82 (#x1F0A #x0399 ))
+    (#x1F83 (#x1F0B #x0399 ))
+    (#x1F84 (#x1F0C #x0399 ))
+    (#x1F85 (#x1F0D #x0399 ))
+    (#x1F86 (#x1F0E #x0399 ))
+    (#x1F87 (#x1F0F #x0399 ))
+    (#x1F88 (#x1F08 #x0399 ))
+    (#x1F89 (#x1F09 #x0399 ))
+    (#x1F8A (#x1F0A #x0399 ))
+    (#x1F8B (#x1F0B #x0399 ))
+    (#x1F8C (#x1F0C #x0399 ))
+    (#x1F8D (#x1F0D #x0399 ))
+    (#x1F8E (#x1F0E #x0399 ))
+    (#x1F8F (#x1F0F #x0399 ))
+    (#x1F90 (#x1F28 #x0399 ))
+    (#x1F91 (#x1F29 #x0399 ))
+    (#x1F92 (#x1F2A #x0399 ))
+    (#x1F93 (#x1F2B #x0399 ))
+    (#x1F94 (#x1F2C #x0399 ))
+    (#x1F95 (#x1F2D #x0399 ))
+    (#x1F96 (#x1F2E #x0399 ))
+    (#x1F97 (#x1F2F #x0399 ))
+    (#x1F98 (#x1F28 #x0399 ))
+    (#x1F99 (#x1F29 #x0399 ))
+    (#x1F9A (#x1F2A #x0399 ))
+    (#x1F9B (#x1F2B #x0399 ))
+    (#x1F9C (#x1F2C #x0399 ))
+    (#x1F9D (#x1F2D #x0399 ))
+    (#x1F9E (#x1F2E #x0399 ))
+    (#x1F9F (#x1F2F #x0399 ))
+    (#x1FA0 (#x1F68 #x0399 ))
+    (#x1FA1 (#x1F69 #x0399 ))
+    (#x1FA2 (#x1F6A #x0399 ))
+    (#x1FA3 (#x1F6B #x0399 ))
+    (#x1FA4 (#x1F6C #x0399 ))
+    (#x1FA5 (#x1F6D #x0399 ))
+    (#x1FA6 (#x1F6E #x0399 ))
+    (#x1FA7 (#x1F6F #x0399 ))
+    (#x1FA8 (#x1F68 #x0399 ))
+    (#x1FA9 (#x1F69 #x0399 ))
+    (#x1FAA (#x1F6A #x0399 ))
+    (#x1FAB (#x1F6B #x0399 ))
+    (#x1FAC (#x1F6C #x0399 ))
+    (#x1FAD (#x1F6D #x0399 ))
+    (#x1FAE (#x1F6E #x0399 ))
+    (#x1FAF (#x1F6F #x0399 ))
+    (#x1FB3 (#x0391 #x0399 ))
+    (#x1FBC (#x0391 #x0399 ))
+    (#x1FC3 (#x0397 #x0399 ))
+    (#x1FCC (#x0397 #x0399 ))
+    (#x1FF3 (#x03A9 #x0399 ))
+    (#x1FFC (#x03A9 #x0399 ))
+    (#x1FB2 (#x1FBA #x0399 ))
+    (#x1FB4 (#x0386 #x0399 ))
+    (#x1FC2 (#x1FCA #x0399 ))
+    (#x1FC4 (#x0389 #x0399 ))
+    (#x1FF2 (#x1FFA #x0399 ))
+    (#x1FF4 (#x038F #x0399 ))
+    (#x1FB7 (#x0391 #x0342 #x0399 ))
+    (#x1FC7 (#x0397 #x0342 #x0399 ))
+    (#x1FF7 (#x03A9 #x0342 #x0399 ))
+    ))
 (define (string-ref str idx) (sys:FOREIGN_CALL "SCM_STRING_REF" str idx))
 (define (string-set! str idx val) (sys:FOREIGN_CALL "SCM_STRING_SET" str idx val))
 (define string->list
   (case-lambda
-    ((str) (string->list str 0 (string-length str)))
-    ((str start) (string->list str start (string-length str)))
-    ((str start end)
-     (unless (and (fixnum? start)
-		  (fixnum? end)) (error "string->list" start))
-     (unless (or (< -1 start (string-length str))
-		 (= start end)) (error "Bad start string->list" start))
-     (unless (<= 0 end (string-length str)) (error "Bad end string->list" end))
-     (when (> start end) (error "Bad end string->list" end))
-     (let string->list-loop ((pos start) (buf '()))
-       (if (= pos end)
-	   (reverse buf)
-	   (string->list-loop (+ pos 1) (cons (string-ref str pos) buf)))))))
+   ((str) (string->list str 0 (string-length str)))
+   ((str start) (string->list str start (string-length str)))
+   ((str start end)
+    (unless (and (fixnum? start)
+		 (fixnum? end)) (error "string->list" start))
+    (unless (or (< -1 start (string-length str))
+		(= start end)) (error "Bad start string->list" start))
+    (unless (<= 0 end (string-length str)) (error "Bad end string->list" end))
+    (when (> start end) (error "Bad end string->list" end))
+    (let string->list-loop ((pos start) (buf '()))
+      (if (= pos end)
+	  (reverse buf)
+	  (string->list-loop (+ pos 1) (cons (string-ref str pos) buf)))))))
 (define string-fill!
   (case-lambda
-    ((string fill) (string-fill! string fill 0 (string-length string)))
-    ((string fill start) (string-fill! string fill start (string-length string)))
-    ((string fill start end)
-     (unless (fixnum? start) (error "string->fill!" start))
-     (unless (or (< -1 start (string-length string))
-		 (= start end)) (error "Bad start string->fill!" start))
-     (unless (<= 0 end (string-length string)) (error "Bad end string->fill!" end))
-     (when (> start end) (error "Bad end string->fill!" end))
-     (do ((i start (+ i 1)))
-	 ((= i end))
-       (string-set! string i fill)))))
+   ((string fill) (string-fill! string fill 0 (string-length string)))
+   ((string fill start) (string-fill! string fill start (string-length string)))
+   ((string fill start end)
+    (unless (fixnum? start) (error "string->fill!" start))
+    (unless (or (< -1 start (string-length string))
+		(= start end)) (error "Bad start string->fill!" start))
+    (unless (<= 0 end (string-length string)) (error "Bad end string->fill!" end))
+    (when (> start end) (error "Bad end string->fill!" end))
+    (do ((i start (+ i 1)))
+	((= i end))
+      (string-set! string i fill)))))
 (define (string . chars) (list->string chars))
 (define (list->string chars)
   (let* ((len (length chars))
@@ -1673,14 +1673,14 @@
 
 (define (reroot! there)
   (unless (eq? *here* there)
-      (reroot! (cdr there))
-      (let ((before (caar there))
-	    (after (cdar there)))
-	(set-car! *here* (cons after before))
-	(set-cdr! *here* there)
-	(set-car! there #f)
-	(set-cdr! there '())
-	(set! *here* there) (before))))
+    (reroot! (cdr there))
+    (let ((before (caar there))
+	  (after (cdar there)))
+      (set-car! *here* (cons after before))
+      (set-cdr! *here* there)
+      (set-car! there #f)
+      (set-cdr! there '())
+      (set! *here* there) (before))))
 
 (define (round x)
   (cond
@@ -1739,10 +1739,10 @@
 
 (define make-list
   (case-lambda
-    ((k) (make-list k '()))
-    ((k fill) (if (= k 0)
-		  '()
-		  (cons fill (make-list (- k 1) fill))))))
+   ((k) (make-list k '()))
+   ((k fill) (if (= k 0)
+		 '()
+		 (cons fill (make-list (- k 1) fill))))))
 
 (include "lib/str2num.scm")
 
@@ -1984,22 +1984,22 @@
 
 (define read-bytevector
   (case-lambda
-    ((k) (read-bytevector k (current-input-port)))
-    ((k port)
-     (let ((p (open-output-bytevector)))
-       (unless (fixnum? k) (error "read-bytevector not a fixnum" k))
-       (let loop ((k k))
-	 (if (= k 0)
-	     (get-output-bytevector p)
-	     (let ((c (read-u8 port)))
-	       (if (eof-object? c)
-		   (let ((res (get-output-bytevector p)))
-		     (if (= 0 (bytevector-length res))
-			 c
-			 res))
-		   (begin
-		     (write-u8 c p)
-		     (loop (- k 1)))))))))))
+   ((k) (read-bytevector k (current-input-port)))
+   ((k port)
+    (let ((p (open-output-bytevector)))
+      (unless (fixnum? k) (error "read-bytevector not a fixnum" k))
+      (let loop ((k k))
+	(if (= k 0)
+	    (get-output-bytevector p)
+	    (let ((c (read-u8 port)))
+	      (if (eof-object? c)
+		  (let ((res (get-output-bytevector p)))
+		    (if (= 0 (bytevector-length res))
+			c
+			res))
+		  (begin
+		    (write-u8 c p)
+		    (loop (- k 1)))))))))))
 
 (include "lib/read.scm")
 
@@ -2037,43 +2037,43 @@
 
 (define read-bytevector!
   (case-lambda
-    ((bv) (read-bytevector! bv (current-input-port) 0 (bytevector-length bv)))
-    ((bv port) (read-bytevector! bv port 0 (bytevector-length bv)))
-    ((bv port start) (read-bytevector! bv port start (bytevector-length bv)))
-    ((bv port start end)
-     (unless (and (fixnum? start)
-		  (fixnum? end)) (error "bad start read-bytevector!" start))
-     (unless (or (< -1 start (bytevector-length bv))
-		 (= start end)) (error "bad start len read-bytevector!" start))
-     (unless (<= 0 end (bytevector-length bv)) (error "bad end read-bytevector!" end))
-     (when (> start end) (error "bad end start read-bytevector!" end))
-     (let loop ((pos start) (read 0))
-       (if (= pos end)
-	   read
-	   (let ((c (read-u8 port)))
-	     (if (eof-object? c)
-		 (if (= 0 read)
-		     c
-		     read)
-		 (begin
-		   (bytevector-u8-set! bv pos c)
-		   (loop (+ pos 1) (+ read 1))))))))))
+   ((bv) (read-bytevector! bv (current-input-port) 0 (bytevector-length bv)))
+   ((bv port) (read-bytevector! bv port 0 (bytevector-length bv)))
+   ((bv port start) (read-bytevector! bv port start (bytevector-length bv)))
+   ((bv port start end)
+    (unless (and (fixnum? start)
+		 (fixnum? end)) (error "bad start read-bytevector!" start))
+    (unless (or (< -1 start (bytevector-length bv))
+		(= start end)) (error "bad start len read-bytevector!" start))
+    (unless (<= 0 end (bytevector-length bv)) (error "bad end read-bytevector!" end))
+    (when (> start end) (error "bad end start read-bytevector!" end))
+    (let loop ((pos start) (read 0))
+      (if (= pos end)
+	  read
+	  (let ((c (read-u8 port)))
+	    (if (eof-object? c)
+		(if (= 0 read)
+		    c
+		    read)
+		(begin
+		  (bytevector-u8-set! bv pos c)
+		  (loop (+ pos 1) (+ read 1))))))))))
 
 (define write-bytevector
   (case-lambda
-    ((bv) (write-bytevector bv (current-output-port) 0 (bytevector-length bv)))
-    ((bv port) (write-bytevector bv port 0 (bytevector-length bv)))
-    ((bv port start) (write-bytevector bv port start (bytevector-length bv)))
-    ((bv port start end)
-     (unless (and (fixnum? start)
-		  (fixnum? end)) (error "bad start write-bytevector" start))
-     (unless (or (< -1 start (bytevector-length bv))
-		 (= start end)) (error "bad start len write-bytevector" start))
-     (unless (<= 0 end (bytevector-length bv)) (error "bad end write-bytevector" end))
-     (when (> start end) (error "bad end start write-bytevector" end))
-     (do ((i start (+ i 1)))
-	 ((= end i))
-       (write-u8 (bytevector-u8-ref bv i) port)))))
+   ((bv) (write-bytevector bv (current-output-port) 0 (bytevector-length bv)))
+   ((bv port) (write-bytevector bv port 0 (bytevector-length bv)))
+   ((bv port start) (write-bytevector bv port start (bytevector-length bv)))
+   ((bv port start end)
+    (unless (and (fixnum? start)
+		 (fixnum? end)) (error "bad start write-bytevector" start))
+    (unless (or (< -1 start (bytevector-length bv))
+		(= start end)) (error "bad start len write-bytevector" start))
+    (unless (<= 0 end (bytevector-length bv)) (error "bad end write-bytevector" end))
+    (when (> start end) (error "bad end start write-bytevector" end))
+    (do ((i start (+ i 1)))
+	((= end i))
+      (write-u8 (bytevector-u8-ref bv i) port)))))
 
 (define (file-exists? name)
   (unless (string? name) (error "Not a string:" name))
@@ -2086,28 +2086,28 @@
 
 (define read-line
   (case-lambda
-    (() (read-line (current-input-port)))
-    ((port)
-     (let ((p (open-output-string)))
-       (let loop ((c (read-char port)))
-	 (if (or (eof-object? c) (eq? #\newline c))
-	     (let ((res (get-output-string p)))
-	       (if (and (eof-object? c) (eqv? (string-length res) 0))
-		   c
-		   res))
-	     (begin
-	       (write-char c p)
-	       (loop (read-char port)))))))))
+   (() (read-line (current-input-port)))
+   ((port)
+    (let ((p (open-output-string)))
+      (let loop ((c (read-char port)))
+	(if (or (eof-object? c) (eq? #\newline c))
+	    (let ((res (get-output-string p)))
+	      (if (and (eof-object? c) (eqv? (string-length res) 0))
+		  c
+		  res))
+	    (begin
+	      (write-char c p)
+	      (loop (read-char port)))))))))
 
 (define write-string
   (case-lambda
-    ((str) (write-string str (current-output-port)))
-    ((str port start) (write-string (substring str start (string-length str)) port))
-    ((str port start end) (write-string (substring str start end) port))
-    ((str port)
-     (do ((i 0 (+ i 1)))
-	 ((= i  (string-length str)))
-       (write-char (string-ref str i) port)))))
+   ((str) (write-string str (current-output-port)))
+   ((str port start) (write-string (substring str start (string-length str)) port))
+   ((str port start end) (write-string (substring str start end) port))
+   ((str port)
+    (do ((i 0 (+ i 1)))
+	((= i  (string-length str)))
+      (write-char (string-ref str i) port)))))
 
 (define (with-input-from-file file thunk)
   (let ((p (open-input-file file)))
@@ -2155,7 +2155,7 @@
 (define (jiffies-per-second) 1000000)
 (define (current-second) (sys:FOREIGN_CALL "SCM_CURRENT_SECOND"))
 (define feature-flags '(r7rs exact-closed exact-complex ieee-float
-	 full-unicode ratios callcc))
+			     full-unicode ratios callcc))
 (define (features) feature-flags)
 
 (define (system . args)
@@ -2165,27 +2165,27 @@
 ;; bytevectors
 (define utf8->string
   (case-lambda
-    ((bytevector) (sys:FOREIGN_CALL "SCM_UTF8_STRING" bytevector))
-    ((bytevector start) (utf8->string bytevector start (bytevector-length bytevector)))
-    ((bytevector start end)
-     (unless (and (fixnum? start) (fixnum? end)) (error "bad start utf8-string" start))
-     (unless (or (< -1 start (bytevector-length bytevector))
-		 (= start end)) (error "bad start len utf8-string" start))
-     (unless (<= 0 end (bytevector-length bytevector)) (error "bad end utf8-string" end))
-     (when (> start end) (error "bad end start utf8-string" end))
-     (sys:FOREIGN_CALL "SCM_UTF8_STRING" (bytevector-copy bytevector start end)))))
+   ((bytevector) (sys:FOREIGN_CALL "SCM_UTF8_STRING" bytevector))
+   ((bytevector start) (utf8->string bytevector start (bytevector-length bytevector)))
+   ((bytevector start end)
+    (unless (and (fixnum? start) (fixnum? end)) (error "bad start utf8-string" start))
+    (unless (or (< -1 start (bytevector-length bytevector))
+		(= start end)) (error "bad start len utf8-string" start))
+    (unless (<= 0 end (bytevector-length bytevector)) (error "bad end utf8-string" end))
+    (when (> start end) (error "bad end start utf8-string" end))
+    (sys:FOREIGN_CALL "SCM_UTF8_STRING" (bytevector-copy bytevector start end)))))
 (define string->utf8
   (case-lambda
-    ((string) (sys:FOREIGN_CALL "SCM_STRING_UTF8" string))
-    ((string start) (string->utf8 string start (string-length string)))
-    ((string start end)
-     (unless (and (fixnum? start) (fixnum? end)) (error "string->utf8" start))
-     (unless (or (< -1 start (string-length string))
-		 (= start end)) (error "string->utf8" start))
-     (unless (<= 0 end (string-length string)) (error "string->utf8" end))
-     (when (> start end) (error "string->utf8" end))
-     ;; TODO: remove copy?
-     (sys:FOREIGN_CALL "SCM_STRING_UTF8" (substring string start end)))))
+   ((string) (sys:FOREIGN_CALL "SCM_STRING_UTF8" string))
+   ((string start) (string->utf8 string start (string-length string)))
+   ((string start end)
+    (unless (and (fixnum? start) (fixnum? end)) (error "string->utf8" start))
+    (unless (or (< -1 start (string-length string))
+		(= start end)) (error "string->utf8" start))
+    (unless (<= 0 end (string-length string)) (error "string->utf8" end))
+    (when (> start end) (error "string->utf8" end))
+    ;; TODO: remove copy?
+    (sys:FOREIGN_CALL "SCM_STRING_UTF8" (substring string start end)))))
 (define (bytevector-u8-ref bv i) (sys:FOREIGN_CALL "SCM_BYTEVECTOR_REF" bv i))
 (define (bytevector-length bv) (sys:FOREIGN_CALL "SCM_BYTEVECTOR_LENGTH" bv))
 (define (bytevector-u8-set! bv i val) (sys:FOREIGN_CALL "SCM_BYTEVECTOR_SET" bv i val))
@@ -2203,58 +2203,58 @@
     res))
 (define %bytevector-copy 
   (case-lambda
-    ((bytevector) (%bytevector-copy bytevector 0 (bytevector-length bytevector)))
-    ((bytevector start) (%bytevector-copy bytevector start (bytevector-length bytevector)))
-    ((bytevector start end)
-     (let ((bv (make-bytevector (- end start))))
-	  (do ((in start (+ in 1))
-	       (out 0 (+ out 1)))
-	      ((= in end) bv)
-	    (bytevector-u8-set! bv out (bytevector-u8-ref bytevector in)))))))
+   ((bytevector) (%bytevector-copy bytevector 0 (bytevector-length bytevector)))
+   ((bytevector start) (%bytevector-copy bytevector start (bytevector-length bytevector)))
+   ((bytevector start end)
+    (let ((bv (make-bytevector (- end start))))
+      (do ((in start (+ in 1))
+	   (out 0 (+ out 1)))
+	  ((= in end) bv)
+	(bytevector-u8-set! bv out (bytevector-u8-ref bytevector in)))))))
 (define bytevector-copy
   (case-lambda
-    ((bytevector) (bytevector-copy bytevector 0 (bytevector-length bytevector)))
-    ((bytevector start) (bytevector-copy bytevector start (bytevector-length bytevector)))
-    ((bytevector start end)
-     (unless (and (fixnum? start)
-		  (fixnum? end)) (error "bad start bytevector-copy" start))
-     (unless (or (< -1 start (bytevector-length bytevector))
-		 (= start end)) (error "bad start len bytevector-copy" start))
-     (unless (<= 0 end (bytevector-length bytevector)) (error "bad end bytevector-copy" end))
-     (when (> start end) (error "bad end start bytevector-copy" end))
-     (%bytevector-copy bytevector start end))))
+   ((bytevector) (bytevector-copy bytevector 0 (bytevector-length bytevector)))
+   ((bytevector start) (bytevector-copy bytevector start (bytevector-length bytevector)))
+   ((bytevector start end)
+    (unless (and (fixnum? start)
+		 (fixnum? end)) (error "bad start bytevector-copy" start))
+    (unless (or (< -1 start (bytevector-length bytevector))
+		(= start end)) (error "bad start len bytevector-copy" start))
+    (unless (<= 0 end (bytevector-length bytevector)) (error "bad end bytevector-copy" end))
+    (when (> start end) (error "bad end start bytevector-copy" end))
+    (%bytevector-copy bytevector start end))))
 (define %bytevector-copy!
   (case-lambda
-    ((to at from) (%bytevector-copy! to at from 0 (bytevector-length from)))
-    ((to at from start) (%bytevector-copy! to at from start (bytevector-length from)))
-    ((to at from start end)
-     (if (>= start at)
-	 (do ((in start (+ in 1))
-	      (out at (+ out 1)))
-	     ((= in end) to)
-	   (bytevector-u8-set! to out (bytevector-u8-ref from in)))
-	 (do ((in end (- in 1))
-	      (out (+ at (- end start)) (- out 1)))
-	     ((= in start) to)
-	   (bytevector-u8-set! to (- out 1) (bytevector-u8-ref from (- in 1))))))))
+   ((to at from) (%bytevector-copy! to at from 0 (bytevector-length from)))
+   ((to at from start) (%bytevector-copy! to at from start (bytevector-length from)))
+   ((to at from start end)
+    (if (>= start at)
+	(do ((in start (+ in 1))
+	     (out at (+ out 1)))
+	    ((= in end) to)
+	  (bytevector-u8-set! to out (bytevector-u8-ref from in)))
+	(do ((in end (- in 1))
+	     (out (+ at (- end start)) (- out 1)))
+	    ((= in start) to)
+	  (bytevector-u8-set! to (- out 1) (bytevector-u8-ref from (- in 1))))))))
 (define bytevector-copy!
   (case-lambda
-    ((to at from) (bytevector-copy! to at from 0 (bytevector-length from)))
-    ((to at from start) (bytevector-copy! to at from start (bytevector-length from)))
-    ((to at from start end)
-     (unless (and (fixnum? start)
-		  (fixnum? end)
-		  (fixnum? at)) (error "bytevector-copy" start))
-     (unless (or (< -1 start (bytevector-length from))
-		 (= start end)) (error "Bad start bytevector-copy" start))
-     (unless (<= 0 end (bytevector-length from)) (error "Bad end bytevector-copy" end (bytevector-length from)))
-     (when (> start end) (error "Bad end start bytevector-copy" start end))
-     (unless (and (or (< -1 at (bytevector-length to))
-		      (= start end))
-		  (<= (+ at (- end start))
-		      (bytevector-length to)))
-       (error "Bad bytevector-copy! destination"))
-     (%bytevector-copy! to at from start end))))
+   ((to at from) (bytevector-copy! to at from 0 (bytevector-length from)))
+   ((to at from start) (bytevector-copy! to at from start (bytevector-length from)))
+   ((to at from start end)
+    (unless (and (fixnum? start)
+		 (fixnum? end)
+		 (fixnum? at)) (error "bytevector-copy" start))
+    (unless (or (< -1 start (bytevector-length from))
+		(= start end)) (error "Bad start bytevector-copy" start))
+    (unless (<= 0 end (bytevector-length from)) (error "Bad end bytevector-copy" end (bytevector-length from)))
+    (when (> start end) (error "Bad end start bytevector-copy" start end))
+    (unless (and (or (< -1 at (bytevector-length to))
+		     (= start end))
+		 (<= (+ at (- end start))
+		     (bytevector-length to)))
+      (error "Bad bytevector-copy! destination"))
+    (%bytevector-copy! to at from start end))))
 
 (define (bytevector-append . bvs)
   (let* ((len (apply + (map bytevector-length bvs)))
