@@ -1432,7 +1432,7 @@ INLINE gc_obj SCM_EQV(gc_obj a, gc_obj b) {
 
 gc_obj SCM_MAKE_STRING(gc_obj len, gc_obj fill) {
   // Align.
-  auto strlen = (to_fixnum(len) + 7) & ~7;
+  auto strlen = align(to_fixnum(len), 8);
   uint8_t buf[4];
   auto bytecnt = utf8proc_encode_char(to_char(fill), buf);
   auto totallen = strlen * bytecnt;
@@ -1449,7 +1449,7 @@ gc_obj SCM_MAKE_STRING(gc_obj len, gc_obj fill) {
     if (bytecnt == 1) {
       memset(str->strdata, to_char(fill), to_fixnum(len));
     } else {
-      for (int64_t i = 0; i < totallen; i += bytecnt) {
+      for (uint64_t i = 0; i < totallen; i += bytecnt) {
         memcpy(&str->strdata[i], buf, bytecnt);
       }
     }
@@ -1548,7 +1548,7 @@ NOINLINE gc_obj SCM_STRING_SET_SLOW(gc_obj str, gc_obj pos, gc_obj scm_ch) {
   if (res != bytecnt) {
     auto old_data = s->strdata;
     auto new_bytes = to_fixnum(s->bytes) + bytecnt - res;
-    auto new_bytes_aligned = (new_bytes + 7) & ~7;
+    auto new_bytes_aligned = align(new_bytes, 8);
     s->strdata = gc_alloc(new_bytes_aligned);
     gc_log((uint64_t)&s->strdata);
     memcpy(s->strdata, old_data, bytepos);
@@ -1771,7 +1771,7 @@ gc_obj SCM_STRING_CPY(gc_obj tostr, gc_obj tostart, gc_obj fromstr,
     len = bytepos - from_pos;
     // Conservatively allocate a large new string
     auto new_bytes = to_fixnum(to->bytes) + len;
-    auto new_bytes_aligned = (new_bytes + 7) & ~7;
+    auto new_bytes_aligned = align(new_bytes, 8);
     auto new_strdata = gc_alloc(new_bytes_aligned);
     // Now iterate dst string, copying to new.
     pos = 0;
@@ -1820,13 +1820,18 @@ INLINE gc_obj SCM_AND(gc_obj num, gc_obj mask) {
 
 ////////////// IO
 
+// Null terminate a scheme string (by copying)
+static char* to_c_str(gc_obj scm_str) {
+  auto str = to_string(scm_str);
+  char* res = gc_alloc(align(to_fixnum(str->bytes) + 1, 8));
+  memcpy(res, str->strdata, to_fixnum(str->bytes));
+  res[to_fixnum(str->bytes)] = 0;
+  return res;
+}
+
 gc_obj SCM_OPEN_FD(gc_obj filename, gc_obj input) {
 
-  auto str = to_string(filename);
-  char name[256];
-  memcpy(name, str->strdata, to_fixnum(str->bytes));
-  assert(to_fixnum(str->bytes) < 255);
-  name[to_fixnum(str->bytes)] = '\0';
+  auto name = to_c_str(filename);
   auto readonly = input.value == TRUE_REP.value;
   return tag_fixnum(
       open(name, readonly ? O_RDONLY : O_WRONLY | O_CREAT | O_TRUNC, 0777));
@@ -1944,11 +1949,7 @@ gc_obj SCM_CLOSE_FD(gc_obj fd) {
 }
 
 gc_obj SCM_FILE_EXISTS(gc_obj scmname) {
-  auto str = to_string(scmname);
-  char name[256];
-  memcpy(name, str->strdata, to_fixnum(str->bytes));
-  assert(to_fixnum(str->bytes) < 255);
-  name[to_fixnum(str->bytes)] = '\0';
+  auto name = to_c_str(scmname);
   auto res = access(name, F_OK);
   if (res == 0) {
     return TRUE_REP;
@@ -1957,11 +1958,7 @@ gc_obj SCM_FILE_EXISTS(gc_obj scmname) {
 }
 
 gc_obj SCM_DELETE_FILE(gc_obj scmname) {
-  auto str = to_string(scmname);
-  char name[256];
-  memcpy(name, str->strdata, to_fixnum(str->bytes));
-  assert(to_fixnum(str->bytes) < 255);
-  name[to_fixnum(str->bytes)] = '\0';
+  auto name = to_c_str(scmname);
   return tag_fixnum(unlink(name));
 }
 /////// FLONUMS
@@ -1970,7 +1967,7 @@ gc_obj SCM_BIGNUM_STR(gc_obj b) {
   // +2 per manual for null-termination and -
   auto len = mpz_sizeinbase(bignum->x, 10) + 2;
   // Align.
-  len = (len + 7) & ~7;
+  len = align(len, 8);
   auto data = gc_alloc(len);
   string_s *str = gc_alloc(sizeof(string_s));
   str->strdata = data;
@@ -1987,7 +1984,7 @@ gc_obj SCM_RATNUM_STR(gc_obj b) {
   auto len = mpz_sizeinbase(mpq_numref(ratnum->x), 10) +
              mpz_sizeinbase(mpq_denref(ratnum->x), 10) + 3;
   // Align.
-  len = (len + 7) & ~7;
+  len = align(len, 8);
   auto data = gc_alloc(len);
   string_s *str = gc_alloc(sizeof(string_s));
   str->strdata = data;
@@ -2099,7 +2096,7 @@ gc_obj SCM_CURRENT_SECOND() {
 gc_obj SCM_SYSTEM(gc_obj strn) {
   auto str = to_string(strn);
   auto len = to_fixnum(str->len);
-  auto align_len = (len + 1 + 7) & ~7;
+  auto align_len = align(len + 1, 8);
   char *tmp = gc_alloc(align_len);
   tmp[len] = '\0';
   strncpy(tmp, str->strdata, len);
@@ -2112,7 +2109,7 @@ gc_obj SCM_STRING_UTF8(gc_obj str) {
     scm_runtime_error1("string->utf8: not a string", str);
   }
   auto s = to_string(str);
-  auto bytes_aligned = (to_fixnum(s->bytes) + 7) & ~7;
+  auto bytes_aligned = align(to_fixnum(s->bytes), 8);
   bytevector_s *utf8 = gc_alloc(sizeof(bytevector_s) + bytes_aligned);
   utf8->type = BYTEVECTOR_TAG;
   utf8->len = s->bytes;
@@ -2125,7 +2122,7 @@ gc_obj SCM_UTF8_STRING(gc_obj scm_bv) {
     scm_runtime_error1("utf8->string: not a bytevector", scm_bv);
   }
   auto bv = to_bytevector(scm_bv);
-  auto bytes_aligned = (to_fixnum(bv->len) + 7) & ~7;
+  auto bytes_aligned = align(to_fixnum(bv->len),8);
   auto data = gc_alloc(bytes_aligned);
   string_s *str = gc_alloc(sizeof(string_s));
   str->type = STRING_TAG;
@@ -2181,7 +2178,7 @@ gc_obj SCM_BYTEVECTOR_LENGTH(gc_obj scm_bv) {
 }
 gc_obj SCM_MAKE_BYTEVECTOR(gc_obj scm_len, gc_obj init) {
   auto len = to_fixnum(scm_len);
-  auto len_aligned = (len + 7) & ~7;
+  auto len_aligned = align(len,8);
   bytevector_s *bv = gc_alloc(sizeof(bytevector_s) + len_aligned);
   bv->type = BYTEVECTOR_TAG;
   bv->len = scm_len;

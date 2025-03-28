@@ -1,7 +1,5 @@
 # CLEANUP
 
-* clean C some more
-
 * website? package? manpage?
 
 ----------------------------------------
@@ -10,6 +8,9 @@
 * get a scm formatter - s7? chez?
 
 # known bugs
+
+* We don't check for modification of constant values
+  (Well, they're in the .rodata section, so you get a SEGV. Install a segv handler).
 
 # library
 * Some of the math routines don't support complex numbers correctly 
