@@ -30,6 +30,10 @@ Will produce a working executable.
 $ PREFIX=/usr sudo make install
 ```
 
+Prebuild DEB ubuntu packages are available in releases:
+
+[Releases](https://github.com/djwatson/callcc/releases)
+
 # Test
 
 ```
@@ -75,6 +79,10 @@ $ llvm-profdata merge -output=a.profdata a.profraw
 $ ./bin/callcc -fno-eval --cc "-O3 -flto -fprofile-use=a.profdata" --exe wc.scm
 $ time ./wc
 ```
+
+A benchmark run vs chez scheme on Ryzen 9 5900x (using PGO):
+
+![Benchmark results image](benchmark.png)
 
 # Platforms
 
