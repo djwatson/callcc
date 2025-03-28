@@ -16,6 +16,8 @@
 
 #include "gc.h"
 
+#include "rodata_handler.h"
+
 #define likely(x) __builtin_expect(x, 1)
 #define unlikely(x) __builtin_expect(x, 0)
 #define NOINLINE __attribute__((noinline))
@@ -511,7 +513,7 @@ NOINLINE _Noreturn static void scm_runtime_error1(char *msg, gc_obj obj) {
   argcnt = 3;
   S_error(UNDEFINED, from_c_str(msg), obj);
 }
-NOINLINE _Noreturn static void scm_runtime_error0(char *msg) {
+NOINLINE _Noreturn void scm_runtime_error0(char *msg) {
   argcnt = 2;
   S_error(UNDEFINED, from_c_str(msg), UNDEFINED);
 }
@@ -1821,9 +1823,9 @@ INLINE gc_obj SCM_AND(gc_obj num, gc_obj mask) {
 ////////////// IO
 
 // Null terminate a scheme string (by copying)
-static char* to_c_str(gc_obj scm_str) {
+static char *to_c_str(gc_obj scm_str) {
   auto str = to_string(scm_str);
-  char* res = gc_alloc(align(to_fixnum(str->bytes) + 1, 8));
+  char *res = gc_alloc(align(to_fixnum(str->bytes) + 1, 8));
   memcpy(res, str->strdata, to_fixnum(str->bytes));
   res[to_fixnum(str->bytes)] = 0;
   return res;
@@ -2122,7 +2124,7 @@ gc_obj SCM_UTF8_STRING(gc_obj scm_bv) {
     scm_runtime_error1("utf8->string: not a bytevector", scm_bv);
   }
   auto bv = to_bytevector(scm_bv);
-  auto bytes_aligned = align(to_fixnum(bv->len),8);
+  auto bytes_aligned = align(to_fixnum(bv->len), 8);
   auto data = gc_alloc(bytes_aligned);
   string_s *str = gc_alloc(sizeof(string_s));
   str->type = STRING_TAG;
@@ -2178,7 +2180,7 @@ gc_obj SCM_BYTEVECTOR_LENGTH(gc_obj scm_bv) {
 }
 gc_obj SCM_MAKE_BYTEVECTOR(gc_obj scm_len, gc_obj init) {
   auto len = to_fixnum(scm_len);
-  auto len_aligned = align(len,8);
+  auto len_aligned = align(len, 8);
   bytevector_s *bv = gc_alloc(sizeof(bytevector_s) + len_aligned);
   bv->type = BYTEVECTOR_TAG;
   bv->len = scm_len;
@@ -2269,6 +2271,7 @@ static void *gmp_realloc_align(void *p, size_t old_sz, size_t new_sz) {
 static void gmp_free(void *ptr, size_t sz) {}
 
 int main(int argc_in, char *argv_in[]) {
+
   // grab the stack top: this is used for both callcc
   // stack replacement, *and* GC conservative collection.
   auto fp = __builtin_frame_address(0);
@@ -2300,6 +2303,9 @@ int main(int argc_in, char *argv_in[]) {
 
   // Set up memory functions for gmp
   mp_set_memory_functions(gmp_alloc_align, gmp_realloc_align, gmp_free);
+
+  // Set up the .rodata write handler.
+  setup_sigsegv_handler();
 
   SCM_MAIN();
 }

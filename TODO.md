@@ -9,10 +9,9 @@
 
 # known bugs
 
-* We don't check for modification of constant values
-  (Well, they're in the .rodata section, so you get a SEGV. Install a segv handler).
+* We don't check for modification of constant values in the interpreter
 
-# library
+## library
 * Some of the math routines don't support complex numbers correctly 
 * Ports need more cleanup: support input from binary ports, more error checking,
 

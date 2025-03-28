@@ -2,7 +2,7 @@
 CC = clang
 CFLAGS = -O3 -flto=full -DNDEBUG -g  -std=gnu23 -Wall  -march=native -mtune=native -ffat-lto-objects -Wextra -Wnull-dereference  -Wshadow -Wno-unused-parameter
 LIBS = -lm -lgmp -lutf8proc
-SRCS = c/alloc_table.c c/gc.c c/runtime.c c/util/list.c c/util/bitset.c c/callcc.S
+SRCS = c/alloc_table.c c/gc.c c/runtime.c c/util/list.c c/util/bitset.c c/callcc.S c/rodata_handler.c
 OBJECTS = $(patsubst %, %.o, $(basename $(SRCS)))
 SCM_LIB_SRCS = lib/runtime.scm lib/eval.scm lib/read.scm lib/equal.scm lib/hashtable.scm lib/str2num.scm  
 SCM_COMPILER_SRCS = compiler/bc.scm compiler/expand.scm compiler/fix-letrec.scm compiler/library-manager.scm compiler/match.scm compiler/memory_layout.scm compiler/passes.scm compiler/qq.scm compiler/sua.scm compiler/util.scm compiler/gen-libraries.scm compiler/callcc.scm
