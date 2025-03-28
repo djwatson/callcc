@@ -66,7 +66,7 @@ install: bin/callcc
 	install -m644 compiler/fix-letrec.scm ${PREFIX}/lib/callcc/compiler
 	install -m644 compiler/qq.scm ${PREFIX}/lib/callcc/compiler
 	install -m644 compiler/sua.scm ${PREFIX}/lib/callcc/compiler
-	install -m644 lib/runtime2.scm ${PREFIX}/lib/callcc/lib
+	install -m644 lib/runtime.scm ${PREFIX}/lib/callcc/lib
 	install -m644 lib/eval.scm ${PREFIX}/lib/callcc/lib
 	install -m644 compiler/memory_layout.scm ${PREFIX}/lib/callcc/compiler
 	install -m644 lib/str2num.scm ${PREFIX}/lib/callcc/lib
