@@ -89,3 +89,6 @@ install: bin/callcc
 uninstall:
 	rm -f ${PREFIX}/bin/callcc
 	rm -rf ${PREFIX}/lib/callcc
+
+package:
+	checkinstall --fstrans=no --maintainer=dade.watson@gmail.com --pkgversion="0.3" --pkgrelease="0.3" --requires="clang-19, libgmp-dev, libutf8proc-dev" --pkglicense=MIT
