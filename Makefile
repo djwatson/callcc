@@ -1,5 +1,6 @@
 # callcc requires clang/llvm.
-CC = clang
+CC = clang-19
+AR = llvm-ar-19
 CFLAGS = -O3 -flto=full -DNDEBUG -g  -std=gnu23 -Wall  -march=native -mtune=native -ffat-lto-objects -Wextra -Wnull-dereference  -Wshadow -Wno-unused-parameter
 LIBS = -lm -lgmp -lutf8proc
 SRCS = c/alloc_table.c c/gc.c c/runtime.c c/util/list.c c/util/bitset.c c/callcc.S c/rodata_handler.c
@@ -17,7 +18,7 @@ bin/callcc: compiler/callcc.scm.ll libcallcc.a
 	${CC} ${CFLAGS} -o $@ compiler/callcc.scm.ll libcallcc.a ${LIBS}
 
 libcallcc.a: ${OBJECTS}
-	ar rcs $@ $^
+	${AR} rcs $@ $^
 
 compiler/headers:
 	cd compiler; mkdir -p headers/flow; mkdir -p headers/scheme; gosh -I. gen-libraries.scm

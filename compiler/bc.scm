@@ -589,7 +589,7 @@ attributes #0 = { returns_twice}
        (display line) (newline)))
 
 (define (get-link-command output output-file opts)
-  (let ((link (format "clang ~a -g -o ~a ~a ~alibcallcc.a -lm -lgmp -lutf8proc"
+  (let ((link (format "clang-19 ~a -g -o ~a ~a ~alibcallcc.a -lm -lgmp -lutf8proc"
 		      opts output-file output (get-compile-path))))
     (display (format "Running link: ~a\n" link) (current-error-port))
     link))
