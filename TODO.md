@@ -1,7 +1,6 @@
 # CLEANUP
 
 * clean C some more
-* clean bc.scm intrinics
 
 * website? package? manpage?
 
