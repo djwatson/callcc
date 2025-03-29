@@ -1436,7 +1436,13 @@ gc_obj SCM_MAKE_STRING(gc_obj len, gc_obj fill) {
   // Align.
   auto strlen = align(to_fixnum(len), 8);
   uint8_t buf[4];
-  auto bytecnt = utf8proc_encode_char(to_char(fill), buf);
+  auto ch = to_char(fill);
+  long bytecnt = 1;
+  if (ch >= 128) {
+    bytecnt = utf8proc_encode_char(to_char(fill), buf);
+  } else {
+    buf[0] = ch;
+  }
   auto totallen = strlen * bytecnt;
   // Note: Allocing data here first, so that modifications to
   // str don't require gc_log (since the second gc_alloc

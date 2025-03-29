@@ -96,6 +96,7 @@
 	   (or (and (eq? comparison eq?) assq)
 	       (and (eq? comparison eqv?) assv)
 	       (and (eq? comparison equal?) assoc)
+	       (and (eq? comparison string=?) (lambda (val alist) (assoc val alist string=?)))
 	       (letrec
 		   ((associate
 		     (lambda (val alist)

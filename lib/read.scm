@@ -232,7 +232,7 @@
 	(define (read-one)
 	  (skip-whitespace)
 	  (let ((c (peek-char port)))
-	    (case (peek-char port)
+	    (case c
 	      ((#\#) (read-char port) (read-hash))
 	      ((#\() (read-char port)	 (read-list))
 	      ((#\)) (read-char port)	  (read-error "Extra list terminator found"))

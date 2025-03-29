@@ -1183,6 +1183,7 @@
 (define char<=?
   (case-lambda
    ((a b) (<= (char->integer a) (char->integer b)))
+   ((a b c) (<= (char->integer a) (char->integer b) (char->integer c)))
    (rest
     (comparer (lambda (a b) (char<=? a b)) rest))))
 (define char-ci=?
