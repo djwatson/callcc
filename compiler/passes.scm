@@ -216,6 +216,13 @@ TODO: boxes could be passed down through funcs
    `(primcall GUARD  ,(integrate-r5rs a) ,(cdr (assq op guards))))
   ((call zero? ,(integrate-r5rs a))
    `(primcall NUM_EQ ,a 0))
+  ;; TODO: improve call-with-values integration: Should push
+  ;; call down all tail-paths, not just those that are (lambda () (values ...))
+  ;; See the paper 'efficient implementation of multiple-value returns'
+  ;; The optimization of call-with-values is separate from the actual *implementation* of
+  ;; return values.
+  ((call call-with-values (lambda (case () (call values ,(integrate-r5rs results) ___))) ,(integrate-r5rs callee))
+   `(call ,callee ,results ___))
   ;; TODO: multiple math ops.
   ;; caar, cddr, cadr
   ;; car, cdr, set-car!, set-cdr!, cons, vector-ref, vector-length, string-length, string-ref, string-set!, vector-set!

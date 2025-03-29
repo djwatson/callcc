@@ -21,7 +21,7 @@
   * faster with float type: fft fibfp mbrot pnpoly simplex sumfp. some might need inlining?
   * faster with list/int typecheck removal: quicksort primes puzzle array1
   * faster with custom ratnum (non libgmp): gcbench
-  * faster with buffer management directly: tail 
+  * faster with buffer management directly: tail, cat?
      * read-line (vs. repeated read-char)
      * Some sort of simd looking for newline?
   * faster with custom inliner: graphs (and probably others due to fewer closure allocs),
@@ -30,6 +30,8 @@
   * faster with chains of recurances: sum / sumfp.  Can be O(1)
   * ports can combine input/textual field
     * or even better: port type can just have bits for input/textual for single-type check.
+  * true multiple-return-values
+    * deriv: call-with-values overhead is high
 
 # CLEANUP
 
