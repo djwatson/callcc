@@ -1732,6 +1732,9 @@
 
 (define (port-fd-fill port)
   (unless (port-fd port) (error "ERROR port fill"))
+  (when (= (port-fd port) 0)
+    (flush-output-port (current-output-port))
+    (flush-output-port (current-error-port)))
   (when (< (port-pos port) (port-len port)) (error "Invalid port fill:" (port-pos port) " " (port-len port)))
   (port-pos-set! port 0)
   (port-len-set! port
@@ -1767,7 +1770,8 @@
    ((port)
     ((port-fillflush port) port))))
 
-(define port-buffer-size 512)
+;; Same buffer size as chez.
+(define port-buffer-size 1024)
 
 (define current-input-port (make-parameter (make-port #t #t #t #f 0 0 0 (make-string port-buffer-size) port-fd-fill)))
 (define current-output-port (make-parameter (make-port #f #t #t #f 1 0 port-buffer-size (make-string port-buffer-size) port-fd-flush)))
@@ -1802,7 +1806,8 @@
 (define (with-output-to-file name thunk)
   (let ((file (open-output-file name)))
     (parameterize ((current-output-port file))
-      (thunk))))
+      (thunk)
+      (close-output-port file))))
 
 (define (call-with-port port proc)
   (dynamic-wind (lambda () #f) (lambda () (proc port)) (lambda () (close-port port))))
@@ -1976,9 +1981,7 @@
 	    (write-char ch port))
 	  (begin
 	    (sys:FOREIGN_CALL "SCM_STRING_SET_FAST" buf pos ch)
-	    (sys:FOREIGN_CALL "SCM_RECORD_SET_FAST" port 6 (+ 1 pos))
-	    (when (eq? #\newline ch)
-	      ((port-fillflush port) port))))))))
+	    (sys:FOREIGN_CALL "SCM_RECORD_SET_FAST" port 6 (+ 1 pos))))))))
 
 (define write-u8
   (case-lambda
@@ -2092,7 +2095,14 @@
 ;; process context
 (define (command-line) (sys:FOREIGN_CALL "SCM_COMMAND_LINE"))
 ;; TODO exit codes, dynamic unwinding
-(define (exit) (sys:FOREIGN_CALL "SCM_EXIT" 0))
+(define exit
+  (case-lambda
+   (() (exit 0))
+   ((code)
+    ;; Flush the ports.
+    (close-output-port (current-output-port))
+    (close-output-port (current-error-port))
+    (sys:FOREIGN_CALL "SCM_EXIT" code))))
 (define emergency-exit exit)
 (define (get-environment-variables) (sys:FOREIGN_CALL "SCM_GET_ENV_VARS"))
 (define (get-environment-variable var)
@@ -2262,7 +2272,7 @@
     (display (error-object-message e) eport)
     (for-each (lambda (x) (write x eport)) (error-object-irritants e))
     (newline eport)
-    (sys:FOREIGN_CALL "SCM_EXIT" -1)))
+    (exit -1)))
 
 (define *exception-handlers* (make-parameter `(,default-exception-handler)))
 

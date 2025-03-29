@@ -21,9 +21,6 @@
   * faster with float type: fft fibfp mbrot pnpoly simplex sumfp. some might need inlining?
   * faster with list/int typecheck removal: quicksort primes puzzle array1
   * faster with custom ratnum (non libgmp): gcbench
-  * faster with buffer management directly: tail, cat?
-     * read-line (vs. repeated read-char)
-     * Some sort of simd looking for newline?
   * faster with custom inliner: graphs (and probably others due to fewer closure allocs),
       * read-char write-char won't inline without PGO
 	  * We also have to rebuild all of the r7rs lib because we don't have cross-lib inlining.

@@ -528,11 +528,12 @@ attributes #0 = { returns_twice}
 	   (lowered (r7-pass `(begin  	,@runtime
 					,@eval-and-macros
 					,@prog
-					0 ;; default return value.
+					(exit 0) ;; default return value.
 					)))
 	   (main-fun (make-fun "SCM_MAIN")))
       (when verbose
-	(display (format "Compiling ~a\n" file) (current-error-port)))
+	(display (format "Compiling ~a\n" file) (current-error-port))
+	(flush-output-port (current-error-port)))
       (emit lowered '() main-fun #t)
       (emit-header)
       (for foreign-func (hash-table->alist foreign-funcs)
@@ -592,4 +593,5 @@ attributes #0 = { returns_twice}
   (let ((link (format "clang-19 ~a -g -o ~a ~a ~alibcallcc.a -lm -lgmp -lutf8proc"
 		      opts output-file output (get-compile-path))))
     (display (format "Running link: ~a\n" link) (current-error-port))
+    (flush-output-port (current-error-port))
     link))

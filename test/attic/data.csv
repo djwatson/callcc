@@ -2,7 +2,7 @@ Category,Value
 ack,2.09018
 array1,1.0731
 browse,0.697919
-cat,1.66565
+cat,1.02068
 chudnovsky,0.104522
 compiler,0.926286
 conform,1.55179
@@ -50,8 +50,8 @@ string,0.232552
 sum1,0.886188
 sum,1.39063
 sumfp,1.89921
-tail,3.28491
+tail,2.37238
 tak,1.2263
 takl,2.00932
 triangl,1.15064
-wc,1.147
+wc,.995057
