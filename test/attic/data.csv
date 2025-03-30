@@ -12,7 +12,7 @@ deriv,0.859513
 destruc,1.23825
 diviter,1.06718
 divrec,1.55383
-dynamic,1.65011
+dynamic,1.33594
 earley,2.13134
 equal,0.764147
 fft,0.542228
@@ -41,13 +41,13 @@ primes,0.623375
 puzzle,1.29689
 quicksort,2.19793
 ray,1.70922
-read1,.941099
+read1,.598
 sboyer,0.65338
 scheme,1.39465
 simplex,1.68386
 slatex,1.58735
 string,0.232552
-sum1,0.886188
+sum1,0.495
 sum,1.39063
 sumfp,1.89921
 tail,2.37238

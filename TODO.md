@@ -29,6 +29,10 @@
     * or even better: port type can just have bits for input/textual for single-type check.
   * true multiple-return-values
     * deriv: call-with-values overhead is high
+  * without a cp0, we're unable to remove record checks
+  * we don't currently inline constant global vars that are non-functions
+    * causes a bunch of extra loads and undef-checks, especially for records (the record type
+	  is a global var)
 
 # CLEANUP
 
