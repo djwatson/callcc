@@ -1669,7 +1669,7 @@
 	      ((positive? num) "+inf.0")
 	      (else "-inf.0")))
 	    ((bignum? num) (sys:FOREIGN_CALL "SCM_BIGNUM_STR" num))
-	    ((ratnum? num) (sys:FOREIGN_CALL "SCM_RATNUM_STR" num))
+	    ((ratnum? num) (string-append (number->string (numerator num)) "/" (number->string (denominator num))))
 	    ((compnum? num)
 	     (let* ((real (number->string (real-part num)))
 		    (comp (number->string (imag-part num)))

@@ -87,7 +87,8 @@ typedef struct bignum_s {
 
 typedef struct ratnum_s {
   uint64_t type;
-  mpq_t x;
+  gc_obj num;
+  gc_obj denom;
 } ratnum_s;
 
 typedef struct compnum_s {
@@ -405,8 +406,7 @@ gc_obj SCM_DISPLAY(gc_obj obj, gc_obj scmfd) {
     }
     case RATNUM_TAG: {
       auto rat = to_ratnum(obj);
-      char *gstr = mpq_get_str(nullptr, 10, rat->x);
-      dprintf(fd, "%s", gstr);
+      abort(); // TODO
       break;
     }
     case COMPNUM_TAG: {
@@ -587,23 +587,94 @@ static gc_obj tag_bignum(mpz_t a) {
   return tag_ptr(res);
 }
 
-static gc_obj tag_ratnum(mpq_t a) {
-  // Simplify to fixnum if possible.
-  mpq_canonicalize(a);
-  mpz_t den;
-  mpz_init(den);
-  mpq_get_den(den, a);
-  if (mpz_cmp_si(den, 1) == 0) {
-    mpz_t num;
-    mpz_init(num);
-    mpq_get_num(num, a);
-    return tag_bignum(num);
+gc_obj SCM_DIV(gc_obj a, gc_obj b);
+gc_obj SCM_MUL(gc_obj a, gc_obj b);
+gc_obj SCM_MOD(gc_obj a, gc_obj b);
+gc_obj SCM_QUOTIENT(gc_obj a, gc_obj b);
+gc_obj SCM_LT(gc_obj a, gc_obj b);
+gc_obj SCM_GT(gc_obj a, gc_obj b);
+
+// Simplify ratnums, allocate and tag them.
+static bool SCM_neg(gc_obj a) {
+  return SCM_LT(a, tag_fixnum(0)).value == TRUE_REP.value;
+}
+static gc_obj SCM_abs(gc_obj a) {
+  if (SCM_neg(a)) {
+    return SCM_MUL(a, tag_fixnum(-1));
+  }
+  return a;
+}
+static gc_obj gcd(gc_obj a, gc_obj b) {
+  if (b.value == 0) {
+    return SCM_abs(a);
+  }
+  [[clang::musttail]] return gcd(b, SCM_MOD(a, b));
+}
+static gc_obj tag_ratnum(ratnum_s num) {
+  gc_obj a= num.num;
+  gc_obj b= num.denom;
+  bool neg = SCM_neg(a) ^ SCM_neg(b);
+  a = SCM_abs(a);
+  b = SCM_abs(b);
+  if (a.value == 0) {
+    return a;
+  }
+
+  auto gcdv = gcd(a, b);
+  if(gcdv.value != tag_fixnum(1).value) {
+    a = SCM_QUOTIENT(a, gcdv);
+    b = SCM_QUOTIENT(b, gcdv);
+  }
+  if (b.value == tag_fixnum(1).value) {
+    if (neg) {
+      return SCM_MUL(tag_fixnum(-1),a);
+    }
+    return a;
   }
   ratnum_s *res = gc_alloc(sizeof(ratnum_s));
   res->type = RATNUM_TAG;
-  mpq_init(res->x);
-  mpq_set(res->x, a);
+  res->num = a;
+  if (neg) {
+    res->num = SCM_MUL(tag_fixnum(-1), a);
+  }
+  res->denom = b;
   return tag_ptr(res);
+}
+
+gc_obj SCM_MUL(gc_obj a, gc_obj b);
+gc_obj SCM_ADD(gc_obj a, gc_obj b);
+gc_obj SCM_SUB(gc_obj a, gc_obj b);
+static ratnum_s ratnum_add(ratnum_s a, ratnum_s b) {
+  gc_obj num = SCM_ADD(SCM_MUL(a.num, b.denom), SCM_MUL(b.num, a.denom));
+  gc_obj denom = SCM_MUL(a.denom, b.denom);
+  return (ratnum_s){RATNUM_TAG, num, denom};
+}
+static ratnum_s ratnum_sub(ratnum_s a, ratnum_s b) {
+  gc_obj num = SCM_SUB(SCM_MUL(a.num, b.denom), SCM_MUL(b.num, a.denom));
+  gc_obj denom = SCM_MUL(a.denom, b.denom);
+  return (ratnum_s){RATNUM_TAG, num, denom};
+}
+static ratnum_s ratnum_mul(ratnum_s a, ratnum_s b) {
+  gc_obj num = SCM_MUL(a.num, b.num);
+  gc_obj denom = SCM_MUL(a.denom, b.denom);
+  return (ratnum_s){RATNUM_TAG, num, denom};
+}
+
+static ratnum_s ratnum_div(ratnum_s a, ratnum_s b) {
+  gc_obj num = SCM_MUL(a.num, b.denom);
+  gc_obj denom = SCM_MUL(a.denom, b.num);
+  return (ratnum_s){RATNUM_TAG, num, denom};
+}
+static int ratnum_cmp(ratnum_s a, ratnum_s b) {
+  gc_obj left = SCM_MUL(a.num, b.denom);
+  gc_obj right = SCM_MUL(b.num, a.denom);
+  if (SCM_LT(left, right).value == TRUE_REP.value) {
+    return -1;
+  }
+  if (SCM_GT(left, right).value == TRUE_REP.value) {
+    return 1;
+  }
+  return 0;
 }
 
 gc_obj SCM_MAKE_RECTANGULAR(gc_obj real, gc_obj imag) {
@@ -612,6 +683,44 @@ gc_obj SCM_MAKE_RECTANGULAR(gc_obj real, gc_obj imag) {
   r->real = real;
   r->imag = imag;
   return tag_ptr(r);
+}
+
+static gc_obj pow2(int64_t exponent) {
+  gc_obj result = tag_fixnum(1);
+  gc_obj base = tag_fixnum(2);
+  while (exponent > 0) {
+    if (exponent %2 == 1) {
+      result = SCM_MUL(result, base);
+    }
+    base = SCM_MUL(base, base);
+    exponent /= 2;
+  }
+  return result;
+}
+
+static gc_obj flonum_ratnum(double x) {
+  uint64_t bits;
+  memcpy(&bits, &x, sizeof(bits));
+  bool sign = bits >> 63;
+  int64_t exponent = (int64_t)(bits >> 52 & 0x7ff);
+  int64_t mantissa = (int64_t)(bits & 0xFFFFFFFFFFFFF);
+  if (exponent != 0) {
+    mantissa += 0x10000000000000;
+  }
+  gc_obj denom = tag_fixnum(0x10000000000000);
+  exponent -= 1023;
+  if (sign) {
+    mantissa *= -1;
+  }
+  auto numerator = tag_fixnum(mantissa);
+  if (exponent < 0) {
+    exponent *= -1;
+    denom = SCM_MUL(denom, pow2(exponent));
+  } else {
+    numerator = SCM_MUL(numerator, pow2(exponent));
+  }
+
+  return tag_ratnum((ratnum_s){RATNUM_TAG, numerator, denom});
 }
 
 gc_obj SCM_EXACT(gc_obj flo) {
@@ -623,10 +732,7 @@ gc_obj SCM_EXACT(gc_obj flo) {
     return flo;
   }
   assert(is_flonum(flo));
-  mpq_t res;
-  mpq_init(res);
-  mpq_set_d(res, to_double(flo));
-  return tag_ratnum(res);
+  return flonum_ratnum(to_double(flo));
 }
 
 gc_obj SCM_INEXACT(gc_obj fix) {
@@ -642,7 +748,7 @@ gc_obj SCM_INEXACT(gc_obj fix) {
   }
   if (is_ratnum(fix)) {
     auto r = to_ratnum(fix);
-    return double_to_gc_slow(mpq_get_d(r->x));
+    return SCM_QUOTIENT(SCM_INEXACT(r->num), SCM_INEXACT(r->denom));
   }
   if (is_bignum(fix)) {
     return double_to_gc_slow(mpz_get_d(to_bignum(fix)->x));
@@ -663,29 +769,20 @@ static void get_bignum(gc_obj obj, mpz_t *loc) {
 }
 
 gc_obj SCM_NUMERATOR(gc_obj obj) {
-  mpz_t num;
-  mpz_init(num);
-  mpq_get_num(num, to_ratnum(obj)->x);
-  return tag_bignum(num);
+  return to_ratnum(obj)->num;
 }
 gc_obj SCM_DENOMINATOR(gc_obj obj) {
-  mpz_t num;
-  mpz_init(num);
-  mpq_get_den(num, to_ratnum(obj)->x);
-  return tag_bignum(num);
+  return to_ratnum(obj)->denom;
 }
 
-static void get_ratnum(gc_obj obj, mpq_t *loc) {
-  mpq_init(*loc);
+static ratnum_s get_ratnum(gc_obj obj) {
   if (is_ratnum(obj)) {
-    auto rat = to_ratnum(obj);
-    mpq_set(*loc, rat->x);
+    auto r = to_ratnum(obj);
+    return *r;
   } else if (is_bignum(obj)) {
-    auto big = to_bignum(obj);
-    mpq_set_z(*loc, big->x);
+    return (ratnum_s){RATNUM_TAG, obj, tag_fixnum(1)};
   } else if (is_fixnum(obj)) {
-    auto fix = to_fixnum(obj);
-    mpq_set_si(*loc, fix, 1);
+    return (ratnum_s){RATNUM_TAG, obj, tag_fixnum(1)};
   } else {
     scm_runtime_error1("Not a number:", obj);
   }
@@ -743,14 +840,9 @@ static gc_obj compnum_mul(gc_obj a, gc_obj b) {
           OP(to_double(SCM_INEXACT(a)), to_double(SCM_INEXACT(b))));           \
     }                                                                          \
     if (is_ratnum(a) || is_ratnum(b)) {                                        \
-      mpq_t ba;                                                                \
-      mpq_t bb;                                                                \
-      mpq_t res;                                                               \
-      mpq_init(res);                                                           \
-      get_ratnum(a, &ba);                                                      \
-      get_ratnum(b, &bb);                                                      \
-      mpq_##OPLCNAME(res, ba, bb);                                             \
-      return tag_ratnum(res);                                                  \
+      ratnum_s ba = get_ratnum(a);						\
+      ratnum_s bb = get_ratnum(b);                                                      \
+      return tag_ratnum(ratnum_##OPLCNAME(ba, bb));				\
     }                                                                          \
     if (is_bignum(a) || is_bignum(b)) {                                        \
       mpz_t ba;                                                                \
@@ -863,14 +955,9 @@ NOINLINE gc_obj SCM_DIV_SLOW(gc_obj a, gc_obj b) {
     return double_to_gc_slow(to_double(SCM_INEXACT(a)) /
                              to_double(SCM_INEXACT(b)));
   }
-  mpq_t ra;
-  mpq_t rb;
-  mpq_t rres;
-  mpq_init(rres);
-  get_ratnum(a, &ra);
-  get_ratnum(b, &rb);
-  mpq_div(rres, ra, rb);
-  return tag_ratnum(rres);
+  ratnum_s ra = get_ratnum(a);
+  ratnum_s rb = get_ratnum(b);
+  return tag_ratnum(ratnum_div(ra, rb));
 }
 
 INLINE gc_obj SCM_DIV(gc_obj a, gc_obj b) {
@@ -892,11 +979,9 @@ INLINE gc_obj SCM_DIV(gc_obj a, gc_obj b) {
     } else if (is_flonum(a) || is_flonum(b)) {                                 \
       res = OP(to_double(SCM_INEXACT(a)), to_double(SCM_INEXACT(b)));          \
     } else if (is_ratnum(a) || is_ratnum(b)) {                                 \
-      mpq_t ba;                                                                \
-      mpq_t bb;                                                                \
-      get_ratnum(a, &ba);                                                      \
-      get_ratnum(b, &bb);                                                      \
-      res = OP(mpq_cmp(ba, bb), 0);                                            \
+      ratnum_s ba = get_ratnum(a);						\
+      ratnum_s bb = get_ratnum(b);						\
+      res = OP(ratnum_cmp(ba, bb), 0);                                            \
     } else if (is_bignum(a) || is_bignum(b)) {                                 \
       mpz_t ba;                                                                \
       mpz_t bb;                                                                \
@@ -2089,23 +2174,6 @@ gc_obj SCM_BIGNUM_STR(gc_obj b) {
   string_s *str = gc_alloc(sizeof(string_s));
   str->strdata = data;
   mpz_get_str(str->strdata, 10, bignum->x);
-  str->len = tag_fixnum((int64_t)strlen(str->strdata));
-  str->bytes = tag_fixnum((int64_t)strlen(str->strdata));
-  str->type = STRING_TAG;
-  return tag_string(str);
-}
-
-gc_obj SCM_RATNUM_STR(gc_obj b) {
-  auto ratnum = to_ratnum(b);
-  // +2 per manual for null-termination and -
-  auto len = mpz_sizeinbase(mpq_numref(ratnum->x), 10) +
-             mpz_sizeinbase(mpq_denref(ratnum->x), 10) + 3;
-  // Align.
-  len = align(len, 8);
-  auto data = gc_alloc(len);
-  string_s *str = gc_alloc(sizeof(string_s));
-  str->strdata = data;
-  mpq_get_str(str->strdata, 10, ratnum->x);
   str->len = tag_fixnum((int64_t)strlen(str->strdata));
   str->bytes = tag_fixnum((int64_t)strlen(str->strdata));
   str->type = STRING_TAG;
