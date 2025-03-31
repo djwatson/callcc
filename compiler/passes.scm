@@ -407,6 +407,34 @@ TODO: boxes could be passed down through funcs
      `(loop ,vars ,name ,body ,args ___)))
   (lower f))
 
+;; A simple scev pass, that only catches sum and sumfp.  lol.
+(define-pass simple-scev
+  ((loop (,i ,sum) ,loop-var
+	 (if (primcall LT ,i2 ,first-v)
+	     ,sum2
+	     (call ,loop-var2 (primcall SUB ,i3 ,stride) (primcall ADD ,i4 ,sum3)))
+	 ,last-v
+	 ,sum-init)
+   (guard (and (eq? i i2) (eq? i i3) (eq? i i4)
+	       (eq? sum sum2) (eq? sum sum3)
+	       (eq? loop-var loop-var2)
+	       (number? stride)
+	       (number? sum-init)))
+   (let ((first (gen-sym 'first))
+	 (last (gen-sym 'last))
+	 (num-terms (gen-sym 'num-terms))
+	 (firstp (gen-sym 'firstp)))
+     `(let ((,first ,first-v)
+	    (,last ,last-v))
+	(let ((,num-terms (call (lookup floor)
+				(primcall DIV (primcall SUB ,last ,first) ,stride))))
+	  (let ((,firstp (primcall SUB ,last (primcall MUL ,num-terms ,stride))))
+	    (primcall ADD ,sum-init
+		      (primcall MUL
+				(primcall DIV (primcall ADD 1 ,num-terms) 2)
+				(primcall MUL ,stride
+					  (primcall QUOTIENT (primcall ADD ,firstp ,last) ,stride))))))))))
+
 ;; Give all lambdas a name.
 
 ;; TODO: we should track the current name, and give anonymous lambdas
@@ -765,7 +793,7 @@ TODO: boxes could be passed down through funcs
 	 `(call (lookup ,global) ,args ___)))))
 
 (define (debug-print x)
-  (display x)
+  (display x (current-error-port))
   x)
 
 ;; This pass mutates the input, let's make sure we have a fresh copy.
@@ -790,6 +818,8 @@ TODO: boxes could be passed down through funcs
       assignment-conversion
       recover-let
       lower-loops
+      ;debug-print
+      simple-scev
       name-lambdas
       fix-all
       uncover-free
