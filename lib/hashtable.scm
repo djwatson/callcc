@@ -64,10 +64,10 @@
       (set! hashvalue (modulo (+ (* 257 hashvalue) (hash (vector-ref v index)))
 			      *default-bound*)))))
 
-(define %make-hash-node cons)
-(define %hash-node-set-value! set-cdr!)
-(define %hash-node-key car)
-(define %hash-node-value cdr)
+(define (%make-hash-node a b) (cons a b))
+(define (%hash-node-set-value! a b) (set-cdr! a b))
+(define (%hash-node-key x) (car x))
+(define (%hash-node-value x) (cdr x))
 
 (define-record-type <srfi-hash-table>
   (%make-hash-table size hash compare associate entries)

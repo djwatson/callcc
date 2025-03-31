@@ -24,13 +24,13 @@
    ((bytevector? x) (and (bytevector? y) (bytevector=? x y) k))
    (else (and (eqv? x y) k))))
 
-(define k0 400)
-(define kb -40)
+(define k0 200)
+(define kb -20)
 (define (random x) x)
 (define (interleave? x y k)
   (let ((ht #f))
     (define (call-union-find x y)
-      (unless ht (set! ht (make-hash-table eq?)))
+      (unless ht (set! ht (make-hash-table eq? hash-by-identity 4096)))
       (union-find ht x y))
     (define (e? x y k)
       (if (<= k 0)
@@ -89,8 +89,13 @@
   (let ((k (pre? x y k0)))
     (and k (or (> k 0) (interleave? x y k)))))
 
-(define-record-type box-type (box val) box?
-		    (val unbox set-box!))
+;; (define-record-type box-type (box val) box?
+;; 		    (val unbox set-box!))
+(define box-tag (cons #t #t))
+(define (box x) (cons box-tag x))
+(define (unbox x) (cdr x))
+(define (set-box x v) (set-cdr! x v))
+(define (box? x) (and (pair? x) (eq? box-tag (car x))))
 (define (union-find ht x y)
   (define (find b)
     (let ((n (unbox b)))
