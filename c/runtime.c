@@ -17,6 +17,7 @@
 #include "gc.h"
 
 #include "rodata_handler.h"
+#include "unionfind.h"
 
 #define likely(x) __builtin_expect(x, 1)
 #define unlikely(x) __builtin_expect(x, 0)
@@ -1428,6 +1429,114 @@ INLINE gc_obj SCM_EQV(gc_obj a, gc_obj b) {
   // sufficient.
   if (unlikely(is_number(a))) {
     [[clang::musttail]] return SCM_EQV_SLOW(a, b);
+  }
+  return FALSE_REP;
+}
+
+static const int64_t kb = -20;
+static const int64_t k0 = 200;
+typedef struct {
+  bool v;
+  int64_t k;
+} ep_result;
+static ep_result ep(uf *ht, bool unused, gc_obj a, gc_obj b, int64_t k);
+static ep_result equalp_interleave(uf *ht, bool fast, gc_obj a, gc_obj b,
+                                   int64_t k) {
+  // eq?
+  if (a.value == b.value) {
+    return (ep_result){true, k};
+  }
+
+  // Check cons, vector, string for equalp?
+  // cons and vector check unionfind table for cycles.
+  if (is_cons(a)) {
+    if (is_cons(b)) {
+      auto cell_a = to_cons(a);
+      auto cell_b = to_cons(b);
+      if (!fast && unionfind(ht, a.value, b.value)) {
+        return (ep_result){true, 0};
+      }
+      // Decrement k once
+      auto res = ep(ht, fast, cell_a->a, cell_b->a, k - 1);
+      if (!res.v) {
+        return res;
+      }
+      // And pass k through.
+      [[clang::musttail]] return ep(ht, fast, cell_a->b, cell_b->b, res.k);
+    }
+    return (ep_result){false, k};
+  }
+  if (is_vector(a) && is_vector(b)) {
+    auto va = to_vector(a);
+    auto vb = to_vector(b);
+    if (va->len.value != vb->len.value) {
+      return (ep_result){false, k};
+    }
+    if (!fast && unionfind(ht, a.value, b.value)) {
+      return (ep_result){true, 0};
+    }
+    // Decrement K once for the vector, but return same K value
+    uint64_t lim = to_fixnum(va->len);
+    for (uint64_t i = 0; i < lim; i++) {
+      auto res = ep(ht, fast, va->v[i], vb->v[i], k - 1);
+      if (!res.v) {
+        return res;
+      }
+    }
+    return (ep_result){true, k};
+  }
+  // string=?
+  if (is_string(a)) {
+    if (is_string(b)) {
+      if (SCM_STRING_CMP(a, b).value == 0) {
+	return (ep_result){true, k};
+      }
+    }
+    return (ep_result){false, k};
+  }
+  // bytevector=?
+  if(is_bytevector(a)) {
+    if (is_bytevector(b)) {
+      auto bva = to_bytevector(a);
+      auto bvb = to_bytevector(b);
+      if (bva->len.value != bvb->len.value) {
+	return (ep_result){false, k};
+      }
+      if (memcmp(bva->v, bvb->v, to_fixnum(bva->len)) == 0) {
+	return (ep_result){true, k};
+      }
+    }
+    return (ep_result){false, k};
+  }
+  // eqvp?
+  if (SCM_EQV(a, b).value == TRUE_REP.value) {
+    return (ep_result){true, k};
+  }
+  return (ep_result){false, k};
+}
+
+static ep_result ep(uf *ht, bool unused, gc_obj a, gc_obj b, int64_t k) {
+  if (k <= 0) {
+    if (k == kb) {
+      [[clang::musttail]] return equalp_interleave(ht, true, a, b, k0 * 2);
+    } else {
+      [[clang::musttail]] return equalp_interleave(ht, false, a, b, k);
+    }
+  } else {
+    [[clang::musttail]] return equalp_interleave(ht, true, a, b, k);
+  }
+}
+
+gc_obj SCM_EQUAL(gc_obj a, gc_obj b) {
+  uf ht;
+  uf_init(&ht);
+  int64_t k = k0;
+
+  ep_result res = ep(&ht, true, a, b, k);
+
+  uf_free(&ht);
+  if (res.v) {
+    return TRUE_REP;
   }
   return FALSE_REP;
 }

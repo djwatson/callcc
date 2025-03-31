@@ -959,6 +959,8 @@
 (define (eq? a b)
   (eq? a b))
 
+(define (equal? a b)
+  (sys:FOREIGN_CALL "SCM_EQUAL" a b))
 ;; CXR
 
 (define (caddr e) (car (cddr e))) 
@@ -2076,7 +2078,6 @@
 ;;;;;;; equals?, hash tables.
 
 (include "lib/hashtable.scm")
-(include "lib/equal.scm")
 
 ;;;;;;; Symbols
 (define (symbol->string a) (sys:FOREIGN_CALL "SCM_SYMBOL_STRING" a))

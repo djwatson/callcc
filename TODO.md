@@ -1,12 +1,3 @@
-# CLEANUP
-
-* website? package? manpage?
-
-----------------------------------------
-# POST-first-release
-
-* get a scm formatter - s7? chez?
-
 # known bugs
 
 * We don't check for modification of constant values in the interpreter
@@ -14,7 +5,6 @@
 ## library
 * Some of the math routines don't support complex numbers correctly 
 * Ports need more cleanup: support input from binary ports, more error checking,
-
 
 # global analysis perf improvements :
   * faster with single-shot continuations: ctak fibc
@@ -36,6 +26,7 @@
 
 # CLEANUP
 
+* get a scm formatter - s7? chez?
 * cleanup library paths (instead of usage of -I or -A, use full path)
   * can remove junk extra paths from bc.scm and eval.scm
 * figure out strategy for cleaner intrinsics????

@@ -13,8 +13,8 @@ destruc,1.23825
 diviter,1.06718
 divrec,1.55383
 dynamic,1.33594
-earley,2.13134
-equal,0.764147
+earley,1.79445
+equal,0.224
 fft,0.542228
 fib,2.01627
 fibc,0.457113
@@ -24,7 +24,7 @@ graphs,2.32349
 lattice,2.72254
 matrix,0.725057
 maze,0.382236
-mazefun,0.966558
+mazefun,0.9101
 mbrot,2.29717
 mbrotZ,4.35699
 mperm,3.28131
@@ -34,7 +34,7 @@ ntakl,1.63544
 nucleic,1.63224
 paraffins,1.47723
 parsing,2.07016
-peval,1.06171
+peval,1.00695
 pi,0.092162
 pnpoly,1.73923
 primes,0.623375

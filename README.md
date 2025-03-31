@@ -100,12 +100,4 @@ The LLVM backend uses a few semi-portable flags, including 'musttail',
 
 Currently only x86_64 has been benchmarked for performance.
 
-# Notes:
-
-Output is only flushed after newlines, so be sure to put a newline
-after the last display.
-
-Currently FD's are closed automatically, close-input/output-port must
-be called.
-
 
