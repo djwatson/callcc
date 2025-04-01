@@ -7,13 +7,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define unlikely(x) __builtin_expect(x, 0)
+#include "util/util.h"
 
-static uint64_t hashmix(uint64_t key) {
-  key += (key << 10);
-  key ^= (key >> 6);
-  return key;
-}
 // Custom hashtable.  I tried to use stb_ds, but it was too slow:
 // insertion/hashing isn't as fast as crc32+linear probe.
 static uf_item *map_find(uf *ht, int64_t key) {

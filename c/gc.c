@@ -19,11 +19,7 @@
 #include "util/bitset.h"
 #include "util/kvec.h"
 #include "util/list.h"
-
-#define likely(x) __builtin_expect(x, 1)
-#define unlikely(x) __builtin_expect(x, 0)
-#define NOINLINE __attribute__((noinline))
-#define INLINE __attribute__((always_inline))
+#include "util/util.h"
 
 static constexpr uint64_t size_classes = 4096 / 8;
 
@@ -59,10 +55,6 @@ typedef struct freelist_s {
   uint64_t end_ptr;
   slab_info *slab;
 } freelist_s;
-
-static uintptr_t align(uintptr_t val, uintptr_t alignment) {
-  return (val + alignment - 1) & ~(alignment - 1);
-}
 
 static freelist_s freelist[size_classes];
 static kvec_t(slab_info *) partials[size_classes];

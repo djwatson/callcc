@@ -14,19 +14,12 @@
 
 #include <utf8proc.h>
 
+#include "util/util.h"
+
 #include "gc.h"
 
 #include "rodata_handler.h"
 #include "unionfind.h"
-
-#define likely(x) __builtin_expect(x, 1)
-#define unlikely(x) __builtin_expect(x, 0)
-#define NOINLINE __attribute__((noinline))
-#define INLINE __attribute__((always_inline))
-
-static uintptr_t align(uintptr_t val, uintptr_t alignment) {
-  return (val + alignment - 1) & ~(alignment - 1);
-}
 
 enum : int64_t {
   // Low bit tags for gc_obj
@@ -611,8 +604,8 @@ static gc_obj gcd(gc_obj a, gc_obj b) {
   [[clang::musttail]] return gcd(b, SCM_MOD(a, b));
 }
 static gc_obj tag_ratnum(ratnum_s num) {
-  gc_obj a= num.num;
-  gc_obj b= num.denom;
+  gc_obj a = num.num;
+  gc_obj b = num.denom;
   bool neg = SCM_neg(a) ^ SCM_neg(b);
   a = SCM_abs(a);
   b = SCM_abs(b);
@@ -621,13 +614,13 @@ static gc_obj tag_ratnum(ratnum_s num) {
   }
 
   auto gcdv = gcd(a, b);
-  if(gcdv.value != tag_fixnum(1).value) {
+  if (gcdv.value != tag_fixnum(1).value) {
     a = SCM_QUOTIENT(a, gcdv);
     b = SCM_QUOTIENT(b, gcdv);
   }
   if (b.value == tag_fixnum(1).value) {
     if (neg) {
-      return SCM_MUL(tag_fixnum(-1),a);
+      return SCM_MUL(tag_fixnum(-1), a);
     }
     return a;
   }
@@ -689,7 +682,7 @@ static gc_obj pow2(int64_t exponent) {
   gc_obj result = tag_fixnum(1);
   gc_obj base = tag_fixnum(2);
   while (exponent > 0) {
-    if (exponent %2 == 1) {
+    if (exponent % 2 == 1) {
       result = SCM_MUL(result, base);
     }
     base = SCM_MUL(base, base);
@@ -768,12 +761,8 @@ static void get_bignum(gc_obj obj, mpz_t *loc) {
   scm_runtime_error1("Not a number: ", obj);
 }
 
-gc_obj SCM_NUMERATOR(gc_obj obj) {
-  return to_ratnum(obj)->num;
-}
-gc_obj SCM_DENOMINATOR(gc_obj obj) {
-  return to_ratnum(obj)->denom;
-}
+gc_obj SCM_NUMERATOR(gc_obj obj) { return to_ratnum(obj)->num; }
+gc_obj SCM_DENOMINATOR(gc_obj obj) { return to_ratnum(obj)->denom; }
 
 static ratnum_s get_ratnum(gc_obj obj) {
   if (is_ratnum(obj)) {
@@ -840,9 +829,9 @@ static gc_obj compnum_mul(gc_obj a, gc_obj b) {
           OP(to_double(SCM_INEXACT(a)), to_double(SCM_INEXACT(b))));           \
     }                                                                          \
     if (is_ratnum(a) || is_ratnum(b)) {                                        \
-      ratnum_s ba = get_ratnum(a);						\
-      ratnum_s bb = get_ratnum(b);                                                      \
-      return tag_ratnum(ratnum_##OPLCNAME(ba, bb));				\
+      ratnum_s ba = get_ratnum(a);                                             \
+      ratnum_s bb = get_ratnum(b);                                             \
+      return tag_ratnum(ratnum_##OPLCNAME(ba, bb));                            \
     }                                                                          \
     if (is_bignum(a) || is_bignum(b)) {                                        \
       mpz_t ba;                                                                \
@@ -979,9 +968,9 @@ INLINE gc_obj SCM_DIV(gc_obj a, gc_obj b) {
     } else if (is_flonum(a) || is_flonum(b)) {                                 \
       res = OP(to_double(SCM_INEXACT(a)), to_double(SCM_INEXACT(b)));          \
     } else if (is_ratnum(a) || is_ratnum(b)) {                                 \
-      ratnum_s ba = get_ratnum(a);						\
-      ratnum_s bb = get_ratnum(b);						\
-      res = OP(ratnum_cmp(ba, bb), 0);                                            \
+      ratnum_s ba = get_ratnum(a);                                             \
+      ratnum_s bb = get_ratnum(b);                                             \
+      res = OP(ratnum_cmp(ba, bb), 0);                                         \
     } else if (is_bignum(a) || is_bignum(b)) {                                 \
       mpz_t ba;                                                                \
       mpz_t bb;                                                                \
@@ -1574,21 +1563,21 @@ static ep_result equalp_interleave(uf *ht, bool fast, gc_obj a, gc_obj b,
   if (is_string(a)) {
     if (is_string(b)) {
       if (SCM_STRING_CMP(a, b).value == 0) {
-	return (ep_result){true, k};
+        return (ep_result){true, k};
       }
     }
     return (ep_result){false, k};
   }
   // bytevector=?
-  if(is_bytevector(a)) {
+  if (is_bytevector(a)) {
     if (is_bytevector(b)) {
       auto bva = to_bytevector(a);
       auto bvb = to_bytevector(b);
       if (bva->len.value != bvb->len.value) {
-	return (ep_result){false, k};
+        return (ep_result){false, k};
       }
       if (memcmp(bva->v, bvb->v, to_fixnum(bva->len)) == 0) {
-	return (ep_result){true, k};
+        return (ep_result){true, k};
       }
     }
     return (ep_result){false, k};
@@ -1910,11 +1899,6 @@ gc_obj SCM_LOG(gc_obj f) {
   return double_to_gc_slow(log(d));
 }
 
-static uint64_t hashmix(uint64_t key) {
-  key += (key << 10);
-  key ^= (key >> 6);
-  return key;
-}
 INLINE gc_obj SCM_EQ_HASH(gc_obj h) {
   return (gc_obj){.value = (long)hashmix(h.value) << 3};
 }
