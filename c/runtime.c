@@ -586,6 +586,8 @@ gc_obj SCM_MOD(gc_obj a, gc_obj b);
 gc_obj SCM_QUOTIENT(gc_obj a, gc_obj b);
 gc_obj SCM_LT(gc_obj a, gc_obj b);
 gc_obj SCM_GT(gc_obj a, gc_obj b);
+gc_obj SCM_ADD(gc_obj a, gc_obj b);
+gc_obj SCM_SUB(gc_obj a, gc_obj b);
 
 // Simplify ratnums, allocate and tag them.
 static bool SCM_neg(gc_obj a) {
@@ -634,9 +636,6 @@ static gc_obj tag_ratnum(ratnum_s num) {
   return tag_ptr(res);
 }
 
-gc_obj SCM_MUL(gc_obj a, gc_obj b);
-gc_obj SCM_ADD(gc_obj a, gc_obj b);
-gc_obj SCM_SUB(gc_obj a, gc_obj b);
 static ratnum_s ratnum_add(ratnum_s a, ratnum_s b) {
   gc_obj num = SCM_ADD(SCM_MUL(a.num, b.denom), SCM_MUL(b.num, a.denom));
   gc_obj denom = SCM_MUL(a.denom, b.denom);
@@ -768,13 +767,14 @@ static ratnum_s get_ratnum(gc_obj obj) {
   if (is_ratnum(obj)) {
     auto r = to_ratnum(obj);
     return *r;
-  } else if (is_bignum(obj)) {
-    return (ratnum_s){RATNUM_TAG, obj, tag_fixnum(1)};
-  } else if (is_fixnum(obj)) {
-    return (ratnum_s){RATNUM_TAG, obj, tag_fixnum(1)};
-  } else {
-    scm_runtime_error1("Not a number:", obj);
   }
+  if (is_bignum(obj)) {
+    return (ratnum_s){RATNUM_TAG, obj, tag_fixnum(1)};
+  }
+  if (is_fixnum(obj)) {
+    return (ratnum_s){RATNUM_TAG, obj, tag_fixnum(1)};
+  }
+  scm_runtime_error1("Not a number:", obj);
 }
 
 static gc_obj get_compnum(gc_obj num) {
@@ -793,9 +793,6 @@ gc_obj SCM_IMAG_PART(gc_obj comp) {
   return r->imag;
 }
 
-INLINE gc_obj SCM_ADD(gc_obj a, gc_obj b);
-INLINE gc_obj SCM_SUB(gc_obj a, gc_obj b);
-INLINE gc_obj SCM_MUL(gc_obj a, gc_obj b);
 static gc_obj compnum_add(gc_obj a, gc_obj b) {
   auto ca = to_compnum(get_compnum(a));
   auto cb = to_compnum(get_compnum(b));
@@ -817,7 +814,6 @@ static gc_obj compnum_mul(gc_obj a, gc_obj b) {
       SCM_ADD(SCM_MUL(ca->real, cb->imag), SCM_MUL(ca->imag, cb->real)));
 }
 
-// TODO: fix can't swap -
 #define MATH_OVERFLOW_OP(OPNAME, OPLCNAME, OP, SHIFT)                          \
   NOINLINE __attribute__((preserve_most)) gc_obj SCM_##OPNAME##_SLOW(          \
       gc_obj a, gc_obj b) {                                                    \
@@ -1360,16 +1356,15 @@ static const int64_t reg_arg_cnt = 6;
 /* static const uint64_t reg_arg_cnt = 8; */
 /* #endif */
 
-// TODO: gc shadow_stack
-int64_t shadow_stack_size = 0;
+uint64_t shadow_stack_size = 0;
 gc_obj *shadow_stack = nullptr;
 ///// Shadow stack
 
 // TODO: Could split in fast/slowpath: only apply doesn't statically know
 // the shadow stack size.
 INLINE void SCM_WRITE_SHADOW_STACK(gc_obj pos, gc_obj obj) {
-  while (unlikely(to_fixnum(pos) >= shadow_stack_size)) {
-    for (int64_t i = shadow_stack_size; i > 0; i--) {
+  while (unlikely((uint64_t)to_fixnum(pos) >= shadow_stack_size)) {
+    for (uint64_t i = shadow_stack_size; i > 0; i--) {
       gc_pop_root((uint64_t *)&shadow_stack[i - 1]);
     }
     shadow_stack_size *= 2;
@@ -1382,12 +1377,12 @@ INLINE void SCM_WRITE_SHADOW_STACK(gc_obj pos, gc_obj obj) {
       abort();
     }
     shadow_stack = new_shadow_stack;
-    for (int64_t i = 0; i < shadow_stack_size; i++) {
+    for (uint64_t i = 0; i < shadow_stack_size; i++) {
       gc_add_root((uint64_t *)&shadow_stack[i]);
     }
     assert(shadow_stack);
   }
-  assert(to_fixnum(pos) < shadow_stack_size);
+  assert((uint64_t)to_fixnum(pos) < shadow_stack_size);
   shadow_stack[to_fixnum(pos)] = obj;
 }
 
@@ -2204,7 +2199,6 @@ gc_obj SCM_DOUBLE_AS_U64(gc_obj b) {
 static int argc;
 static char **argv;
 
-// TODO: check utf8
 static gc_obj from_c_str(char *str) {
   auto len = strlen(str);
   gc_obj res = SCM_MAKE_STRING(tag_fixnum((int64_t)len), FALSE_REP);
@@ -2222,7 +2216,6 @@ gc_obj SCM_COMMAND_LINE() {
 }
 gc_obj SCM_EXIT(gc_obj code) { exit((int)to_fixnum(code)); }
 
-// TODO: check utf8
 gc_obj SCM_GET_ENV_VARS() {
   gc_obj tail = NIL;
 
@@ -2261,7 +2254,6 @@ gc_obj SCM_CURRENT_SECOND() {
   return double_to_gc_slow(f);
 }
 
-// TODO: check utf8
 gc_obj SCM_SYSTEM(gc_obj strn) {
   auto str = to_string(strn);
   auto len = to_fixnum(str->len);

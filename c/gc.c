@@ -390,7 +390,7 @@ static slab_info *alloc_slab(uint64_t sz_class) {
   if (page_class < page_classes && kv_size(pages_free[page_class])) {
     slab_info *free = kv_pop(pages_free[page_class]);
     if (free) {
-      assert(sz <= (free->end - free->start));
+      assert((int64_t)sz <= (free->end - free->start));
       free->class = sz_class;
       list_add(&free->link, &live_slabs);
       return free;
