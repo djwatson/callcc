@@ -771,6 +771,7 @@ TODO: boxes could be passed down through funcs
 
 (define global-defs (make-hash-table eq?))
 (define global-labels (make-hash-table eq?))
+(define global-defs-inv (make-hash-table eq?))
 
 (define-pass find-global-labels sexp
   ((define ,var (labels ((,label ,lam)) (let ((,closure (const-closure (label ,label2))))
@@ -781,6 +782,7 @@ TODO: boxes could be passed down through funcs
        (begin
 	 ;;(display (format "Record global ~a\n" var) (current-error-port))
 	 (hash-table-set! global-defs var label)
+	 (hash-table-set! global-defs-inv label var)
 	 (hash-table-set! global-labels label lam)))
    sexp))
 
@@ -833,7 +835,7 @@ TODO: boxes could be passed down through funcs
       find-global-labels
       programify
       
-      ;; storage-use-analysis
+      storage-use-analysis
       ))
 
 

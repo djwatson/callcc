@@ -7,7 +7,7 @@ chudnovsky,0.104522
 compiler,0.926286
 conform,1.55179
 cpstak,2.11726
-ctak,1.05146
+ctak,.36743
 deriv,0.859513
 destruc,1.23825
 diviter,1.06718
@@ -17,9 +17,9 @@ earley,1.79445
 equal,0.224
 fft,0.542228
 fib,2.01627
-fibc,0.457113
+fibc,0.219098
 fibfp,0.939403
-gcbench,0.94037
+gcbench,0.631467
 graphs,2.32349
 lattice,2.72254
 matrix,0.725057
@@ -38,8 +38,8 @@ peval,1.00695
 pi,0.092162
 pnpoly,1.73923
 primes,0.623375
-puzzle,1.29689
-quicksort,2.19793
+puzzle,1.2788
+quicksort,2.06487
 ray,1.70922
 read1,.598
 sboyer,0.65338

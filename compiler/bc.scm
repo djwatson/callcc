@@ -162,6 +162,7 @@
     ;; These are either only emitted from the code generator,
     ;; or need custom flags (like preserve_none)
     (unless (member name '("SCM_CALLCC" "SCM_CALLCC_ONESHOT" "SCM_SET_GLOBAL" "SCM_LOAD_GLOBAL"
+			   "SCM_CLOSURE_SET"
 			   "SCM_WRITE_SHADOW_STACK"))
       (hash-table-set! foreign-funcs name cnt))))
 

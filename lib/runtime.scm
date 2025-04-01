@@ -386,6 +386,12 @@
     (unless (eq? *here* winds)
       (reroot! winds))
     res))
+(define (call-with-current-continuation-oneshot x)
+  (let* ((winds *here*)
+	 (res (sys:FOREIGN_CALL "SCM_CALLCC_ONESHOT" x)))
+    (unless (eq? *here* winds)
+      (reroot! winds))
+    res))
 (define (call/cc x) (call-with-current-continuation x))
 
 (define (car a)

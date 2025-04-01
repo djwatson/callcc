@@ -1,20 +1,18 @@
 # known bugs
 
-* We don't check for modification of constant values in the interpreter
+* We don't check for modification of constant values in the interpreter (only the compiler)
+* (load) paths seem incorrect
 
 ## library
 * Some of the math routines don't support complex numbers correctly 
 * Ports need more cleanup: support input from binary ports, more error checking,
 
 # global analysis perf improvements :
-  * faster with single-shot continuations: ctak fibc
   * faster with float type: fft fibfp mbrot pnpoly simplex sumfp. some might need inlining?
   * faster with list/int typecheck removal: quicksort primes puzzle array1
-  * faster with custom ratnum (non libgmp): gcbench
   * faster with custom inliner: graphs (and probably others due to fewer closure allocs),
       * read-char write-char won't inline without PGO
 	  * We also have to rebuild all of the r7rs lib because we don't have cross-lib inlining.
-  * faster with chains of recurances: sum / sumfp.  Can be O(1)
   * ports can combine input/textual field
     * or even better: port type can just have bits for input/textual for single-type check.
   * true multiple-return-values
@@ -29,9 +27,7 @@
 * get a scm formatter - s7? chez?
 * cleanup library paths (instead of usage of -I or -A, use full path)
   * can remove junk extra paths from bc.scm and eval.scm
-* figure out strategy for cleaner intrinsics????
-  * we can auto-gen the header for llvm (excepting like SCM_CALL_CC that need extra flags)
-  * what we've got is fine, gen-libraries can remove the old intrinsics
+* figure out strategy for cleaner intrinsics - cleanup gen-libraries
 * cleanup runtime - move as much to scm as possible?
   * especially moving the number routine slowpaths would be cleaner?
 * environments/eval
