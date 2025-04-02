@@ -2450,7 +2450,6 @@ int main(int argc_in, char *argv_in[]) {
   auto vec = to_vector(symbol_table);
   for (int64_t i = 0; i < to_fixnum(vec->len); i++) {
     auto sym = to_symbol(vec->v[i]);
-    gc_add_root((uint64_t *)&sym->name);
     gc_add_root((uint64_t *)&sym->val);
   }
   // stack call/cc link.
