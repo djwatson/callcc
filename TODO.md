@@ -7,12 +7,14 @@
 * Some of the math routines don't support complex numbers correctly 
 * Ports need more cleanup: support input from binary ports, more error checking,
 
-# global analysis perf improvements :
-  * faster with float type: fft fibfp mbrot pnpoly simplex sumfp. some might need inlining?
-  * faster with list/int typecheck removal: quicksort primes puzzle array1
+# PERF
+  * Needs inliner to remove alloc: graphs
+    * simple called-once: Do it based on libraries?
   * faster with custom inliner: graphs (and probably others due to fewer closure allocs),
       * read-char write-char won't inline without PGO
 	  * We also have to rebuild all of the r7rs lib because we don't have cross-lib inlining.
+  * faster with float type: fft fibfp mbrot pnpoly simplex sumfp. some might need inlining?
+  * faster with list/int typecheck removal: quicksort primes puzzle array1
   * ports can combine input/textual field
     * or even better: port type can just have bits for input/textual for single-type check.
   * true multiple-return-values
@@ -21,6 +23,13 @@
   * we don't currently inline constant global vars that are non-functions
     * causes a bunch of extra loads and undef-checks, especially for records (the record type
 	  is a global var)
+  * auto-listify globals: consargs stub in compiler called a lot: 
+    * vector. Hand-coded in chez
+  * better control of inlining, read-char/peek-char should be inlined fastpath.
+  * S_error should have noreturn
+  * fixup writing w-out going through write-char if possible?: doesn't seem to affect perf much.
+
+  * fast globals, a.la chez
 
 # CLEANUP
 
@@ -34,17 +43,6 @@
   * check if necessary to rename intrinsics? Works in other eval somehow
      * I think this is caused by needing to 'expand' symbols inserted by 
 	   syntax-case, and by the macro serializer.
-
-# PERF
-* Needs inliner to remove alloc: graphs
-  * simple called-once: Do it based on libraries?
-* auto-listify globals: consargs stub in compiler called a lot: 
-  * vector. Hand-coded in chez
-* better control of inlining, read-char/peek-char should be inlined fastpath.
-* S_error should have noreturn
-* fixup writing w-out going through write-char if possible?: doesn't seem to affect perf much.
-
-* fast globals, a.la chez
 
 # gc
   * cleanup vector sizing: just use another header for large similar to small logbits?

@@ -791,8 +791,13 @@ TODO: boxes could be passed down through funcs
    (if (hash-table-exists? global-defs global)
        `(label-call ,(hash-table-ref global-defs global) #f ,args ___)
        (begin
-					;(display (format "Global not found:~a\n" global) (current-error-port))
-	 `(call (lookup ,global) ,args ___)))))
+	 (display (format "Global not found:~a\n" global) (current-error-port))
+	 `(call (lookup ,global) ,args ___))))
+  ((lookup ,sym)
+   (guard (hash-table-exists? global-defs sym))
+   ;; TODO
+   ;;(display (format "Could fastpath ~a\n" sym ) (current-error-port))
+   `(lookup ,sym)))
 
 (define (debug-print x)
   (display x (current-error-port))
