@@ -1,5 +1,7 @@
 # known bugs
 
+* call/cc multiple value return is broken:
+  (call-with-values (lambda ()  (call-with-current-continuation (lambda (arg) (arg '() '())))) (lambda (a b) (display a) (display b) (newline)))
 * We don't check for modification of constant values in the interpreter (only the compiler)
 * (load) paths seem incorrect
 
@@ -8,9 +10,7 @@
 * Ports need more cleanup: support input from binary ports, more error checking,
 
 # PERF
-  * Needs inliner to remove alloc: graphs
-    * simple called-once: Do it based on libraries?
-  * faster with custom inliner: graphs (and probably others due to fewer closure allocs),
+  * faster with full inliner: 
       * read-char write-char won't inline without PGO
 	  * We also have to rebuild all of the r7rs lib because we don't have cross-lib inlining.
   * faster with float type: fft fibfp mbrot pnpoly simplex sumfp. some might need inlining?
@@ -19,10 +19,13 @@
     * or even better: port type can just have bits for input/textual for single-type check.
   * true multiple-return-values
     * deriv: call-with-values overhead is high
-  * without a cp0, we're unable to remove record checks
+	* there is a hacky pass for this for now.
+  * we're unable to remove record checks - a type-removal pass, and more work around records
+    as intriniscs.
   * we don't currently inline constant global vars that are non-functions
     * causes a bunch of extra loads and undef-checks, especially for records (the record type
 	  is a global var)
+    * this affects cat,tail,wc (because ports used records), and gcbench.
   * auto-listify globals: consargs stub in compiler called a lot: 
     * vector. Hand-coded in chez
   * better control of inlining, read-char/peek-char should be inlined fastpath.

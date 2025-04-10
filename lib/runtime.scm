@@ -818,9 +818,9 @@
       (cons (car lst) (list-copy (cdr lst)))
       lst))
 (define (cons* first . rest)
-  (let recur ((x first) (rest rest))
+  (let recur-cons* ((x first) (rest rest))
     (if (pair? rest)
-        (cons x (recur (car rest) (cdr rest)))
+        (cons x (recur-cons* (car rest) (cdr rest)))
         x)))
 
 (define list

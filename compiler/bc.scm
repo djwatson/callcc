@@ -522,8 +522,10 @@ attributes #0 = { returns_twice}
 	    (match pre-input
 	      (((import ,anything ___) ,body ___) pre-input)
 	      (,else `((import  (scheme base) (scheme r5rs) (scheme time) (scheme file) (scheme inexact) (scheme complex)) ,@pre-input))))
-	   (runtime (expand-program runtime-input "" libman))
-	   (evals (if include-eval (expand-program eval-input "" libman) '()))
+	   (runtime   (expand-program runtime-input "" libman)
+		    )
+	   (evals   (if include-eval (expand-program eval-input "" libman) '())
+		  )
 	   (prog (expand-program input "PROG-" libman))
 	   (eval-and-macros (if include-eval (append evals (serialize-libraries libman)) '()))
 	   (lowered (r7-pass `(begin  	,@runtime

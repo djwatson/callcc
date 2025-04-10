@@ -241,7 +241,7 @@ TODO: boxes could be passed down through funcs
      (->
       (command arg args ...) rest ...))
     ((_ arg command rest ...)
-     (-> (command arg) rest ...))
+     (-> (command arg)  rest ...))
     ((_ arg) arg)))
 
 (define (make-a-program prog)
@@ -330,6 +330,100 @@ TODO: boxes could be passed down through funcs
 	   var
 	   `(lookup ,var))))
     (pass x)))
+
+(define use-counts (make-hash-table eq?))
+(define (add-use-count sym)
+  (let ((prev (hash-table-ref/default use-counts sym 0)))
+    (hash-table-set! use-counts sym (+ 1 prev))))
+(define-pass count-uses sexp
+  ((lookup ,sym)
+   (guard (and (>= (string-length (symbol->string sym)) 5)
+	       (string=? "PROG-" (string-copy (symbol->string sym) 0 5))
+	       (not (hash-table-exists? assigned sym))))
+   (add-use-count sym)
+   sexp)
+  (,sym
+   (guard (and (symbol? sym)
+	       (not (hash-table-exists? assigned sym))))
+   (add-use-count sym)
+   sexp)
+  )
+
+(define (cp0 sexp)
+  (define defs (make-hash-table eq?))
+  (define refs (make-hash-table eq?))
+  (define env (make-hash-table eq?))
+  (define-pass collect-defs
+    ((define ,sym ,val)
+     (guard (and (= 1 (hash-table-ref/default use-counts sym 0))
+		   (not (hash-table-exists? assigned sym)))
+	    (pair? val)
+	    (eq? 'lambda (car val)))
+       (hash-table-set! defs sym val)
+       ;(display (format "REMOVING:~a\n" sym ) (current-error-port))
+       #f
+       ))
+  (define (run-pass sexp)
+    (define-pass pass sexp
+      ((call (lookup ,sym) ,args ___)
+       (guard (and (hash-table-exists? defs sym)
+		   (not (hash-table-exists? assigned sym))))
+       ;;(display (format "CALL INILNING ~a\n" sym) (current-error-port))
+       (run-pass (recover-let `(call ,(hash-table-ref defs sym) ,args ___))))
+      ((call ,sym ,args ___)
+       (guard (hash-table-exists? env sym))
+       ;;(display (format "CALL CINILNING ~a\n" sym) (current-error-port))
+       (run-pass (recover-let `(call ,(hash-table-ref env sym) ,args ___))))
+      ((let ((,args ,vals) ___) ,body)
+       (let ((inlinable (omap (arg val) (args vals)
+			      (and (= 1 (hash-table-ref/default use-counts arg 0))
+				   (match val
+				     (,sym
+				      (guard (and (symbol? sym)
+						  (not (hash-table-exists? assigned sym))
+						  (hash-table-exists? env sym)))
+				      (hash-table-set! env arg (hash-table-ref env sym))
+				      #t)
+				     ((lookup ,sym)
+				      (guard (and (hash-table-exists? defs sym)
+						  (not (hash-table-exists? assigned sym))))
+				      (hash-table-set! env arg (hash-table-ref defs sym))
+				      #t)
+				     ((lambda ,anything ___)
+				      (hash-table-set! env arg val)
+				      #t)
+				     (,else #f))))))
+	 (flush-output-port (current-error-port))
+	 (let ((new-body (run-pass body))
+	       (new-args (filter-map (lambda (arg val inline)
+				       (if (or (not inline) (hash-table-exists? refs arg))
+					   (list arg (run-pass val))
+					   (begin
+					     ;;(display (format "Dropping:~a\n" arg) (current-error-port))
+					     #f)))
+				     args vals inlinable)))
+	   (if (null? new-args)
+	       new-body
+	       `(let ,new-args
+		  ,new-body)))))
+      (,sym
+       (guard (hash-table-exists? env sym))
+       ;;(display (format "CINILNING ~a\n" sym) (current-error-port))
+       (run-pass (hash-table-ref env sym)))
+      (,sym
+       (guard (symbol? sym))
+       ;;(display (format "REFING ~a\n" sym) (current-error-port))
+       (hash-table-set! refs sym #t)
+       sym)
+      ((lookup ,sym)
+       (guard (hash-table-exists? defs sym))
+       ;;(display (format "INILNING ~a\n" sym) (current-error-port))
+       (run-pass (hash-table-ref defs sym)))
+      )
+    ;;(display (format "Pass:~a\n" (if (pair? sexp) (car sexp) sexp)) (current-error-port))
+    (pass sexp))
+  (collect-defs sexp)
+  (run-pass sexp ))
 
 (define (assignment-conversion x)
   ;; TODO cleanup boxes: make it a hash table?
@@ -791,7 +885,7 @@ TODO: boxes could be passed down through funcs
    (if (hash-table-exists? global-defs global)
        `(label-call ,(hash-table-ref global-defs global) #f ,args ___)
        (begin
-	 (display (format "Global not found:~a\n" global) (current-error-port))
+	 ;(display (format "Global not found:~a\n" global) (current-error-port))
 	 `(call (lookup ,global) ,args ___))))
   ((lookup ,sym)
    (guard (hash-table-exists? global-defs sym))
@@ -800,7 +894,7 @@ TODO: boxes could be passed down through funcs
    `(lookup ,sym)))
 
 (define (debug-print x)
-  (display x (current-error-port))
+  (write x (current-error-port))
   x)
 
 ;; This pass mutates the input, let's make sure we have a fresh copy.
@@ -824,8 +918,11 @@ TODO: boxes could be passed down through funcs
       find-globals
       assignment-conversion
       recover-let
+      count-uses
+      ;;debug-print
+      cp0
       lower-loops
-      ;debug-print
+      ;;debug-print
       simple-scev
       name-lambdas
       fix-all
@@ -834,12 +931,9 @@ TODO: boxes could be passed down through funcs
       scletrec
       scletrec2
       final-free
-
       closure-conversion-scc
-
       find-global-labels
       programify
-      
       storage-use-analysis
       ))
 

@@ -43,7 +43,8 @@
     )
   (import (scheme base)
           (scheme case-lambda)
-          (scheme cxr))
+          (scheme cxr)
+	  (scheme write))
 
   (begin
 
@@ -246,9 +247,9 @@
     ;;; (cons first (unfold not-pair? car cdr rest values))
 
     (define (cons* first . rest)
-      (let recur ((x first) (rest rest))
+      (let recur-1-cons* ((x first) (rest rest))
         (if (pair? rest)
-          (cons x (recur (car rest) (cdr rest)))
+          (cons x (recur-1-cons* (car rest) (cdr rest)))
           x)))
 
     ;;; (unfold not-pair? car cdr lis values)
@@ -473,10 +474,10 @@
 
     (define (take lis k)
       (check-arg integer? k take)
-      (let recur ((lis lis) (k k))
+      (let recur-take ((lis lis) (k k))
         (if (zero? k) '()
           (cons (car lis)
-                (recur (cdr lis) (- k 1))))))
+                (recur-take (cdr lis) (- k 1))))))
 
     (define (drop lis k)
       (check-arg integer? k drop)
@@ -502,9 +503,9 @@
 
     (define (drop-right lis k)
       (check-arg integer? k drop-right)
-      (let recur ((lag lis) (lead (drop lis k)))
+      (let recur-drop-right ((lag lis) (lead (drop lis k)))
         (if (pair? lead)
-          (cons (car lag) (recur (cdr lag) (cdr lead)))
+          (cons (car lag) (recur-drop-right (cdr lag) (cdr lead)))
           '())))
 
     ;;; In this function, LEAD is actually K+1 ahead of LAG. This lets
@@ -568,9 +569,9 @@
 
     (define (split-at x k)
       (check-arg integer? k split-at)
-      (let recur ((lis x) (k k))
+      (let recur-split-at ((lis x) (k k))
         (if (zero? k) (values '() lis)
-          (receive (prefix suffix) (recur (cdr lis) (- k 1))
+          (receive (prefix suffix) (recur-split-at (cdr lis) (- k 1))
                    (values (cons (car lis) prefix) suffix)))))
 
     (define (split-at! x k)
@@ -597,10 +598,10 @@
     (define (unzip1 lis) (map car lis))
 
     (define (unzip2 lis)
-      (let recur ((lis lis))
+      (let recur-unzip2 ((lis lis))
         (if (null-list? lis) (values lis lis)	; Use NOT-PAIR? to handle
           (let ((elt (car lis)))			; dotted lists.
-            (receive (a b) (recur (cdr lis))
+            (receive (a b) (recur-unzip2 (cdr lis))
                      (values (cons (car  elt) a)
                              (cons (cadr elt) b)))))))
 
@@ -715,16 +716,16 @@
     (define (%cdrs lists)
       (call-with-current-continuation
         (lambda (abort)
-          (let recur ((lists lists))
+          (let recur-cdrs ((lists lists))
             (if (pair? lists)
               (let ((lis (car lists)))
                 (if (null-list? lis) (abort '())
-                  (cons (cdr lis) (recur (cdr lists)))))
+                  (cons (cdr lis) (recur-cdrs (cdr lists)))))
               '())))))
 
     (define (%cars+ lists last-elt)	; (append! (map car lists) (list last-elt))
-      (let recur ((lists lists))
-        (if (pair? lists) (cons (caar lists) (recur (cdr lists))) (list last-elt))))
+      (let recur-cars ((lists lists))
+        (if (pair? lists) (cons (caar lists) (recur-cars (cdr lists))) (list last-elt))))
 
     ;;; LISTS is a (not very long) non-empty list of lists.
     ;;; Return two lists: the cars & the cdrs of the lists.
@@ -733,12 +734,12 @@
     (define (%cars+cdrs lists)
       (call-with-current-continuation
         (lambda (abort)
-          (let recur ((lists lists))
+          (let recur-carcdrs ((lists lists))
             (if (pair? lists)
               (receive (list other-lists) (car+cdr lists)
                        (if (null-list? list) (abort '() '()) ; LIST is empty -- bail out
                          (receive (a d) (car+cdr list)
-                                  (receive (cars cdrs) (recur other-lists)
+                                  (receive (cars cdrs) (recur-carcdrs other-lists)
                                            (values (cons a cars) (cons d cdrs))))))
               (values '() '()))))))
 
@@ -747,22 +748,22 @@
     (define (%cars+cdrs+ lists cars-final)
       (call-with-current-continuation
         (lambda (abort)
-          (let recur ((lists lists))
+          (let recur-carcdrs+ ((lists lists))
             (if (pair? lists)
               (receive (list other-lists) (car+cdr lists)
                        (if (null-list? list) (abort '() '()) ; LIST is empty -- bail out
                          (receive (a d) (car+cdr list)
-                                  (receive (cars cdrs) (recur other-lists)
+                                  (receive (cars cdrs) (recur-carcdrs+ other-lists)
                                            (values (cons a cars) (cons d cdrs))))))
               (values (list cars-final) '()))))))
 
     ;;; Like %CARS+CDRS, but blow up if any list is empty.
     (define (%cars+cdrs/no-test lists)
-      (let recur ((lists lists))
+      (let recur-carcrds-no ((lists lists))
         (if (pair? lists)
           (receive (list other-lists) (car+cdr lists)
                    (receive (a d) (car+cdr list)
-                            (receive (cars cdrs) (recur other-lists)
+                            (receive (cars cdrs) (recur-carcrds-no other-lists)
                                      (values (cons a cars) (cons d cdrs)))))
           (values '() '()))))
 
@@ -834,15 +835,15 @@
     (define (fold-right kons knil lis1 . lists)
       (check-arg procedure? kons fold-right)
       (if (pair? lists)
-        (let recur ((lists (cons lis1 lists)))		; N-ary case
+        (let recur-fold-right ((lists (cons lis1 lists)))		; N-ary case
           (let ((cdrs (%cdrs lists)))
             (if (null? cdrs) knil
-              (apply kons (%cars+ lists (recur cdrs))))))
+              (apply kons (%cars+ lists (recur-fold-right cdrs))))))
 
-        (let recur ((lis lis1))				; Fast path
+        (let recur-fold-right-fast ((lis lis1))				; Fast path
           (if (null-list? lis) knil
             (let ((head (car lis)))
-              (kons head (recur (cdr lis))))))))
+              (kons head (recur-fold-right-fast (cdr lis))))))))
 
 
     (define (pair-fold-right f zero lis1 . lists)
@@ -951,19 +952,25 @@
     (define (filter-map f lis1 . lists)
       (check-arg procedure? f filter-map)
       (if (pair? lists)
-        (let recur ((lists (cons lis1 lists)))
-          (receive (cars cdrs) (%cars+cdrs lists)
-                   (if (pair? cars)
-                     (cond ((apply f cars) => (lambda (x) (cons x (recur cdrs))))
-                           (else (recur cdrs))) ; Tail call in this arm.
-                     '())))
+          (let recur-fmap ((lists (cons lis1 lists)))
+	    ;; (display "filter-map:" (current-error-port))
+	    ;; (display lists (current-error-port))
+	    ;; (newline (current-error-port))
+	    ;; (flush-output-port (current-error-port))
+	    (if (null? (car lists))
+		'()
+		(receive (cars cdrs) (%cars+cdrs lists)
+		  (if (pair? cars)
+                      (cond ((apply f cars) => (lambda (x) (cons x (recur-fmap cdrs))))
+                            (else (recur-fmap cdrs))) ; Tail call in this arm.
+                      '()))))
 
-        ;; Fast path.
-        (let recur ((lis lis1))
-          (if (null-list? lis) lis
-            (let ((tail (recur (cdr lis))))
-              (cond ((f (car lis)) => (lambda (x) (cons x tail)))
-                    (else tail)))))))
+          ;; Fast path.
+          (let recur-fmap-fast ((lis lis1))
+            (if (null-list? lis) lis
+		(let ((tail (recur-fmap-fast (cdr lis))))
+		  (cond ((f (car lis)) => (lambda (x) (cons x tail)))
+			(else tail)))))))
 
 
     ;;; Map F across lists, guaranteeing to go left-to-right.
@@ -973,19 +980,19 @@
     (define (map-in-order f lis1 . lists)
       (check-arg procedure? f map-in-order)
       (if (pair? lists)
-        (let recur ((lists (cons lis1 lists)))
+        (let recur-mio ((lists (cons lis1 lists)))
           (receive (cars cdrs) (%cars+cdrs lists)
                    (if (pair? cars)
                      (let ((x (apply f cars)))		; Do head first,
-                       (cons x (recur cdrs)))		; then tail.
+                       (cons x (recur-mio cdrs)))		; then tail.
                      '())))
 
         ;; Fast path.
-        (let recur ((lis lis1))
+        (let recur-mio-fast ((lis lis1))
           (if (null-list? lis) lis
             (let ((tail (cdr lis))
                   (x (f (car lis))))		; Do head first,
-              (cons x (recur tail)))))))	; then tail.
+              (cons x (recur-mio-fast tail)))))))	; then tail.
 
 
 
@@ -999,15 +1006,15 @@
 
     (define (filter pred lis)			; Sleazing with EQ? makes this
       (check-arg procedure? pred filter)		; one faster.
-      (let recur ((lis lis))
+      (let recur-filter ((lis lis))
         (if (null-list? lis) lis			; Use NOT-PAIR? to handle dotted lists.
           (let ((head (car lis))
                 (tail (cdr lis)))
             (if (pred head)
-              (let ((new-tail (recur tail)))	; Replicate the RECUR call so
+              (let ((new-tail (recur-filter tail)))	; Replicate the RECUR call so
                 (if (eq? tail new-tail) lis
                   (cons head new-tail)))
-              (recur tail))))))			; this one can be a tail call.
+              (recur-filter tail))))))			; this one can be a tail call.
 
 
     ;;; Another version that shares longest tail.
