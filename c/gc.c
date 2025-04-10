@@ -134,6 +134,7 @@ void gc_init(void *stacktop_in) {
     abort();
   }
   memend = memstart + gc_virtual_space;
+  memstart = align(memstart, default_slab_size);
   alloc_table_init(&atable, memstart, memend);
   stacktop = stacktop_in;
 

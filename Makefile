@@ -1,6 +1,6 @@
 # callcc requires clang/llvm.
 CC = clang-19
-AR = llvm-ar-19
+AR = $(shell command -v llvm-ar-19 >/dev/null 2>&1 && echo llvm-ar-19 || echo llvm-ar)
 CFLAGS = -O3 -flto=full -DNDEBUG -g  -std=gnu23 -Wall  -march=native -mtune=native -ffat-lto-objects -Wextra -Wnull-dereference  -Wshadow -Wno-unused-parameter
 LIBS = -lm -lgmp -lutf8proc
 SRCS = c/alloc_table.c c/gc.c c/runtime.c c/util/list.c c/util/bitset.c c/callcc.S c/rodata_handler.c c/unionfind.c

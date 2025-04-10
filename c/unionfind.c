@@ -1,7 +1,6 @@
 #include "unionfind.h"
 
 #include <assert.h>
-#include <smmintrin.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>

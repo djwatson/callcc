@@ -1266,7 +1266,7 @@ gc_obj ccresthunk(gc_obj unused, gc_obj n) {
                "ldp x29, x30, [sp], #16\n\t" // leave
                "ret\n\t"                     // Return to caller of 'callcc'.
                :                             // output
-               : "r"(tmpstack), "r"(stack_bottom), "r"(saved_stack),
+               : "r"(tmpstackalign), "r"(stack_bottom), "r"(saved_stack),
                  "r"(saved_sz), "r"(n)
                : "memory", "x19", "x20", "x0", "x1", "x2");
 #else

@@ -63,7 +63,7 @@ SCM_CALLCC_ONESHOT:
 	mov x19, x20 // First arg reg is x20.
 	mov x20, SP
 	mov X21, FP
-	mov x0, 32 // Make a call, allocate 32-byte closure.
+	mov x0, 40 // Make a call, allocate 40-byte closure.
 	stp x29, x30, [sp, -16]!
 	bl gc_alloc
 	ldp x29, x30, [sp], 16
@@ -74,6 +74,7 @@ SCM_CALLCC_ONESHOT:
 	str x1, [x0, #8]
 	str x20, [x0, #16]
 	str x21, [x0, #24]
+	str LR, [x0, #32]
 	add x1, x0, #2 // Tag closure, move to secondcall arg.
 	mov x0, x19 // Move thunk to x0, fetch ptr.
 	ldr x2, [x0, #6] 
@@ -87,6 +88,7 @@ SCM_CALLCC_ONESHOT:
 	
 	// x0 is closure, x1 is return value
 ccresthunk_oneshot:
+	ldr LR, [x0, #30]
 	ldr FP, [x0, #22]
 	ldr x2, [x0, #14] // Can't  ldr SP directly.
 	mov SP, x2
