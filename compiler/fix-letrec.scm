@@ -79,9 +79,7 @@
 							    (cdr (assq var bind-map))))))
 			       ;; Orderer the complex bindings in their occurance in the original form
 			       
-			       (let ((seto (filter
-					    (lambda (bind)
-					      (memq bind set)) bindings)))
+			       (let ((seto (filter (lambda (bind) (memq bind set)) bindings)))
 				 ;; (display "SET:") (display (length seto)) (display ":")
 				 ;; (display (map binding-var seto)) (newline)
 				 ;; (display "UNSET:") (display (length unset)) (display ":")
@@ -115,7 +113,7 @@
     ;; Calls
     ((primcall ,name ,(%fix-letrec free complex expr assigned) ___)
      (values (set-union* free)
-	     #f
+	     #t
 	     `(primcall ,name ,@expr)
 	     (set-union* assigned)))
     ((call ,(%fix-letrec free complex expr assigned) ___)
@@ -126,7 +124,7 @@
     ;; TODO: make primcall?
     ((global-set! ,var ,vard)
      (values (list vard)
-	     #f
+	     #t
 	     `(global-set! ,var ,vard)
 	     '()))
     ((const-init ,label ,(%fix-letrec free complex expr assigned))

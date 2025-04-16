@@ -196,7 +196,7 @@
     ((set! ,var ,val)
      (emit `(define ,var ,val) env fun #f)
      (finish undefined-tag))
-    ((global-set! ,var ,val)
+    ((global-set! ',var ,val)
      (emit `(define ,var ,val) env fun #f)
      (finish undefined-tag))
     ((define ,var ,val)
@@ -214,7 +214,8 @@
     ((primcall const-init ,const ,call)
      (let ((res (emit call env fun #f)))
        (push-instr! fun (format "store i64 ~a, ptr @~a" res (const-label-label const)))
-       #f))
+       ;; Result *should be* unused, but fix-letrec pass uses it in complex??
+       res))
     ((primcall APPLY ,args ___)
      (let* ((args (omap arg args (emit arg env fun #f)))
 	    (clo-id (next-id))

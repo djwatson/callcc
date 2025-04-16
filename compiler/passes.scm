@@ -245,24 +245,23 @@ TODO: boxes could be passed down through funcs
     ((_ arg) arg)))
 
 (define (make-a-program prog)
-  (let ((sexp (cdr prog)))
-    (define (doit sexp defs)
-      (if (null? (cdr sexp))
-	  `(letrec* ,(reverse defs)
-	     ,(car sexp))
-	  (match (car sexp)
-	    ((define ,var ,val)
-	     (if (assq var defs)
-		 (begin
-		   (display (format "WARNING: multiple definition of ~a\n" var) (current-error-port))
-		   (doit (cdr sexp) (cons (list (gen-sym 'unused) `(set! ,var ,val)) defs)))
-		 (doit (cdr sexp) (cons
-				   (list (gen-sym 'unused) `(global-set! ,var ,var))
-				   (cons (list var val) defs)))))
-	    (,else
-	     (doit (cdr sexp) (cons (list (gen-sym 'unused) else) defs))))))
-    `(begin ,(doit sexp '()))))
-
+  (define sexp (cdr prog))
+  (define (doit sexp defs)
+    (if (null? (cdr sexp))
+	`(letrec* ,(reverse defs)
+	   ,(car sexp))
+	(match (car sexp)
+	  ((define ,var ,val)
+	   (if (assq var defs)
+	       (begin
+		 (display (format "WARNING: multiple definition of ~a\n" var) (current-error-port))
+		 (doit (cdr sexp) (cons (list (gen-sym 'unused) `(set! ,var ,val)) defs)))
+	       (doit (cdr sexp) (cons
+				 (list (gen-sym 'unused) `(global-set! ',var ,var))
+				 (cons (list var val) defs)))))
+	  (,else
+	   (doit (cdr sexp) (cons (list (gen-sym 'unused) else) defs))))))
+  `(begin ,(doit sexp '())))
 
 ;; Requires alpha-renamed
 (define assigned (make-hash-table eq?))
