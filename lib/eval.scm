@@ -91,7 +91,7 @@
 	       (body (car bodies)))
 	   (if (or (and (list? cargs) (eq? (length cargs) (length args)))
 		   (and (not (list? cargs)) (>= (length args) (ilength cargs))))
-	       (base-eval `((lambda ,cargs ,body) ,@args) env)
+	       (apply (base-eval `(lambda ,cargs ,body) env) args)
 	       (loop (cdr cargs-all) (cdr bodies)))))))
     ((if ,test ,true ,false)
      (if (base-eval test env)
