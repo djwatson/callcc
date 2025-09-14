@@ -1,6 +1,7 @@
 # known bugs
 
 * writing to open-output-string with write-char is super slow if there is unicode
+* nan.0 results in non-eqv values if add, sub, etc.
 
 * call/cc multiple value return is broken:
   (call-with-values (lambda ()  (call-with-current-continuation (lambda (arg) (arg '() '())))) (lambda (a b) (display a) (display b) (newline)))

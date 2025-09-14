@@ -224,7 +224,7 @@
 				 (make-rectangular (or x1 0) (sign num)))))
 		     ((#\-) (num1 str len (+ 1 off) (sign2 num) r ex 0 -))
 		     ((#\+)  (num1 str len (+ 1 off) (sign2 num) r ex 0 +))
-		     ((#\@) (let ((angle (num1 str len (+ 1 off) #f r ex 0 +)))
+		     ((#\@) (let ((angle (num0 str len (+ 1 off) r ex)))
 			      (and num
 				   (number? angle)
 				   (= 0 (imag-part angle))
