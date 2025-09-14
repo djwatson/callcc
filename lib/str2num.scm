@@ -171,9 +171,9 @@
 	     (else #f)))
 
 (make-state nan4 ch (str len off x1 r ex sum sign)  ;; saw sign
-	    (and (not x1) (not (eq? ex exact)) (sign +nan.0))
+	    (and (not x1) (not (eq? ex exact)) +nan.0)
 	    (cond
-	     (else (complex0 str len off x1 r ex sign (and (not (eq? ex exact)) +nan.0)))))
+	     (else (complex0 str len off x1 r ex + (and (not (eq? ex exact)) +nan.0)))))
 
 (make-state float0 ch (str len off x1 ex sign )  
 	    #f
