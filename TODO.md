@@ -1,5 +1,7 @@
 # known bugs
 
+* writing to open-output-string with write-char is super slow if there is unicode
+
 * call/cc multiple value return is broken:
   (call-with-values (lambda ()  (call-with-current-continuation (lambda (arg) (arg '() '())))) (lambda (a b) (display a) (display b) (newline)))
 * We don't check for modification of constant values in the interpreter (only the compiler)
