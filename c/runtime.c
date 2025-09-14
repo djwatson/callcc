@@ -1015,11 +1015,21 @@ static bool COMP_CMP_EQ(gc_obj a, gc_obj b) {
   return SCM_NUM_EQ(ca->real, cb->real).value == TRUE_REP.value &&
          SCM_NUM_EQ(ca->imag, cb->imag).value == TRUE_REP.value;
 }
+static bool COMP_CMP_EQV(gc_obj a, gc_obj b) {
+  auto ca = to_compnum(get_compnum(a));
+  auto cb = to_compnum(get_compnum(b));
+  
+  return (SCM_NUM_EQ(ca->real, cb->real).value == TRUE_REP.value ||
+	  ca->real.value == cb->real.value) &&
+    (SCM_NUM_EQ(ca->imag, cb->imag).value == TRUE_REP.value ||
+     ca->imag.value == cb->imag.value);
+}
 MATH_COMPARE_OP(LT, MATH_LT, COMP_FAIL)
 MATH_COMPARE_OP(LTE, MATH_LTE, COMP_FAIL)
 MATH_COMPARE_OP(GT, MATH_GT, COMP_FAIL)
 MATH_COMPARE_OP(GTE, MATH_GTE, COMP_FAIL)
 MATH_COMPARE_OP(NUM_EQ, MATH_EQ, COMP_CMP_EQ)
+MATH_COMPARE_OP(NUM_EQV, MATH_EQ, COMP_CMP_EQV)
 
 gc_obj SCM_ISNAN(gc_obj obj) {
   auto f = to_double(obj);
@@ -1482,7 +1492,7 @@ INLINE gc_obj SCM_EQ(gc_obj a, gc_obj b) {
 
 gc_obj SCM_EQV_SLOW(gc_obj a, gc_obj b) {
   if (is_number(b)) {
-    return SCM_NUM_EQ(a, b);
+    return SCM_NUM_EQV(a, b);
   }
   return FALSE_REP;
 }
