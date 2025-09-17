@@ -189,7 +189,7 @@
    ((a) (* -1 a))
    ((a b) (base- a b))
    ((a b c) (base- (base- a b) c))
-   (rest (reducer base- 0 rest))))
+   ((a . rest) (reducer base- a rest))))
 
 (define (base* a b)
   (sys:MUL a b))
