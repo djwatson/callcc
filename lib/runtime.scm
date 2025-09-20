@@ -584,12 +584,20 @@
 	  ((#\null) (display "#\\null" port))
 	  (else (display "#\\" port) (display arg port))))
        ((string? arg)
-	(display "\"" port) 
-	(for-each 
-	 (lambda (chr) 
+	(display "\"" port)
+	(for-each
+	 (lambda (chr)
 	   (case chr
 	     ((#\") (display "\\\"" port))
 	     ((#\\) (display "\\\\" port))
+	     ((#\newline) (display "\\n" port))
+	     ((#\tab) (display "\\t" port))
+	     ((#\return) (display "\\r" port))
+	     ((#\alarm) (display "\\a" port))
+	     ((#\backspace) (display "\\b" port))
+	     ((#\delete) (display "\\x7F;" port))
+	     ((#\escape) (display "\\x1B;" port))
+	     ((#\null) (display "\\x00;" port))
 	     (else (display chr port))))
 	 (string->list arg))
 	(display "\"" port))

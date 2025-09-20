@@ -1,5 +1,7 @@
 # known bugs
 
+* make-string with negative numbers gives 'const data' errors. (it should really check if alloc succeeded?)
+  and not allow neg numbers.
 * writing to open-output-string with write-char is super slow if there is unicode
 * nan.0 results in non-eqv values if add, sub, etc.
 
