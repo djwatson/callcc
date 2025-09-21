@@ -18,6 +18,7 @@ typedef struct {
 
 kvec_t(range) ranges;
 
+#ifndef __APPLE__
 static void find_rodata_range() {
   kv_init(ranges);
 
@@ -71,8 +72,12 @@ static void sigsegv_handler(int sig, siginfo_t *info, void *context) {
   signal(SIGSEGV, SIG_DFL);
   raise(SIGSEGV);
 }
-
+#endif
 void setup_sigsegv_handler() {
+#ifdef __APPLE__
+  // Disable SIGSEGV handler on macOS
+  return;
+#else
   find_rodata_range();
 
   struct sigaction sa;
@@ -83,4 +88,5 @@ void setup_sigsegv_handler() {
     perror("sigaction");
     exit(1);
   }
+#endif
 }

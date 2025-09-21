@@ -1252,7 +1252,11 @@ gc_obj ccresthunk(gc_obj unused, gc_obj n) {
       "mov %1, %%rdi\n\t" // Set up memcpy call args
       "mov %2, %%rsi\n\t"
       "mov %3, %%rdx\n\t"
+#ifdef __APPLE__
+      "call _memcpy\n\t"     // call memcpy
+#else
       "call memcpy\n\t"      // call memcpy
+#endif
       "mov %%r13, %%rsp\n\t" // Restore the old stack pointer.
       "pop %%rbp\n\t"        // Pop the old frame pointer.
       "mov %%r12, %%rax\n\t" // Move return value from callee-saved to rax.
@@ -1270,7 +1274,11 @@ gc_obj ccresthunk(gc_obj unused, gc_obj n) {
                "mov x0, %1\n\t"  // Set up memcpy call args
                "mov x1, %2\n\t"
                "mov x2, %3\n\t"
+#ifdef __APPLE__
+               "bl _memcpy\n\t"  // call memcpy
+#else
                "bl memcpy\n\t"   // call memcpy
+#endif
                "mov x0, x19\n\t" // Restore the old stack pointer.
                "mov sp, x20\n\t" // Move return value from callee-saved to rax.
                "ldp x29, x30, [sp], #16\n\t" // leave
@@ -2122,7 +2130,7 @@ gc_obj SCM_WRITE_FD(gc_obj scmfd, gc_obj scmbuf) {
   auto len = to_fixnum(buf->len);
   auto res = write(fd, buf->v, len);
   if (res != len) {
-    printf("Could not write %li bytes to fd %i\n", len, fd);
+    printf("Could not write %lld bytes to fd %i\n", (long long)len, fd);
     exit(-1);
   }
   return UNDEFINED;
@@ -2131,7 +2139,7 @@ gc_obj SCM_WRITE_FD(gc_obj scmfd, gc_obj scmbuf) {
 gc_obj SCM_CLOSE_FD(gc_obj fd) {
   auto res = close((int)to_fixnum(fd));
   if (res != 0) {
-    printf("Error closing fd %li, res %i, errno %i\n", to_fixnum(fd), res,
+    printf("Error closing fd %lld, res %i, errno %i\n", (long long)to_fixnum(fd), res,
            errno);
     perror("foo");
     exit(-1);
@@ -2258,7 +2266,7 @@ gc_obj SCM_CURRENT_JIFFY() {
 
 gc_obj SCM_CURRENT_SECOND() {
   struct timespec ts;
-  clock_gettime(CLOCK_TAI, &ts);
+  clock_gettime(CLOCK_REALTIME, &ts);
   double offset = 37; // TODO should be based on leap seconds.
   double f = (double)ts.tv_sec + ((double)ts.tv_nsec / 1000000000.0) + offset;
   return double_to_gc_slow(f);
@@ -2448,10 +2456,20 @@ int main(int argc_in, char *argv_in[]) {
   argc = argc_in;
   argv = argv_in;
 
-  auto lim = (struct rlimit){RLIM_INFINITY, RLIM_INFINITY};
-  auto res = setrlimit(RLIMIT_STACK, &lim);
-  if (res) {
-    perror("Setrlimit error");
+  struct rlimit lim;
+  // First get current limits
+  if (getrlimit(RLIMIT_STACK, &lim) == 0) {
+    // Try to set soft limit to hard limit (or a reasonable value)
+    rlim_t new_limit = lim.rlim_max;
+    if (new_limit == RLIM_INFINITY || new_limit > 64 * 1024 * 1024) {
+      new_limit = 64 * 1024 * 1024; // 64MB stack limit
+    }
+    lim.rlim_cur = new_limit;
+    auto res = setrlimit(RLIMIT_STACK, &lim);
+    if (res) {
+      // Don't treat this as a fatal error, just warn
+      // perror("Setrlimit warning: could not increase stack size");
+    }
   }
   gc_init(fp);
   // Add the static GC roots.

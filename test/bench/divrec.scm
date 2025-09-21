@@ -21,7 +21,7 @@
 
 ;; (display (recursive-div2 (create-n 0)))
 ;; (display (recursive-div2 (create-n 10)))
-(display (length (recursive-div2 (create-n 10000000))))
+(display (length (recursive-div2 (create-n 100000))))
 (newline)
 ;0
 ;1

@@ -1,5 +1,14 @@
 // Implementation for SCM_CALLCC_ONESHOT, and bits for SCM_CALLCC if required.
 
+#ifdef __APPLE__
+	.globl _cur_link
+	.globl _ccresthunk
+	.globl _gc_alloc
+	.globl _need_more_frames
+	.globl _argcnt
+	.globl _ccresthunk_oneshot
+	.globl _SCM_CALLCC_ONESHOT
+#else
 	.globl cur_link
 	.globl ccresthunk
 	.globl gc_alloc
@@ -7,6 +16,7 @@
 	.globl argcnt
 	.globl ccresthunk_oneshot
 	.globl SCM_CALLCC_ONESHOT
+#endif
 	.text
 #if defined(__x86_64__)
 
@@ -33,7 +43,11 @@ need_more_frames:
 	jmp ccresthunk // Jump to return routine
 
 	// Requires returns_twice, preserve_none in LLVM
+#ifdef __APPLE__
+_SCM_CALLCC_ONESHOT:
+#else
 SCM_CALLCC_ONESHOT:
+#endif
 	// Preserve the two registers that preserve_none doesn't: rsp, rbp
 	mov r14, r12 // First arg in preservenonecc is r12
 	mov r12, rsp
@@ -59,18 +73,31 @@ ccresthunk_oneshot:
 	mov rsp, [rdi+14]
 	ret
 #elif defined(__aarch64__)
+#ifdef __APPLE__
+_SCM_CALLCC_ONESHOT:
+#else
 SCM_CALLCC_ONESHOT:
+#endif
 	mov x19, x20 // First arg reg is x20.
 	mov x20, SP
 	mov X21, FP
 	mov x0, 40 // Make a call, allocate 40-byte closure.
 	stp x29, x30, [sp, -16]!
+#ifdef __APPLE__
+	bl _gc_alloc
+#else
 	bl gc_alloc
+#endif
 	ldp x29, x30, [sp], 16
 	mov x1, #0x12 // setup closure tag, pointer, SP,FP saves.
 	str x1, [x0]
+#ifdef __APPLE__
+	adrp x1, _ccresthunk_oneshot@PAGE
+	add x1, x1, _ccresthunk_oneshot@PAGEOFF
+#else
 	adrp x1, ccresthunk_oneshot
 	add x1, x1, :lo12:ccresthunk_oneshot
+#endif
 	str x1, [x0, #8]
 	str x20, [x0, #16]
 	str x21, [x0, #24]
@@ -79,15 +106,25 @@ SCM_CALLCC_ONESHOT:
 	mov x0, x19 // Move thunk to x0, fetch ptr.
 	ldr x2, [x0, #6] 
 	// Set argcnt to 2.
-	adrp x3, :got:argcnt
+#ifdef __APPLE__
+	adrp x3, _argcnt@PAGE
 	mov x4, #2
-	ldr x3, [x3, :got_lo12:argcnt]
+	add x3, x3, _argcnt@PAGEOFF
+#else
+	adrp x3, argcnt
+	mov x4, #2
+	add x3, x3, :lo12:argcnt
+#endif
 	str x4, [x3]
 	// Finally, tail-call the thunk ptr.
 	br x2
 	
 	// x0 is closure, x1 is return value
+#ifdef __APPLE__
+_ccresthunk_oneshot:
+#else
 ccresthunk_oneshot:
+#endif
 	ldr LR, [x0, #30]
 	ldr FP, [x0, #22]
 	ldr x2, [x0, #14] // Can't  ldr SP directly.
@@ -95,4 +132,6 @@ ccresthunk_oneshot:
 	mov x0, x1
 	ret
 #endif
+#if !defined(__APPLE__)
 	.section  .note.GNU-stack, "", @progbits
+#endif

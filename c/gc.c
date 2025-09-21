@@ -1,5 +1,7 @@
 #define _POSIX_C_SOURCE 200112L
 #define _GNU_SOURCE
+#define _DEFAULT_SOURCE
+#define _DARWIN_C_SOURCE
 
 // Comment out to turn off generational GC.
 #define GENGC 1
@@ -7,6 +9,7 @@
 #include <sys/mman.h>
 
 #include <assert.h>
+#include <inttypes.h>
 #include <pthread.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -130,7 +133,7 @@ void gc_init(void *stacktop_in) {
   memstart = (intptr_t)mmap(nullptr, gc_virtual_space, PROT_READ | PROT_WRITE,
                             MAP_PRIVATE | MAP_ANON, -1, 0);
   if ((intptr_t)memstart == -1) {
-    printf("Can't alloc virtual space: %li\n", gc_virtual_space);
+    printf("Can't alloc virtual space: %" PRIu64 "\n", gc_virtual_space);
     abort();
   }
   memend = memstart + gc_virtual_space;

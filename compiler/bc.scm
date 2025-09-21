@@ -1,3 +1,5 @@
+(include "config.scm")
+
 (define next-id (make-counter 0))
 
 (define-record-type fun (%make-fun code name last-label args thunk debug-id debug-loc-id) fun?
@@ -467,8 +469,8 @@
    (else (error "Unknown Const: " c))))
 
 (define (emit-header)
-  (display
-   "target triple = \"x86_64-pc-linux-gnu\"\n
+  (display (format "target triple = \"~a\"\n\n" platform-target-triple))
+  (display "
 declare void @SCM_CLOSURE_SET (i64, i64, i64)
 declare void @SCM_CLOSURE_SET_FAST (i64, i64, i64)
 declare ptr @SCM_LOAD_CLOSURE_PTR(i64)
@@ -594,8 +596,8 @@ attributes #0 = { returns_twice}
        (display line) (newline)))
 
 (define (get-link-command output output-file opts)
-  (let ((link (format "clang-19 ~a -g -o ~a ~a ~alibcallcc.a -lm -lgmp -lutf8proc"
-		      opts output-file output (get-compile-path))))
+  (let ((link (format "~a --target=~a ~a -g -o ~a ~a ~alibcallcc.a ~a"
+		      platform-cc platform-target-triple opts output-file output (get-compile-path) platform-link-opts)))
     (display (format "Running link: ~a\n" link) (current-error-port))
     (flush-output-port (current-error-port))
     link))

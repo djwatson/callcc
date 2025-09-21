@@ -1,15 +1,52 @@
 # callcc requires clang/llvm.
-CC = clang-19
-AR = $(shell command -v llvm-ar-19 >/dev/null 2>&1 && echo llvm-ar-19 || echo llvm-ar)
-CFLAGS = -O3 -flto=full -DNDEBUG -g  -std=gnu23 -Wall  -march=native -mtune=native -ffat-lto-objects -Wextra -Wnull-dereference  -Wshadow -Wno-unused-parameter
-LIBS = -lm -lgmp -lutf8proc
+UNAME_S := $(shell uname -s)
+
+# Cross-compilation support: respect environment variables
+CC = $(shell if command -v clang-19 >/dev/null 2>&1; then echo clang-19; elif command -v clang-21 >/dev/null 2>&1; then echo clang-21; else echo clang; fi)
+AR = $(shell if command -v llvm-ar-19 >/dev/null 2>&1; then echo llvm-ar-19; elif command -v llvm-ar-21 >/dev/null 2>&1; then echo llvm-ar-21; else echo llvm-ar; fi)
+
+# Platform-specific settings (only if not cross-compiling)
+# Default CFLAGS (can be overridden by environment)
+CFLAGS ?= -O3 -flto=full -DNDEBUG -g -std=gnu23 -Wall -Wextra -Wnull-dereference -Wshadow -Wno-unused-parameter
+
+# Cross compilation: add --target if ARCH is set
+ifdef ARCH
+    CFLAGS += --target=$(ARCH)
+    ASFLAGS += --target=$(ARCH)
+    LDFLAGS += --target=$(ARCH)
+endif
+
+ifeq ($(UNAME_S),Darwin)
+    # macOS settings (only if not cross-compiling)
+    ifndef ARCH
+        HOMEBREW_PREFIX := $(shell brew --prefix 2>/dev/null || echo /opt/homebrew)
+        MACOS_SDK := $(shell xcrun --show-sdk-path 2>/dev/null || echo /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk)
+        CFLAGS += -march=native -mtune=native -isysroot $(MACOS_SDK) -I$(HOMEBREW_PREFIX)/include
+        LIBS = -L$(HOMEBREW_PREFIX)/lib -lgmp -lutf8proc
+    else
+        LIBS ?= -lgmp -lutf8proc
+    endif
+else
+    # Linux settings (only if not cross-compiling)
+    ifndef ARCH
+        CFLAGS += -march=native -mtune=native -ffat-lto-objects
+        LIBS = -lm -lgmp -lutf8proc
+    else
+        LIBS ?= -lm -lgmp -lutf8proc
+    endif
+endif
 SRCS = c/alloc_table.c c/gc.c c/runtime.c c/util/list.c c/util/bitset.c c/callcc.S c/rodata_handler.c c/unionfind.c
 OBJECTS = $(patsubst %, %.o, $(basename $(SRCS)))
 SCM_LIB_SRCS = lib/runtime.scm lib/eval.scm lib/read.scm lib/hashtable.scm lib/str2num.scm  
 SCM_COMPILER_SRCS = compiler/bc.scm compiler/expand.scm compiler/fix-letrec.scm compiler/library-manager.scm compiler/match.scm compiler/memory_layout.scm compiler/passes.scm compiler/qq.scm compiler/sua.scm compiler/util.scm compiler/gen-libraries.scm compiler/callcc.scm
 SCM_SRCS = ${SCM_LIB_SRCS} ${SCM_COMPILER_SRCS}
 SRFI_SRCS = lib/srfi2/srfi/*.scm
-PREFIX ?= /usr
+# Set PREFIX based on platform
+ifeq ($(UNAME_S),Darwin)
+    PREFIX ?= /usr/local
+else
+    PREFIX ?= /usr
+endif
 
 all: bin/callcc
 
@@ -23,14 +60,33 @@ libcallcc.a: ${OBJECTS}
 compiler/headers:
 	cd compiler; mkdir -p headers/flow; mkdir -p headers/scheme; gosh -I. gen-libraries.scm
 
+compiler/config.scm:
+	@echo "Generating config.scm for platform: $(UNAME_S)"
+	@echo "; Auto-generated platform configuration" > compiler/config.scm
+	@echo "(define platform-os \"$(UNAME_S)\")" >> compiler/config.scm
+	@echo "(define platform-cc \"$(CC)\")" >> compiler/config.scm
+ifndef ARCH
+    ifeq ($(UNAME_S),Darwin)
+	    @echo "(define platform-link-opts \"-isysroot $(MACOS_SDK) -L$(HOMEBREW_PREFIX)/lib -lgmp -lutf8proc\")" >> compiler/config.scm
+	    @echo "(define platform-target-triple \"arm64-apple-macosx15.2.0\")" >> compiler/config.scm
+    else
+	    @echo "(define platform-link-opts \"-lm -lgmp -lutf8proc\")" >> compiler/config.scm
+	    @echo "(define platform-target-triple \"x86_64-pc-linux-gnu\")" >> compiler/config.scm
+    endif
+else
+	@echo "(define platform-link-opts \"-lm -lgmp -lutf8proc\")" >> compiler/config.scm
+	@echo "(define platform-target-triple \"$(ARCH)\")" >> compiler/config.scm
+endif
+
 compiler/callcc.scm.ll: ${SCM_SRCS} compiler/headers ${SRFI_SRCS}
+	$(MAKE) compiler/config.scm
 # Fake install dir location, only used for bootstrap.
 	rm -f lib/callcc
-	ln -s .. lib/callcc 
+	ln -s .. lib/callcc
 	cd compiler; gosh -I. callcc.scm --exe callcc.scm 
 
 clean:
-	rm -rf bin/callcc compiler/headers  c/*.o libcallcc.a
+	rm -rf bin/callcc compiler/headers compiler/config.scm c/*.o c/util/*.o libcallcc.a
 
 cloc:
 	cloc --by-file ${SRCS} 

@@ -40,6 +40,22 @@ Prebuild DEB ubuntu packages are available in releases:
 $ make test -j12 -k
 ```
 
+# Cross-compilation
+
+CALLCC supports cross-compilation to different architectures. Set the `ARCH` environment variable to specify the target architecture:
+
+```bash
+# Cross-compile for ARM64 Linux
+$ ARCH=aarch64-linux-gnu make
+```
+
+The build system will automatically:
+- Add `--target=$(ARCH)` to compiler flags
+- Use appropriate libraries for the target platform
+- Generate correct platform configuration
+
+Supported cross-compilation targets include any architecture supported by your LLVM/Clang installation.
+
 # Usage
 
 Basic usage for the interpreter is to use -s or --script to run a scm file:
