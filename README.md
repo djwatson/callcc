@@ -105,7 +105,7 @@ A benchmark run vs chez scheme on Ryzen 9 5900x (using PGO):
 Tested and known to work:
 
 * x86_64/linux
-* aarch64/linux, aarch64/termux
+* aarch64/linux, aarch64/termux, aarch64/macosx.
 
 There are ~50 lines of asm required for each platform, entirely for
 fast call/cc support.  Everything else is relatively portable C/posix
